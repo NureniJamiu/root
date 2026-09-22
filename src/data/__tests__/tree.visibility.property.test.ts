@@ -77,19 +77,24 @@ const arbCanvas: fc.Arbitrary<Canvas> = fc
         fc
           .tuple(...Array.from({ length: n }, (_, i) => perNodeSpec(i)))
           .map((specs): Canvas => {
-            const nodes: Node[] = ids.map((id, i) => ({
-              id,
-              parentId:
-                specs[i].parentIdx === -1 ? null : ids[specs[i].parentIdx],
-              title: '',
-              body: '',
-              images: [],
-              type: specs[i].type,
-              position: { x: specs[i].x, y: specs[i].y },
-              collapsed: specs[i].collapsed,
-              createdAt: TIMESTAMP,
-              updatedAt: TIMESTAMP,
-            }));
+            const nodes: Node[] = ids.map((id, i) => {
+              // `specs` has length n and is indexed in lockstep with `ids`, and
+              // for non-root nodes `parentIdx` is drawn from [0, i-1], so every
+              // indexed access below is in-bounds by construction.
+              const spec = specs[i]!;
+              return {
+                id,
+                parentId: spec.parentIdx === -1 ? null : ids[spec.parentIdx]!,
+                title: '',
+                body: '',
+                images: [],
+                type: spec.type,
+                position: { x: spec.x, y: spec.y },
+                collapsed: spec.collapsed,
+                createdAt: TIMESTAMP,
+                updatedAt: TIMESTAMP,
+              };
+            });
             return {
               id: CANVAS_ID,
               title: '',

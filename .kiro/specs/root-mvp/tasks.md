@@ -57,34 +57,34 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Test accepts empty canvas and single-root canvas
     - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 3. Data Model Layer — tree utilities
+- [x] 3. Data Model Layer — tree utilities
   - [x] 3.1 Implement tree utilities
     - Create `src/data/tree.ts` with `childrenIndex`, `visibleNodeIds` (DFS from root, skipping subtrees whose ancestor is collapsed), `descendantCount`, `subtreeIds` (inclusive), `hasCycle(c, childId, newParentId)`, `rootNode`
     - _Requirements: 1.1, 6.2, 6.4, 6.5, 3.5_
 
-  - [-] 3.2 Property test for visibility rule
+  - [x] 3.2 Property test for visibility rule
     - **Property 1: Visibility rule** — for any canvas `c` and node `n`, `n ∈ visibleNodeIds(c)` iff every strict ancestor of `n` has `collapsed === false`
     - **Validates: Requirements 1.1, 6.2, 6.4**
     - Tag: `Feature: root-mvp, Property 1: <text>`; `fc.assert(..., { numRuns: 100 })`
     - _Requirements: 1.1, 6.2, 6.4_
 
-  - [-] 3.3 Property test for descendantCount correctness
+  - [x] 3.3 Property test for descendantCount correctness
     - **Property 11: descendantCount correctness** — `descendantCount(c, id) === subtreeIds(c, id).size - 1`
     - **Validates: Requirements 6.5**
     - _Requirements: 6.5_
 
-  - [-] 3.4 Property test for hasCycle correctness
+  - [x] 3.4 Property test for hasCycle correctness
     - **Property 14: hasCycle correctness** — `hasCycle(c, childId, newParentId) === true` iff `newParentId === childId || newParentId ∈ subtreeIds(c, childId)`
     - **Validates: Requirements 3.5**
     - _Requirements: 3.5_
 
 - [ ] 4. Data Model Layer — pure mutators
-  - [-] 4.1 Implement mutators
+  - [x] 4.1 Implement mutators
     - Create `src/data/mutators.ts` with `emptyCanvas`, `addRoot`, `addChild` (auto-expands collapsed parent per R3.4), `updateNode`, `addImage` (rejects data URLs > 2 MB by byte length), `removeImage`, `moveNode`, `setCollapsed`, `deleteNodeOnly` (reparents children to deleted node's parent), `deleteSubtree`
     - All mutators are pure, return new `Canvas`, stamp `updatedAt = now()`, and are guarded so invariant-breaking inputs return the input unchanged
     - _Requirements: 2.2, 3.1, 3.4, 3.5, 4.2, 4.3, 4.4, 4.5, 4.6, 5.2, 5.4, 6.1, 6.3, 7.1, 7.3, 7.4_
 
-  - [~] 4.2 Shared fast-check arbitrary `arbCanvas`
+  - [-] 4.2 Shared fast-check arbitrary `arbCanvas`
     - Create `src/data/__tests__/arbitraries.ts` exporting `arbCanvas`, `arbNodeId(c)`, `arbParentChildPair(c)`, `arbNodeType`, `arbPosition`, `arbImageEntry`
     - `arbCanvas` builds a canvas by applying a random sequence of mutators to `emptyCanvas()`, guaranteeing structural validity and simultaneously exercising Property 15
     - _Requirements: 9.1, 9.2, 9.3_
@@ -134,7 +134,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - **Validates: Requirements 9.1, 9.2**
     - _Requirements: 9.1, 9.2_
 
-  - [~] 4.12 Unit tests for mutator edge cases
+  - [-] 4.12 Unit tests for mutator edge cases
     - `deleteNodeOnly` on a leaf equals `deleteSubtree` on the same leaf
     - `addImage` rejects a 2.5 MB data URL and returns the input canvas
     - `addChild` on unknown `parentId` returns the input canvas
@@ -146,7 +146,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Create `src/data/serialize.ts` with `serializeCanvas(c): string` (stable field order) and `parseCanvas(raw): { ok: true; canvas } | { ok: false; error; raw }` using `canvasSchema.safeParse` and JSON try/catch
     - _Requirements: 8.2, 8.3, 8.5, 9.4, 9.5, 9.6_
 
-  - [~] 5.2 Create data barrel `src/data/index.ts`
+  - [-] 5.2 Create data barrel `src/data/index.ts`
     - Re-export types, schemas, mutators, tree utilities, `emptyCanvas`, `serializeCanvas`, `parseCanvas`
     - This is the ONLY surface `canvas/`, `nodes/`, `persistence/`, and `app/` may import from `data/`
     - _Requirements: 10.4, 10.5_
@@ -156,7 +156,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - **Validates: Requirements 6.6, 8.2, 8.3, 9.4, 9.5, 9.6, 14.3**
     - _Requirements: 6.6, 8.2, 8.3, 9.4, 9.5, 9.6, 14.3_
 
-  - [-] 5.4 Unit tests for parseCanvas error paths
+  - [x] 5.4 Unit tests for parseCanvas error paths
     - Malformed JSON → `{ ok: false }`
     - Valid JSON failing schema (duplicate ids, missing root, cycle, dangling parentId) → `{ ok: false }` with useful error string
     - _Requirements: 8.5, 9.4_

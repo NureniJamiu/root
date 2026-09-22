@@ -58,7 +58,9 @@ const arbCanvasLocal: fc.Arbitrary<Canvas> = fc
   .map(({ ids, parentIdxs }) => {
     const nodes: Node[] = ids.map((id, i) => ({
       id,
-      parentId: i === 0 ? null : ids[parentIdxs[i - 1]],
+      // Indices are bounded by construction: for i >= 1, parentIdxs[i-1]
+      // exists and is in [0, i-1], so ids[parentIdxs[i-1]] is defined.
+      parentId: i === 0 ? null : ids[parentIdxs[i - 1]!]!,
       title: '',
       body: '',
       images: [],
@@ -80,14 +82,15 @@ const arbCanvasLocal: fc.Arbitrary<Canvas> = fc
 const arbHasCycleInput = arbCanvasLocal.chain((canvas) =>
   fc.record({
     canvas: fc.constant(canvas),
+    // Indices are drawn from [0, nodes.length - 1], so canvas.nodes[i] is defined.
     childId: fc
       .integer({ min: 0, max: canvas.nodes.length - 1 })
-      .map((i) => canvas.nodes[i].id),
+      .map((i) => canvas.nodes[i]!.id),
     newParentId: fc.oneof(
       fc.constant<UUID | null>(null),
       fc
         .integer({ min: 0, max: canvas.nodes.length - 1 })
-        .map((i) => canvas.nodes[i].id as UUID | null),
+        .map((i) => canvas.nodes[i]!.id as UUID | null),
     ),
   }),
 );
