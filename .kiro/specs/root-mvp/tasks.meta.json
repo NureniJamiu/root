@@ -11,6 +11,22 @@
     "3.4 Property test for hasCycle correctness": {
       "status": "passed",
       "lastRunTimestamp": 1790119613013
+    },
+    "4.3 Property test for addRoot postcondition": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120394285
+    },
+    "4.4 Property test for addChild postcondition": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120437033
+    },
+    "4.6 Property test for image add/remove round-trip": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120455167
+    },
+    "4.7 Property test for moveNode isolation": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120471744
     }
   },
   "executionHistory": {
@@ -211,6 +227,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790119897081
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120299480
       }
     ],
     "4.3 Property test for addRoot postcondition": [
@@ -218,6 +239,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160724
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120311280
       }
     ],
     "4.4 Property test for addChild postcondition": [
@@ -225,6 +251,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160810
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120311559
       }
     ],
     "4.5 Property test for updateNode preserves the patch": [
@@ -232,6 +263,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160912
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120311893
       }
     ],
     "4.6 Property test for image add/remove round-trip": [
@@ -239,6 +275,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118161010
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120312600
       }
     ],
     "4.7 Property test for moveNode isolation": [
@@ -246,6 +287,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118161133
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120313244
       }
     ],
     "4.8 Property test for collapse round-trip": [
@@ -286,6 +332,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790119897926
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120298859
       }
     ],
     "5.1 Implement serializeCanvas and parseCanvas": [
@@ -315,6 +366,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790119898832
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120297648
       }
     ],
     "5.3 Property test for serialization round-trip": [

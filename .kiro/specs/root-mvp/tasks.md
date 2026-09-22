@@ -84,32 +84,32 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - All mutators are pure, return new `Canvas`, stamp `updatedAt = now()`, and are guarded so invariant-breaking inputs return the input unchanged
     - _Requirements: 2.2, 3.1, 3.4, 3.5, 4.2, 4.3, 4.4, 4.5, 4.6, 5.2, 5.4, 6.1, 6.3, 7.1, 7.3, 7.4_
 
-  - [-] 4.2 Shared fast-check arbitrary `arbCanvas`
+  - [x] 4.2 Shared fast-check arbitrary `arbCanvas`
     - Create `src/data/__tests__/arbitraries.ts` exporting `arbCanvas`, `arbNodeId(c)`, `arbParentChildPair(c)`, `arbNodeType`, `arbPosition`, `arbImageEntry`
     - `arbCanvas` builds a canvas by applying a random sequence of mutators to `emptyCanvas()`, guaranteeing structural validity and simultaneously exercising Property 15
     - _Requirements: 9.1, 9.2, 9.3_
 
-  - [~] 4.3 Property test for addRoot postcondition
+  - [-] 4.3 Property test for addRoot postcondition
     - **Property 3: addRoot postcondition** — for any `Position` `p`, `addRoot(emptyCanvas(), {position: p})` yields a canvas with exactly one node with the required field values and `createdAt === updatedAt`
     - **Validates: Requirements 2.2**
     - _Requirements: 2.2_
 
-  - [~] 4.4 Property test for addChild postcondition
+  - [-] 4.4 Property test for addChild postcondition
     - **Property 4: addChild postcondition** — child count grows by 1, new node has `parentId`, type `topic`, empty content, `collapsed: false`, position `p`; parent's `collapsed` becomes `false`; result satisfies structural invariants
     - **Validates: Requirements 3.1, 3.4**
     - _Requirements: 3.1, 3.4_
 
-  - [~] 4.5 Property test for updateNode preserves the patch
+  - [-] 4.5 Property test for updateNode preserves the patch
     - **Property 6: updateNode preserves the patch** — patched fields match, unpatched fields unchanged, `updatedAt` monotonic
     - **Validates: Requirements 4.2, 4.3, 4.6**
     - _Requirements: 4.2, 4.3, 4.6_
 
-  - [~] 4.6 Property test for image add/remove round-trip
+  - [-] 4.6 Property test for image add/remove round-trip
     - **Property 7: Image add/remove round-trip** — `removeImage(addImage(c, id, img), id, img.id).nodes[id].images` deep-equals `c.nodes[id].images`
     - **Validates: Requirements 4.4, 4.5**
     - _Requirements: 4.4, 4.5_
 
-  - [~] 4.7 Property test for moveNode isolation
+  - [-] 4.7 Property test for moveNode isolation
     - **Property 9: moveNode isolation** — target node's `position` updates; every other node's `position` is unchanged
     - **Validates: Requirements 5.2, 5.4**
     - _Requirements: 5.2, 5.4_
@@ -134,7 +134,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - **Validates: Requirements 9.1, 9.2**
     - _Requirements: 9.1, 9.2_
 
-  - [-] 4.12 Unit tests for mutator edge cases
+  - [x] 4.12 Unit tests for mutator edge cases
     - `deleteNodeOnly` on a leaf equals `deleteSubtree` on the same leaf
     - `addImage` rejects a 2.5 MB data URL and returns the input canvas
     - `addChild` on unknown `parentId` returns the input canvas
@@ -146,7 +146,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Create `src/data/serialize.ts` with `serializeCanvas(c): string` (stable field order) and `parseCanvas(raw): { ok: true; canvas } | { ok: false; error; raw }` using `canvasSchema.safeParse` and JSON try/catch
     - _Requirements: 8.2, 8.3, 8.5, 9.4, 9.5, 9.6_
 
-  - [-] 5.2 Create data barrel `src/data/index.ts`
+  - [x] 5.2 Create data barrel `src/data/index.ts`
     - Re-export types, schemas, mutators, tree utilities, `emptyCanvas`, `serializeCanvas`, `parseCanvas`
     - This is the ONLY surface `canvas/`, `nodes/`, `persistence/`, and `app/` may import from `data/`
     - _Requirements: 10.4, 10.5_
