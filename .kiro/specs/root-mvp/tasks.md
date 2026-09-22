@@ -78,7 +78,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - **Validates: Requirements 3.5**
     - _Requirements: 3.5_
 
-- [ ] 4. Data Model Layer — pure mutators
+- [x] 4. Data Model Layer — pure mutators
   - [x] 4.1 Implement mutators
     - Create `src/data/mutators.ts` with `emptyCanvas`, `addRoot`, `addChild` (auto-expands collapsed parent per R3.4), `updateNode`, `addImage` (rejects data URLs > 2 MB by byte length), `removeImage`, `moveNode`, `setCollapsed`, `deleteNodeOnly` (reparents children to deleted node's parent), `deleteSubtree`
     - All mutators are pure, return new `Canvas`, stamp `updatedAt = now()`, and are guarded so invariant-breaking inputs return the input unchanged
@@ -89,47 +89,47 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - `arbCanvas` builds a canvas by applying a random sequence of mutators to `emptyCanvas()`, guaranteeing structural validity and simultaneously exercising Property 15
     - _Requirements: 9.1, 9.2, 9.3_
 
-  - [-] 4.3 Property test for addRoot postcondition
+  - [x] 4.3 Property test for addRoot postcondition
     - **Property 3: addRoot postcondition** — for any `Position` `p`, `addRoot(emptyCanvas(), {position: p})` yields a canvas with exactly one node with the required field values and `createdAt === updatedAt`
     - **Validates: Requirements 2.2**
     - _Requirements: 2.2_
 
-  - [-] 4.4 Property test for addChild postcondition
+  - [x] 4.4 Property test for addChild postcondition
     - **Property 4: addChild postcondition** — child count grows by 1, new node has `parentId`, type `topic`, empty content, `collapsed: false`, position `p`; parent's `collapsed` becomes `false`; result satisfies structural invariants
     - **Validates: Requirements 3.1, 3.4**
     - _Requirements: 3.1, 3.4_
 
-  - [-] 4.5 Property test for updateNode preserves the patch
+  - [x] 4.5 Property test for updateNode preserves the patch
     - **Property 6: updateNode preserves the patch** — patched fields match, unpatched fields unchanged, `updatedAt` monotonic
     - **Validates: Requirements 4.2, 4.3, 4.6**
     - _Requirements: 4.2, 4.3, 4.6_
 
-  - [-] 4.6 Property test for image add/remove round-trip
+  - [x] 4.6 Property test for image add/remove round-trip
     - **Property 7: Image add/remove round-trip** — `removeImage(addImage(c, id, img), id, img.id).nodes[id].images` deep-equals `c.nodes[id].images`
     - **Validates: Requirements 4.4, 4.5**
     - _Requirements: 4.4, 4.5_
 
-  - [-] 4.7 Property test for moveNode isolation
+  - [x] 4.7 Property test for moveNode isolation
     - **Property 9: moveNode isolation** — target node's `position` updates; every other node's `position` is unchanged
     - **Validates: Requirements 5.2, 5.4**
     - _Requirements: 5.2, 5.4_
 
-  - [~] 4.8 Property test for collapse round-trip
+  - [x] 4.8 Property test for collapse round-trip
     - **Property 10: Collapse round-trip** — `setCollapsed(setCollapsed(c, id, true), id, false).nodes` deep-equals `c.nodes` modulo `updatedAt`
     - **Validates: Requirements 6.3**
     - _Requirements: 6.3_
 
-  - [~] 4.9 Property test for deleteNodeOnly semantics
+  - [x] 4.9 Property test for deleteNodeOnly semantics
     - **Property 12: deleteNodeOnly semantics** — target absent, children reparented to target's parent, other parentIds unchanged, structural invariants hold
     - **Validates: Requirements 7.1, 7.3**
     - _Requirements: 7.1, 7.3_
 
-  - [~] 4.10 Property test for deleteSubtree semantics
+  - [x] 4.10 Property test for deleteSubtree semantics
     - **Property 13: deleteSubtree semantics** — remaining ids equal `idsOf(c) \ subtreeIds(c, id)`, remaining nodes unchanged, structural invariants hold
     - **Validates: Requirements 7.4**
     - _Requirements: 7.4_
 
-  - [~] 4.11 Property test for structural invariants under all mutator sequences
+  - [x] 4.11 Property test for structural invariants under all mutator sequences
     - **Property 15: Structural invariants under all mutator sequences** — for any finite mutator sequence applied to `emptyCanvas()`, `canvasSchema.safeParse(c).success === true`
     - **Validates: Requirements 9.1, 9.2**
     - _Requirements: 9.1, 9.2_
@@ -141,7 +141,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - `deleteNodeOnly` on root-with-children returns the input canvas
     - _Requirements: 4.4, 7.5_
 
-- [ ] 5. Data Model Layer — serialization and public surface
+- [x] 5. Data Model Layer — serialization and public surface
   - [x] 5.1 Implement serializeCanvas and parseCanvas
     - Create `src/data/serialize.ts` with `serializeCanvas(c): string` (stable field order) and `parseCanvas(raw): { ok: true; canvas } | { ok: false; error; raw }` using `canvasSchema.safeParse` and JSON try/catch
     - _Requirements: 8.2, 8.3, 8.5, 9.4, 9.5, 9.6_
@@ -151,7 +151,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - This is the ONLY surface `canvas/`, `nodes/`, `persistence/`, and `app/` may import from `data/`
     - _Requirements: 10.4, 10.5_
 
-  - [~] 5.3 Property test for serialization round-trip
+  - [x] 5.3 Property test for serialization round-trip
     - **Property 16: Serialization round-trip** — `parseCanvas(serializeCanvas(c))` returns `{ ok: true, canvas: c' }` with `c'` deep-equal to `c`
     - **Validates: Requirements 6.6, 8.2, 8.3, 9.4, 9.5, 9.6, 14.3**
     - _Requirements: 6.6, 8.2, 8.3, 9.4, 9.5, 9.6, 14.3_
@@ -162,7 +162,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - _Requirements: 8.5, 9.4_
 
 - [ ] 6. Data Model Layer — Zustand store and actions
-  - [~] 6.1 Implement store and typed canvasActions
+  - [-] 6.1 Implement store and typed canvasActions
     - Create `src/data/store.ts` with `CanvasState` (`canvas`, `selection`, `editor`, `deletePrompt`, `viewport`) and `useCanvasStore`
     - Create `canvasActions` object exposing `addRoot`, `addChild`, `updateNode`, `addImage`, `removeImage`, `moveNode`, `setCollapsed`, `deleteNodeOnly`, `deleteSubtree`, `openEditor`, `closeEditor`, `openDeletePrompt`, `closeDeletePrompt`, `select`, `setViewport`
     - Every write invokes a mutator, then `canvasSchema.safeParse`s the result before committing; on failure the write is aborted and a `saveError` event is emitted

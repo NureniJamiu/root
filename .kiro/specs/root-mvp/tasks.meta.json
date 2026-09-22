@@ -27,6 +27,26 @@
     "4.7 Property test for moveNode isolation": {
       "status": "passed",
       "lastRunTimestamp": 1790120471744
+    },
+    "4.5 Property test for updateNode preserves the patch": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120568477
+    },
+    "5.3 Property test for serialization round-trip": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120733904
+    },
+    "4.10 Property test for deleteSubtree semantics": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120757342
+    },
+    "4.8 Property test for collapse round-trip": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120771058
+    },
+    "4.9 Property test for deleteNodeOnly semantics": {
+      "status": "passed",
+      "lastRunTimestamp": 1790120774762
     }
   },
   "executionHistory": {
@@ -244,6 +264,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790120311280
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120599695
       }
     ],
     "4.4 Property test for addChild postcondition": [
@@ -256,6 +281,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790120311559
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120600656
       }
     ],
     "4.5 Property test for updateNode preserves the patch": [
@@ -268,6 +298,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790120311893
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120601483
       }
     ],
     "4.6 Property test for image add/remove round-trip": [
@@ -280,6 +315,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790120312600
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120601992
       }
     ],
     "4.7 Property test for moveNode isolation": [
@@ -292,6 +332,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790120313244
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120602849
       }
     ],
     "4.8 Property test for collapse round-trip": [
@@ -299,6 +344,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118161222
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120609965
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120817094
       }
     ],
     "4.9 Property test for deleteNodeOnly semantics": [
@@ -306,6 +361,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118161316
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120610725
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120814641
       }
     ],
     "4.10 Property test for deleteSubtree semantics": [
@@ -313,6 +378,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118161411
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120611526
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120813902
       }
     ],
     "4.11 Property test for structural invariants under all mutator sequences": [
@@ -320,6 +395,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118161516
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120612684
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120816998
       }
     ],
     "4.12 Unit tests for mutator edge cases": [
@@ -378,6 +463,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118161936
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120613247
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120816735
       }
     ],
     "5.4 Unit tests for parseCanvas error paths": [
@@ -402,6 +497,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118162142
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120825560
       }
     ],
     "6.2 Unit tests for canvasActions dispatch": [
@@ -584,6 +684,20 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790119890092
+      }
+    ],
+    "5. Data Model Layer — serialization and public surface": [
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120817193
+      }
+    ],
+    "4. Data Model Layer — pure mutators": [
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790120817304
       }
     ]
   }
