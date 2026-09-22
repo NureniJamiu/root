@@ -1,5 +1,18 @@
 {
-  "pbtResults": {},
+  "pbtResults": {
+    "3.3 Property test for descendantCount correctness": {
+      "status": "passed",
+      "lastRunTimestamp": 1790119589709
+    },
+    "3.2 Property test for visibility rule": {
+      "status": "passed",
+      "lastRunTimestamp": 1790119595958
+    },
+    "3.4 Property test for hasCycle correctness": {
+      "status": "passed",
+      "lastRunTimestamp": 1790119613013
+    }
+  },
   "executionHistory": {
     "1.1 Scaffold Vite + React 18 + TypeScript project": [
       {
@@ -79,6 +92,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790119140310
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119257319
       }
     ],
     "2.2 Write unit tests for canvasSchema.superRefine": [
@@ -86,6 +104,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160011
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119270151
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119409259
       }
     ],
     "3.1 Implement tree utilities": [
@@ -93,6 +121,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160116
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119270389
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119410406
       }
     ],
     "3.2 Property test for visibility rule": [
@@ -100,6 +138,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160212
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119415947
       }
     ],
     "3.3 Property test for descendantCount correctness": [
@@ -107,6 +150,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160320
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119417282
       }
     ],
     "3.4 Property test for hasCycle correctness": [
@@ -114,6 +162,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160427
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119417832
       }
     ],
     "4.1 Implement mutators": [
@@ -121,6 +174,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118160544
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119418597
       }
     ],
     "4.2 Shared fast-check arbitrary `arbCanvas`": [
@@ -205,6 +263,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118161736
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119270605
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119411056
       }
     ],
     "5.2 Create data barrel `src/data/index.ts`": [
@@ -226,6 +294,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118162037
+      },
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119419345
       }
     ],
     "6.1 Implement store and typed canvasActions": [
@@ -401,6 +474,13 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790119134841
+      }
+    ],
+    "2. Data Model Layer — types and schema": [
+      {
+        "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790119409488
       }
     ]
   }
