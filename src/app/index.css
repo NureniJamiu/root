@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DESIGN.md: Times is the primary font family for all text (Requirement 11.2). */
+body {
+  font-family: Times, serif;
+}
