@@ -29,8 +29,14 @@
  *   - `./ids` (`newId`) and `./time` (`now`) — internal helpers used by the
  *     mutators; feature code should never fabricate ids or timestamps
  *     directly, it should route through a mutator.
- *   - The Zustand store and `canvasActions` — added by task 6.1 once the
- *     store module exists.
+ *
+ * Also re-exported from this barrel:
+ *   - Zustand store         (from `./store`)       — CanvasState,
+ *                                                    useCanvasStore,
+ *                                                    canvasActions
+ *   - Store event bus       (from `./storeEvents`) — emitSaveError,
+ *                                                    onSaveError,
+ *                                                    SaveErrorDetail
  */
 
 export type { Canvas, ImageEntry, Node, NodeType, Position, UUID } from './types';
@@ -68,3 +74,9 @@ export {
 
 export { parseCanvas, serializeCanvas } from './serialize';
 export type { ParseCanvasResult } from './serialize';
+
+export { canvasActions, useCanvasStore } from './store';
+export type { CanvasState } from './store';
+
+export { emitSaveError, onSaveError } from './storeEvents';
+export type { SaveErrorDetail } from './storeEvents';

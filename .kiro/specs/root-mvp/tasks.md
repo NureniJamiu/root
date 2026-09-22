@@ -162,20 +162,20 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - _Requirements: 8.5, 9.4_
 
 - [ ] 6. Data Model Layer — Zustand store and actions
-  - [-] 6.1 Implement store and typed canvasActions
+  - [x] 6.1 Implement store and typed canvasActions
     - Create `src/data/store.ts` with `CanvasState` (`canvas`, `selection`, `editor`, `deletePrompt`, `viewport`) and `useCanvasStore`
     - Create `canvasActions` object exposing `addRoot`, `addChild`, `updateNode`, `addImage`, `removeImage`, `moveNode`, `setCollapsed`, `deleteNodeOnly`, `deleteSubtree`, `openEditor`, `closeEditor`, `openDeletePrompt`, `closeDeletePrompt`, `select`, `setViewport`
     - Every write invokes a mutator, then `canvasSchema.safeParse`s the result before committing; on failure the write is aborted and a `saveError` event is emitted
     - Re-export `useCanvasStore` and `canvasActions` from `src/data/index.ts`
     - _Requirements: 10.4, 10.5_
 
-  - [~] 6.2 Unit tests for canvasActions dispatch
+  - [-] 6.2 Unit tests for canvasActions dispatch
     - `canvasActions.addChild(parentId, p)` produces a store state with an additional node and a new `editor.openNodeId`
     - `canvasActions.deleteNodeOnly` on root with children is a no-op at the store level
     - _Requirements: 2.4, 3.3, 7.5_
 
 - [ ] 7. Persistence layer
-  - [~] 7.1 Implement debounced localStorage middleware and load path
+  - [-] 7.1 Implement debounced localStorage middleware and load path
     - Create `src/persistence/keys.ts` (`CANVAS_KEY = 'root-mvp:canvas'`, `RAW_KEY = 'root-mvp:canvas.raw'`)
     - Create `src/persistence/middleware.ts` — subscribes to `useCanvasStore` on `canvas` changes, debounces 500 ms, writes `serializeCanvas(canvas)` to `localStorage`; on `beforeunload`, flushes any pending timeout synchronously; catches `setItem` errors and surfaces via a `persistenceEvents` event bus
     - Create `src/persistence/load.ts` — `loadInitialCanvas()` reads `CANVAS_KEY`; if absent returns `emptyCanvas()`; on `parseCanvas` failure, writes the raw payload to `RAW_KEY`, emits a load error, returns `emptyCanvas()`
@@ -220,7 +220,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - _Requirements: 1.4, 12.2_
 
 - [ ] 10. Node UI Layer — styles and card
-  - [~] 10.1 Implement typeStyles and NodeCard shell
+  - [-] 10.1 Implement typeStyles and NodeCard shell
     - Create `src/nodes/typeStyles.ts` with the four `NodeType` → `{ border, background, text }` pairings from design.md §Data Models (topic/finding/question/conclusion), all colors drawn from the DESIGN.md palette
     - Create `src/nodes/NodeCard.tsx` — reads its node from `useCanvasStore` via memoized selector by `nodeId`, applies `typeStyles[node.type]`, renders `Header` (title text), `BodyPreview` (first N chars of body), `ImageThumbStrip` (thumbnails), `CollapseBadge` (only when collapsed), `HoverToolbar` (buttons for add-child, edit, add-image, cycle-type, delete)
     - Selection style: `border: 2px solid #0051c3` when selected; base border 1 px in type color; radius 5 px; no shadow
