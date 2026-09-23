@@ -22,7 +22,7 @@ export { NodeEditor } from './NodeEditor';
 export type { NodeEditorProps } from './NodeEditor';
 
 export { DeletePrompt } from './DeletePrompt';
-export type { DeletePromptProps } from './DeletePrompt';
+export type { DeletePromptProps, DeleteMode } from './DeletePrompt';
 
 export {
   ToolbarCallbacksProvider,

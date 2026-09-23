@@ -19,10 +19,20 @@
 
 import type { ReactNode } from 'react';
 
-import { canvasActions } from '../data';
-import type { Node, NodeType } from '../data';
+import { canvasActions, useCanvasStore } from '../data';
+import type { Node, NodeType, UUID } from '../data';
 
 import { useToolbarCallbacks } from './toolbarCallbacks';
+
+/**
+ * Selector: does the given node have at least one child in the canvas?
+ * Used to decide whether the collapse affordance should be shown
+ * (Requirement 6.1: collapse affordance only appears when node has children).
+ */
+function selectHasChildren(nodeId: UUID) {
+  return (s: { canvas: { nodes: readonly Node[] } }): boolean =>
+    s.canvas.nodes.some((n) => n.parentId === nodeId);
+}
 
 /**
  * The cycle order used by the type button. Follows the four-button
@@ -47,6 +57,8 @@ export interface HoverToolbarProps {
 
 export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
   const { onAddChild } = useToolbarCallbacks();
+  const hasChildren = useCanvasStore(selectHasChildren(node.id));
+
   const handleAddChild = (): void => {
     // The provider is responsible for computing the child position and
     // dispatching `canvasActions.addChild`. In production the App shell
@@ -70,6 +82,14 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
     // and disables invalid options for root-with-children.
     canvasActions.openDeletePrompt(node.id);
   };
+  const onCollapse = (): void => {
+    // R6.1: set collapsed to true (collapse affordance).
+    canvasActions.setCollapsed(node.id, true);
+  };
+  const onExpand = (): void => {
+    // R6.3: set collapsed to false (expand affordance).
+    canvasActions.setCollapsed(node.id, false);
+  };
 
   return (
     <div
@@ -92,6 +112,17 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
       >
         ⟳
       </ToolbarButton>
+      {/* Collapse affordance (R6.1): only when node has children and is not
+          collapsed. Expand affordance (R6.3): when node is collapsed. */}
+      {node.collapsed ? (
+        <ToolbarButton label="Expand subtree" onClick={onExpand} testId="btn-expand">
+          ▶
+        </ToolbarButton>
+      ) : hasChildren ? (
+        <ToolbarButton label="Collapse subtree" onClick={onCollapse} testId="btn-collapse">
+          ▼
+        </ToolbarButton>
+      ) : null}
       <ToolbarButton label="Delete" onClick={onDelete} testId="btn-delete">
         ✕
       </ToolbarButton>

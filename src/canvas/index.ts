@@ -11,9 +11,8 @@
  *     (from `./placement`) — used by the App shell to compute a
  *     non-overlapping initial position for a newly created child node
  *     (task 9.2, Requirement 3.2).
- *
- * Future exports (later tasks): `CanvasView` (task 9.1), plus any edge
- * style helpers the app layer needs.
+ *   - `CanvasView` (from `./CanvasView`) — the React Flow adapter for
+ *     the Root MVP canvas surface (task 9.1, Requirement 2.1).
  */
 
 export {
@@ -22,3 +21,6 @@ export {
   SIBLING_GAP,
   computeChildPosition,
 } from './placement';
+
+export { CanvasView } from './CanvasView';
+export type { CanvasViewProps, CanvasViewProbeProps } from './CanvasView';

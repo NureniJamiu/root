@@ -174,14 +174,14 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - `canvasActions.deleteNodeOnly` on root with children is a no-op at the store level
     - _Requirements: 2.4, 3.3, 7.5_
 
-- [ ] 7. Persistence layer
+- [x] 7. Persistence layer
   - [x] 7.1 Implement debounced localStorage middleware and load path
     - Create `src/persistence/keys.ts` (`CANVAS_KEY = 'root-mvp:canvas'`, `RAW_KEY = 'root-mvp:canvas.raw'`)
     - Create `src/persistence/middleware.ts` — subscribes to `useCanvasStore` on `canvas` changes, debounces 500 ms, writes `serializeCanvas(canvas)` to `localStorage`; on `beforeunload`, flushes any pending timeout synchronously; catches `setItem` errors and surfaces via a `persistenceEvents` event bus
     - Create `src/persistence/load.ts` — `loadInitialCanvas()` reads `CANVAS_KEY`; if absent returns `emptyCanvas()`; on `parseCanvas` failure, writes the raw payload to `RAW_KEY`, emits a load error, returns `emptyCanvas()`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 12.3_
 
-  - [-] 7.2 Integration tests for persistence timing
+  - [x] 7.2 Integration tests for persistence timing
     - With `vi.useFakeTimers()`: fire three `updateNode` actions in rapid succession, advance 499 ms, assert `setItem` not called; advance 1 ms, assert exactly one `setItem` call
     - Fire a change, dispatch `beforeunload`, assert immediate synchronous `setItem`
     - Seed `localStorage` with `"{"`, run `loadInitialCanvas()`, assert `emptyCanvas()` returned, assert `RAW_KEY` contains original string, assert error event emitted
@@ -190,8 +190,8 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
 - [x] 8. Checkpoint — pure data core is complete and tested
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Canvas Layer — React Flow adapter
-  - [-] 9.1 Implement CanvasView and useReactFlowGraph
+- [x] 9. Canvas Layer — React Flow adapter
+  - [x] 9.1 Implement CanvasView and useReactFlowGraph
     - Create `src/canvas/CanvasView.tsx` wrapping `<ReactFlowProvider>` + `<ReactFlow>` with `minZoom={0.25}`, `maxZoom={2.5}`, `nodesDraggable`, `nodesConnectable={false}`, `elementsSelectable`, `onlyRenderVisibleElements`
     - Register a single custom node type `'research'` that renders the exported `NodeCard` from `nodes/` (referenced via a small `nodeTypes` registration — no import of editor internals)
     - Create `src/canvas/useReactFlowGraph.ts` — subscribes to `useCanvasStore`, computes visible node set via `visibleNodeIds(canvas)`, derives RF `nodes` (mapping to `{ id, type:'research', position, data:{ nodeId } }`) and RF `edges` (derived from `parentId` restricted to visible pairs, `type:'default'`, stroke `#404040`, width 1)
@@ -199,7 +199,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Create `src/canvas/edgeStyles.ts` and `src/canvas/index.ts` exporting only `CanvasView`
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 5.1, 5.2, 5.3, 5.4, 12.2_
 
-  - [-] 9.2 Implement initial child position placement
+  - [x] 9.2 Implement initial child position placement
     - Create `src/canvas/placement.ts` with `computeChildPosition(canvas, parentId)` returning a `Position` offset from the parent such that the child's bounding box (at standard node width/height constants) does not intersect the parent's bounding box or any existing direct sibling's bounding box
     - Call site: `App`/toolbar action that dispatches `canvasActions.addChild` computes position from the current canvas before dispatching
     - _Requirements: 3.2_
@@ -238,29 +238,29 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Render a collapsed node with N descendants, assert `CollapseBadge` shows N
     - _Requirements: 4.7, 6.5, 11.3, 11.4_
 
-- [ ] 11. Node UI Layer — editor
-  - [-] 11.1 Implement NodeEditor
+- [x] 11. Node UI Layer — editor
+  - [x] 11.1 Implement NodeEditor
     - Create `src/nodes/NodeEditor.tsx` — bound to `nodeId`; renders single-line `<input>` for title (`maxLength=200`, autoFocus), `<textarea>` for body (`maxLength=20000`, character counter turning `#de5052` in the last 200 chars), 4 type buttons (`topic | finding | question | conclusion`) styled per `typeStyles`, image drop zone + paste handler + file picker
     - Image handler: `FileReader.readAsDataURL`, rejects payloads > 2 MB with inline message "Images must be under 2 MB.", ignores non-image files (drop zone border flashes once), on success dispatches `canvasActions.addImage`
     - Text changes dispatch `canvasActions.updateNode({title})` / `({body})`; type button dispatches `updateNode({type})`; image delete dispatches `removeImage`
     - Close via Esc or click-away → `canvasActions.closeEditor()`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
-  - [-] 11.2 Component tests for NodeEditor
+  - [x] 11.2 Component tests for NodeEditor
     - Renders with title field focused when opened (covers R2.4 / R3.3 focus behavior)
     - Typing title dispatches `updateNode({title})`
     - Dropping a 2.5 MB image is rejected with an inline message; canvas unchanged
     - Clicking each type button updates `node.type`
     - _Requirements: 2.4, 3.3, 4.1, 4.2, 4.3, 4.4, 4.6_
 
-- [ ] 12. Node UI Layer — delete prompt
-  - [-] 12.1 Implement DeletePrompt modal
+- [x] 12. Node UI Layer — delete prompt
+  - [x] 12.1 Implement DeletePrompt modal
     - Create `src/nodes/DeletePrompt.tsx` — reads target node from store; if node has zero children the modal is bypassed and delete happens immediately; otherwise renders two options: "Delete node only" and "Delete node and entire subtree"
     - Root-with-children constraint: when `node.parentId === null` and node has children, disable "Delete node only" (R7.5)
     - Cancel → `canvasActions.closeDeletePrompt()` leaves canvas unchanged; confirm → dispatches `deleteNodeOnly` or `deleteSubtree`
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-  - [-] 12.2 Component tests for DeletePrompt variants
+  - [x] 12.2 Component tests for DeletePrompt variants
     - Delete on leaf: no modal rendered, node removed immediately
     - Delete on parent: both options rendered; selecting "nodeOnly" reparents children; selecting "subtree" removes descendants
     - Delete on root with children: only subtree option enabled
@@ -268,7 +268,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
 - [ ] 13. App shell
-  - [-] 13.1 Implement App shell, toolbar, empty-canvas affordance, ErrorBoundary, toast surface
+  - [x] 13.1 Implement App shell, toolbar, empty-canvas affordance, ErrorBoundary, toast surface
     - Create `src/app/ErrorBoundary.tsx` (class component) — catches render/effect errors, renders "Something went wrong. Your work has been saved." with a Reload button
     - Create `src/app/Toast.tsx` — minimal toast surface subscribed to `persistenceEvents` (load error, save error, image-too-large echo)
     - Create `src/app/Toolbar.tsx` — top chrome, shows canvas title
@@ -276,27 +276,27 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Update `src/app/App.tsx` to: call `loadInitialCanvas()` on mount, install persistence middleware, wrap `<CanvasView />` + modals in `<ErrorBoundary>`, render `<Toast />`, render `<CreateRootAffordance />` when canvas is empty, render `<NodeEditor />` when `editor.openNodeId` is set, render `<DeletePrompt />` when `deletePrompt.nodeId` is set
     - _Requirements: 2.1, 2.3, 2.4, 8.4, 8.5_
 
-  - [~] 13.2 Integration tests for App shell
+  - [-] 13.2 Integration tests for App shell
     - Empty canvas: create-root affordance visible; after `addRoot`, affordance hidden and editor open with title focused (R2.1, R2.3, R2.4)
     - Load error surface: seed `localStorage` with `"{"`, mount `<App />`, assert error toast rendered and `RAW_KEY` preserved (R8.5)
     - _Requirements: 2.1, 2.3, 2.4, 8.4, 8.5_
 
 - [ ] 14. Module-boundary import-graph test
-  - [~] 14.1 Implement runtime import-graph test
+  - [-] 14.1 Implement runtime import-graph test
     - Create `src/__tests__/module-boundaries.test.ts` — walks `src/` using `es-module-lexer` (or `@typescript-eslint/parser`) and asserts: no file under `src/data/` imports from `src/canvas/`, `src/nodes/`, `reactflow`, or `react`; no file under `src/canvas/` imports from `src/nodes/*` except the public `NodeCard` re-export; no file under `src/nodes/` imports from `src/canvas/`
     - This test guards against ESLint config drift
     - _Requirements: 10.1, 10.2, 10.3_
 
 - [ ] 15. End-to-end Playwright tests (R14 walkthrough)
-  - [~] 15.1 E2E: MVP walkthrough (build tree)
+  - [-] 15.1 E2E: MVP walkthrough (build tree)
     - Create `e2e/mvp-walkthrough.spec.ts` — start with empty `localStorage`; click "Create root"; edit title and body; add a child, then a grandchild; edit each; drop an image into one node; assert final DOM shows all node cards with correct type styling and connectors between the correct pairs
     - _Requirements: 14.1_
 
-  - [~] 15.2 E2E: Collapse and expand a subtree
+  - [-] 15.2 E2E: Collapse and expand a subtree
     - Create `e2e/collapse-expand.spec.ts` — build a three-level tree; collapse the middle node; assert all descendants absent from the DOM and their connectors gone; expand; assert all descendants restored
     - _Requirements: 6.2, 6.4, 14.2_
 
-  - [~] 15.3 E2E: Reload preserves state exactly
+  - [-] 15.3 E2E: Reload preserves state exactly
     - Create `e2e/reload-restore.spec.ts` — build the R14.1 tree; reload the page; assert every node's rendered title, body, image, type, position, and collapse state matches pre-reload state
     - _Requirements: 8.3, 14.3_
 

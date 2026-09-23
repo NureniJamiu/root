@@ -561,6 +561,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790121562729
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183077983
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183088558
       }
     ],
     "8. Checkpoint — pure data core is complete and tested": [
@@ -585,6 +595,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790121559474
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183078246
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183098761
       }
     ],
     "9.2 Implement initial child position placement": [
@@ -597,6 +617,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790121560424
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183078432
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183099322
       }
     ],
     "9.3 Property test for initial child position non-overlap": [
@@ -711,6 +741,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790121561225
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183078607
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183108743
       }
     ],
     "11.2 Component tests for NodeEditor": [
@@ -723,6 +763,16 @@
         "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790123493552
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183078792
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183119266
       }
     ],
     "12.1 Implement DeletePrompt modal": [
@@ -735,6 +785,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790121562274
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183078928
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183108926
       }
     ],
     "12.2 Component tests for DeletePrompt variants": [
@@ -747,6 +807,16 @@
         "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790123499556
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183079083
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183119693
       }
     ],
     "13.1 Implement App shell, toolbar, empty-canvas affordance, ErrorBoundary, toast surface": [
@@ -759,6 +829,16 @@
         "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790123505240
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183079293
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183139022
       }
     ],
     "13.2 Integration tests for App shell": [
@@ -766,6 +846,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118164038
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183079423
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183164311
       }
     ],
     "14.1 Implement runtime import-graph test": [
@@ -773,6 +863,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118164139
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183079527
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183164534
       }
     ],
     "15.1 E2E: MVP walkthrough (build tree)": [
@@ -780,6 +880,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118164243
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183079671
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183164975
       }
     ],
     "15.2 E2E: Collapse and expand a subtree": [
@@ -787,6 +897,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118164339
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183079796
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183165620
       }
     ],
     "15.3 E2E: Reload preserves state exactly": [
@@ -794,6 +914,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118164451
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183079932
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183166133
       }
     ],
     "16. Final checkpoint — Ensure all tests pass": [
@@ -801,6 +931,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118164537
+      },
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183080074
       }
     ],
     "1. Bootstrap project and toolchain": [
@@ -850,6 +985,34 @@
         "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790123474076
+      }
+    ],
+    "7. Persistence layer": [
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183088708
+      }
+    ],
+    "9. Canvas Layer — React Flow adapter": [
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183099476
+      }
+    ],
+    "11. Node UI Layer — editor": [
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183119403
+      }
+    ],
+    "12. Node UI Layer — delete prompt": [
+      {
+        "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790183119820
       }
     ]
   }

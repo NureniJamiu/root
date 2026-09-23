@@ -50,10 +50,17 @@ function stateWithOneNode(): { state: CanvasState; nodeId: string } {
 /* -------------------------------------------------------------------------- */
 
 describe('NodeEditor — component', () => {
+  // Shared nodeId extracted from beforeEach so tests use the same id
+  // that seeds the store (fixes the double-UUID bug where a second
+  // stateWithOneNode() call produced a different random id).
+  let nodeId: string;
+
   beforeEach(() => {
-    // Reset the module-level singleton before each test.
-    const { state } = stateWithOneNode();
-    useCanvasStore.setState(state);
+    // Reset the module-level singleton before each test and capture
+    // the node id so every test references the same node.
+    const result = stateWithOneNode();
+    nodeId = result.nodeId;
+    useCanvasStore.setState(result.state);
   });
 
   /* ---------------------------------------------------------------------- */
@@ -61,7 +68,6 @@ describe('NodeEditor — component', () => {
   /* ---------------------------------------------------------------------- */
 
   it('typing in the title input updates the node title in the store (R4.2)', async () => {
-    const { nodeId } = stateWithOneNode();
     const onClose = vi.fn();
     const user = userEvent.setup();
 
@@ -84,7 +90,6 @@ describe('NodeEditor — component', () => {
   /* ---------------------------------------------------------------------- */
 
   it('body counter shows {length}/20000 in normal color when body is short (R4.3)', async () => {
-    const { nodeId } = stateWithOneNode();
     const onClose = vi.fn();
 
     await act(async () => {
@@ -107,7 +112,6 @@ describe('NodeEditor — component', () => {
   /* ---------------------------------------------------------------------- */
 
   it('body counter turns red when body length exceeds 19800 chars (R4.3)', async () => {
-    const { nodeId } = stateWithOneNode();
     const onClose = vi.fn();
 
     // Seed the node with a 19 900-character body via the action (typing
@@ -124,11 +128,11 @@ describe('NodeEditor — component', () => {
 
     expect(counter.textContent).toBe('19900/20000');
 
-    // Warning state: counter color must be the #de5052 red. jsdom
-    // stores inline styles as given, not in rgb() form, so we check
-    // the inline `style.color` value directly.
+    // Warning state: counter color must be the #de5052 red. jsdom may
+    // normalize inline styles from hex to rgb(), so we accept both forms.
     const color = (counter as HTMLElement).style.color;
-    expect(color).toBe('#de5052');
+    const isWarnColor = color === '#de5052' || color === 'rgb(222, 80, 82)';
+    expect(isWarnColor).toBe(true);
   });
 
   /* ---------------------------------------------------------------------- */
@@ -136,7 +140,6 @@ describe('NodeEditor — component', () => {
   /* ---------------------------------------------------------------------- */
 
   it('clicking the "finding" type button sets node.type to "finding" (R4.6)', async () => {
-    const { nodeId } = stateWithOneNode();
     const onClose = vi.fn();
     const user = userEvent.setup();
 
@@ -156,7 +159,6 @@ describe('NodeEditor — component', () => {
   /* ---------------------------------------------------------------------- */
 
   it('pressing Escape closes the editor (sets editor.openNodeId to null) (R4.7)', async () => {
-    const { nodeId } = stateWithOneNode();
     const onClose = vi.fn();
     const user = userEvent.setup();
 
