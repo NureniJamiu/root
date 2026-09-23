@@ -204,22 +204,22 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Call site: `App`/toolbar action that dispatches `canvasActions.addChild` computes position from the current canvas before dispatching
     - _Requirements: 3.2_
 
-  - [~] 9.3 Property test for initial child position non-overlap
+  - [x] 9.3 Property test for initial child position non-overlap
     - **Property 5: Initial child position non-overlap** — for any canvas `c` and parent `p`, the child bounding box produced by `computeChildPosition(c, p.id)` does not intersect the parent's bbox nor any existing direct child's bbox
     - **Validates: Requirements 3.2**
     - _Requirements: 3.2_
 
-  - [~] 9.4 Property test for edge derivation from parentId
+  - [x] 9.4 Property test for edge derivation from parentId
     - **Property 2: Edge derivation from parentId** — the RF edge set produced by `useReactFlowGraph` equals `{ (p, k) | p, k ∈ visibleNodeIds(c) ∧ k.parentId === p.id }`, contains no duplicates, and contains no edges incident to hidden nodes
     - **Validates: Requirements 1.5**
     - Test `useReactFlowGraph` selector output directly (no React Flow render required)
     - _Requirements: 1.5_
 
-  - [~] 9.5 Component test for React Flow config
+  - [x] 9.5 Component test for React Flow config
     - Render `CanvasView`, assert `minZoom`, `maxZoom`, `onlyRenderVisibleElements` props via a test-only prop probe
     - _Requirements: 1.4, 12.2_
 
-- [ ] 10. Node UI Layer — styles and card
+- [x] 10. Node UI Layer — styles and card
   - [x] 10.1 Implement typeStyles and NodeCard shell
     - Create `src/nodes/typeStyles.ts` with the four `NodeType` → `{ border, background, text }` pairings from design.md §Data Models (topic/finding/question/conclusion), all colors drawn from the DESIGN.md palette
     - Create `src/nodes/NodeCard.tsx` — reads its node from `useCanvasStore` via memoized selector by `nodeId`, applies `typeStyles[node.type]`, renders `Header` (title text), `BodyPreview` (first N chars of body), `ImageThumbStrip` (thumbnails), `CollapseBadge` (only when collapsed), `HoverToolbar` (buttons for add-child, edit, add-image, cycle-type, delete)
@@ -228,12 +228,12 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Create `src/nodes/index.ts` exporting `NodeCard`, `NodeEditor`, `DeletePrompt`
     - _Requirements: 4.7, 6.5, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8_
 
-  - [~] 10.2 Property test for typeStyles palette conformance
+  - [x] 10.2 Property test for typeStyles palette conformance
     - **Property 8: typeStyles palette conformance** — for every `NodeType t`, `typeStyles[t]` returns colors drawn from the DESIGN.md palette, and the four returned pairings are pairwise distinct
     - **Validates: Requirements 4.7**
     - _Requirements: 4.7, 11.3, 11.4_
 
-  - [~] 10.3 Component test for NodeCard type rendering
+  - [x] 10.3 Component test for NodeCard type rendering
     - Render `NodeCard` for each of the four types, snapshot the resulting class list, assert only palette-token classes appear
     - Render a collapsed node with N descendants, assert `CollapseBadge` shows N
     - _Requirements: 4.7, 6.5, 11.3, 11.4_
@@ -246,7 +246,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Close via Esc or click-away → `canvasActions.closeEditor()`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
-  - [~] 11.2 Component tests for NodeEditor
+  - [-] 11.2 Component tests for NodeEditor
     - Renders with title field focused when opened (covers R2.4 / R3.3 focus behavior)
     - Typing title dispatches `updateNode({title})`
     - Dropping a 2.5 MB image is rejected with an inline message; canvas unchanged
@@ -260,7 +260,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Cancel → `canvasActions.closeDeletePrompt()` leaves canvas unchanged; confirm → dispatches `deleteNodeOnly` or `deleteSubtree`
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-  - [~] 12.2 Component tests for DeletePrompt variants
+  - [-] 12.2 Component tests for DeletePrompt variants
     - Delete on leaf: no modal rendered, node removed immediately
     - Delete on parent: both options rendered; selecting "nodeOnly" reparents children; selecting "subtree" removes descendants
     - Delete on root with children: only subtree option enabled
@@ -268,7 +268,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
 - [ ] 13. App shell
-  - [~] 13.1 Implement App shell, toolbar, empty-canvas affordance, ErrorBoundary, toast surface
+  - [-] 13.1 Implement App shell, toolbar, empty-canvas affordance, ErrorBoundary, toast surface
     - Create `src/app/ErrorBoundary.tsx` (class component) — catches render/effect errors, renders "Something went wrong. Your work has been saved." with a Reload button
     - Create `src/app/Toast.tsx` — minimal toast surface subscribed to `persistenceEvents` (load error, save error, image-too-large echo)
     - Create `src/app/Toolbar.tsx` — top chrome, shows canvas title

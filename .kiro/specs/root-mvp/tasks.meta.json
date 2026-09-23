@@ -47,6 +47,14 @@
     "4.9 Property test for deleteNodeOnly semantics": {
       "status": "passed",
       "lastRunTimestamp": 1790120774762
+    },
+    "9.4 Property test for edge derivation from parentId": {
+      "status": "passed",
+      "lastRunTimestamp": 1790123016981
+    },
+    "9.3 Property test for initial child position non-overlap": {
+      "status": "passed",
+      "lastRunTimestamp": 1790123034612
     }
   },
   "executionHistory": {
@@ -596,6 +604,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118162859
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790122486595
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123444003
       }
     ],
     "9.4 Property test for edge derivation from parentId": [
@@ -603,6 +621,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118162958
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790122490999
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123450682
       }
     ],
     "9.5 Component test for React Flow config": [
@@ -610,6 +638,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118163064
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790122495617
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123455720
       }
     ],
     "10.1 Implement typeStyles and NodeCard shell": [
@@ -634,6 +672,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118163302
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790122499991
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123461936
       }
     ],
     "10.3 Component test for NodeCard type rendering": [
@@ -641,6 +689,16 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118163402
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790122504484
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123473956
       }
     ],
     "11.1 Implement NodeEditor": [
@@ -660,6 +718,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118163608
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123493552
       }
     ],
     "12.1 Implement DeletePrompt modal": [
@@ -679,6 +742,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118163832
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123499556
       }
     ],
     "13.1 Implement App shell, toolbar, empty-canvas affordance, ErrorBoundary, toast surface": [
@@ -686,6 +754,11 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790118163936
+      },
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123505240
       }
     ],
     "13.2 Integration tests for App shell": [
@@ -770,6 +843,13 @@
         "executionId": "5f35c4c6-9dab-4a0b-917a-9f64832b1d18",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790121517027
+      }
+    ],
+    "10. Node UI Layer — styles and card": [
+      {
+        "executionId": "75737764-f121-4cd0-94f5-36423d62c317",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790123474076
       }
     ]
   }
