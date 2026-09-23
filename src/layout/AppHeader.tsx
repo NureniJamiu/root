@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { NodeType } from '../data';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { RootMarkIcon, RootLogo } from './Logo';
+import { RootLogo } from './Logo';
 
 export interface AppHeaderProps {
   readonly title: string;
@@ -15,6 +15,12 @@ export interface AppHeaderProps {
   readonly onFitView: () => void;
   readonly onCenterRoot: () => void;
   readonly onAddNode: () => void;
+  readonly isPanActive?: boolean;
+  readonly onTogglePan?: () => void;
+  readonly isSidebarOpen?: boolean;
+  readonly onToggleSidebar?: () => void;
+  readonly isInspectorOpen?: boolean;
+  readonly onToggleInspector?: () => void;
   readonly activeTypeFilter?: NodeType | null;
   readonly onSelectTypeFilter?: (type: NodeType | null) => void;
 }
@@ -30,6 +36,12 @@ export function AppHeader({
   onFitView,
   onCenterRoot,
   onAddNode,
+  isPanActive = false,
+  onTogglePan,
+  isSidebarOpen = true,
+  onToggleSidebar,
+  isInspectorOpen = true,
+  onToggleInspector,
   activeTypeFilter,
   onSelectTypeFilter,
 }: AppHeaderProps): JSX.Element {
@@ -52,51 +64,70 @@ export function AppHeader({
     >
       {/* Left: Brand Mark & Title */}
       <div className="flex items-center gap-2.5">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className={`p-1.5 rounded-[2px] transition-colors cursor-pointer ${
+              isSidebarOpen ? 'text-[#000000] bg-[#f0eded]' : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
+            }`}
+            title={isSidebarOpen ? 'Collapse Projects sidebar' : 'Expand Projects sidebar'}
+            aria-label="Toggle Projects sidebar"
+            data-testid="btn-toggle-sidebar"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M9 3v18" />
+              <path d="m14 9-3 3 3 3" />
+            </svg>
+          </button>
+        )}
+
         <div className="flex items-center gap-2">
-          <RootMarkIcon size={26} />
-          <div className="h-4 w-px bg-[#ebebeb]" />
-          <RootLogo className="h-5 w-auto" />
+          <RootLogo className="h-8 w-auto min-w-[70px]" />
         </div>
 
-        <div className="h-4 w-px bg-[#ebebeb] mx-0.5" />
-
-        {isEditingTitle ? (
-          <input
-            type="text"
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={handleTitleSubmit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleTitleSubmit();
-              if (e.key === 'Escape') {
-                setTitleDraft(title);
-                setIsEditingTitle(false);
-              }
-            }}
-            autoFocus
-            className="font-serif text-[15px] font-medium text-[#000000] border-b border-[#000000] bg-transparent outline-none px-1 py-0.5"
-          />
-        ) : (
-          <div
-            onClick={() => setIsEditingTitle(true)}
-            className="group flex items-center gap-1.5 cursor-pointer py-1 px-1.5 rounded-[2px] hover:bg-[#f5f3f3] transition-colors"
-            title="Click to edit canvas title"
-          >
-            <span className="font-serif text-[15px] font-medium text-[#000000] tracking-tight">
-              {title || 'Root — Untitled Research Canvas'}
-            </span>
-            <svg
-              className="w-3 h-3 text-[#737785] opacity-50 group-hover:opacity-100 transition-opacity"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+        {/* Project title shifted far more to the right */}
+        <div className="ml-10 flex items-center">
+          <div className="h-4 w-px bg-[#ebebeb] mr-3" />
+          {isEditingTitle ? (
+            <input
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={handleTitleSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleTitleSubmit();
+                if (e.key === 'Escape') {
+                  setTitleDraft(title);
+                  setIsEditingTitle(false);
+                }
+              }}
+              autoFocus
+              className="font-serif text-[15px] font-medium text-[#000000] border-b border-[#000000] bg-transparent outline-none px-1 py-0.5"
+            />
+          ) : (
+            <div
+              onClick={() => setIsEditingTitle(true)}
+              className="group flex items-center gap-1.5 cursor-pointer py-1 px-1.5 rounded-[2px] hover:bg-[#f5f3f3] transition-colors"
+              title="Click to edit canvas title"
             >
-              <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-              <path d="m15 5 4 4" />
-            </svg>
-          </div>
-        )}
+              <span className="font-serif text-[15px] font-medium text-[#000000] tracking-tight">
+                {title || 'Root — Untitled Research Canvas'}
+              </span>
+              <svg
+                className="w-3 h-3 text-[#737785] opacity-50 group-hover:opacity-100 transition-opacity"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Center: Canvas Viewport & Zoom Controls */}
@@ -129,8 +160,11 @@ export function AppHeader({
         {/* Pan Mode indicator/toggle */}
         <Button
           size="sm"
-          variant="secondary"
-          className="h-7 text-[10px] font-mono"
+          variant={isPanActive ? 'primary' : 'secondary'}
+          onClick={onTogglePan}
+          className={`h-7 text-[10px] font-mono transition-colors ${
+            isPanActive ? 'bg-[#000000] text-[#ffffff] border-[#000000]' : ''
+          }`}
           icon={
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5" />
@@ -139,8 +173,9 @@ export function AppHeader({
               <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
             </svg>
           }
+          data-testid="btn-pan"
         >
-          Pan
+          {isPanActive ? 'Panning' : 'Pan'}
         </Button>
 
         {/* Fit View */}
@@ -157,6 +192,7 @@ export function AppHeader({
               <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
             </svg>
           }
+          data-testid="btn-fit"
         >
           Fit
         </Button>
@@ -177,6 +213,7 @@ export function AppHeader({
               <line x1="20" y1="12" x2="22" y2="12" />
             </svg>
           }
+          data-testid="btn-root"
         >
           Root
         </Button>
@@ -256,6 +293,26 @@ export function AppHeader({
         >
           Tour
         </Button>
+
+        {/* Inspector toggle button */}
+        {onToggleInspector && (
+          <button
+            type="button"
+            onClick={onToggleInspector}
+            className={`p-1.5 rounded-[2px] transition-colors cursor-pointer ${
+              isInspectorOpen ? 'text-[#000000] bg-[#f0eded]' : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
+            }`}
+            title={isInspectorOpen ? 'Collapse Inspector (Slide right)' : 'Expand Inspector'}
+            aria-label="Toggle Inspector"
+            data-testid="btn-toggle-inspector"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M15 3v18" />
+              <path d="m10 15 3-3-3-3" />
+            </svg>
+          </button>
+        )}
 
         {/* User avatar */}
         <div

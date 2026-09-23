@@ -44,7 +44,7 @@ import ReactFlow, {
 // remains drop-in usable from `App` without a separate CSS entry point.
 import 'reactflow/dist/style.css';
 
-import { canvasActions } from '../data';
+import { canvasActions, useCanvasStore } from '../data';
 import type { UUID } from '../data';
 import { FitViewIcon, NodeCard, ZoomInIcon, ZoomOutIcon } from '../nodes';
 
@@ -104,6 +104,16 @@ export interface CanvasViewProps {
   readonly onNodeSelect?: (id: UUID) => void;
 
   /**
+   * Fired when the user clicks the empty canvas pane (background).
+   */
+  readonly onPaneClick?: () => void;
+
+  /**
+   * Whether pan mode is active (left mouse button drags canvas).
+   */
+  readonly isPanActive?: boolean;
+
+  /**
    * Test-only prop probe (Task 9.5).
    */
   readonly onRFPropsMounted?: (props: CanvasViewProbeProps) => void;
@@ -119,9 +129,11 @@ export interface CanvasViewProps {
 /* -------------------------------------------------------------------------- */
 
 function CanvasViewInner(props: CanvasViewProps): JSX.Element {
-  const { onNodeSelect, onRFPropsMounted, onControlsReady } = props;
+  const { onNodeSelect, onPaneClick, isPanActive = false, onRFPropsMounted, onControlsReady } = props;
   const { nodes, edges } = useReactFlowGraph();
   const reactFlow = useReactFlow();
+  const canvas = useCanvasStore((s) => s.canvas);
+  const storeViewport = useCanvasStore((s) => s.viewport);
 
   const handleZoomIn = useCallback(() => {
     reactFlow?.zoomIn?.({ duration: 150 });
@@ -136,13 +148,14 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, [reactFlow]);
 
   const handleCenterRoot = useCallback(() => {
-    const rootNode = nodes.find((n) => n.id);
+    const rootNode =
+      canvas.nodes.find((n) => n.parentId === null) ?? canvas.nodes[0];
     if (rootNode) {
-      reactFlow?.setCenter(rootNode.position.x + 120, rootNode.position.y + 60, { duration: 200, zoom: 1 });
+      reactFlow?.setCenter(rootNode.position.x + 130, rootNode.position.y + 60, { duration: 200, zoom: 1 });
     } else {
       reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
     }
-  }, [nodes, reactFlow]);
+  }, [canvas.nodes, reactFlow]);
 
   /**
    * Commit the final drag position to the store.
@@ -172,8 +185,15 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     [onNodeSelect],
   );
 
-  const viewport = reactFlow?.getViewport?.() ?? { x: 0, y: 0, zoom: 1 };
-  const zoomPercent = Math.round(viewport.zoom * 100);
+  /**
+   * Handle clicking the empty background of the canvas.
+   */
+  const handlePaneClick = useCallback(() => {
+    canvasActions.select(null);
+    onPaneClick?.();
+  }, [onPaneClick]);
+
+  const zoomPercent = Math.round(storeViewport.zoom * 100);
 
   useEffect(() => {
     onControlsReady?.({
@@ -213,18 +233,14 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       data-nodes-connectable="false"
       data-elements-selectable="true"
     >
-      {/* Top Coordinate & Stats Ribbon */}
+      {/* Top Stats Ribbon — no coordinates per user request */}
       <div className="h-8 w-full border-b border-[#ebebeb] bg-[#ffffff] px-3 flex items-center justify-between z-10 shrink-0">
         <div className="flex items-center gap-2 font-mono text-[9px] text-[#595959] tracking-wide">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#737785]" />
-          <span>
-            COORD: X:{viewport.x.toFixed(1)} Y:{viewport.y.toFixed(1)}
-          </span>
-          <span className="text-[#c3c6d6]">|</span>
-          <span className="text-[#0051c3] font-medium">{viewport.zoom.toFixed(2)}x</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#0051c3]" />
+          <span className="text-[#0051c3] font-medium">{storeViewport.zoom.toFixed(2)}x</span>
           <span className="text-[#c3c6d6]">|</span>
           <span>
-            {nodes.length} nodes rendered (0.0ms)
+            {nodes.length} {nodes.length === 1 ? 'node' : 'nodes'} rendered
           </span>
         </div>
 
@@ -256,7 +272,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
             onClick={handleCenterRoot}
             className="h-6 px-2 border border-[#ebebeb] rounded-[2px] bg-[#ffffff] font-mono text-[9px] text-[#404040] hover:text-[#000000] hover:border-[#000000] transition-colors cursor-pointer"
           >
-            Center
+            Root
           </button>
           <button
             type="button"
@@ -269,20 +285,27 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       </div>
 
       {/* React Flow Surface */}
-      <div className="relative flex-1 w-full h-full overflow-hidden">
+      <div
+        className={`relative flex-1 w-full h-full overflow-hidden ${
+          isPanActive ? 'cursor-grab active:cursor-grabbing' : ''
+        }`}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={NODE_TYPES}
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
-          nodesDraggable
+          panOnDrag={isPanActive ? true : [1, 2]}
+          selectionOnDrag={!isPanActive}
+          nodesDraggable={!isPanActive}
           nodesConnectable={false}
-          elementsSelectable
+          elementsSelectable={!isPanActive}
           onlyRenderVisibleElements
           onNodeDragStop={handleNodeDragStop}
           onMove={handleMove}
           onNodeClick={handleNodeClick}
+          onPaneClick={handlePaneClick}
           proOptions={{ hideAttribution: true }}
         >
           {/* 16px geometric coordinate grid dot matrix per DESIGN.md §Spatial Engine */}
@@ -369,18 +392,14 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
         </div>
       </div>
 
-      {/* Bottom Canvas Status Bar */}
+      {/* Bottom Canvas Status Bar — coordinates removed */}
       <div className="h-6 w-full border-t border-[#ebebeb] bg-[#ffffff] px-3 flex items-center justify-between shrink-0 font-mono text-[9px] text-[#595959] z-10">
         <div className="flex items-center gap-2">
-          <span>COORD: X: {viewport.x.toFixed(1)}</span>
-          <span className="text-[#ebebeb]">|</span>
-          <span>Y: {viewport.y.toFixed(1)}</span>
-          <span className="text-[#ebebeb]">|</span>
-          <span>SCALE: {viewport.zoom.toFixed(2)}x</span>
+          <span>SCALE: {storeViewport.zoom.toFixed(2)}x</span>
           <span className="text-[#ebebeb]">|</span>
           <span>RENDER: {nodes.length} nodes</span>
           <span className="text-[#ebebeb]">|</span>
-          <span>PROJECTION: Cartesian Orthographic</span>
+          <span>MODE: {isPanActive ? 'Pan Navigation' : 'Select & Edit'}</span>
         </div>
 
         <div className="flex items-center gap-2">

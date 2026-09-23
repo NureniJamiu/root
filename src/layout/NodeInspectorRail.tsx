@@ -7,9 +7,15 @@ import { Kbd } from '../ui/Kbd';
 export interface NodeInspectorRailProps {
   readonly onOpenEditor?: (nodeId: UUID) => void;
   readonly onAddChild?: (parentId: UUID) => void;
+  readonly isOpen?: boolean;
+  readonly onClose?: () => void;
 }
 
-export function NodeInspectorRail({ onOpenEditor, onAddChild }: NodeInspectorRailProps): JSX.Element {
+export function NodeInspectorRail({
+  onOpenEditor,
+  onAddChild,
+  onClose,
+}: NodeInspectorRailProps): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const selectionId = useCanvasStore((s) => s.selection.nodeId);
   const selectedNode = canvas.nodes.find((n) => n.id === selectionId);
@@ -34,8 +40,9 @@ export function NodeInspectorRail({ onOpenEditor, onAddChild }: NodeInspectorRai
 
   return (
     <aside
-      className="w-[360px] h-full bg-[#ffffff] border-l border-[#ebebeb] flex flex-col justify-between shrink-0 select-none z-20"
+      className="w-[360px] min-w-[360px] h-full bg-[#ffffff] border-l border-[#ebebeb] flex flex-col justify-between shrink-0 select-none z-20"
       style={{ boxShadow: 'none' }}
+      data-testid="node-inspector-rail"
     >
       {/* Top Header & Breadcrumb */}
       <div className="flex flex-col">
@@ -53,9 +60,27 @@ export function NodeInspectorRail({ onOpenEditor, onAddChild }: NodeInspectorRai
             </span>
           </div>
 
-          <Badge variant={selectedNode ? 'topic' : 'muted'}>
-            {selectedNode ? 'Active' : 'Empty'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={selectedNode ? 'topic' : 'muted'}>
+              {selectedNode ? 'Active' : 'Empty'}
+            </Badge>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1 rounded-[2px] text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
+                title="Collapse Inspector (Slide right)"
+                aria-label="Collapse Inspector"
+                data-testid="btn-close-inspector"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M15 3v18" />
+                  <path d="m10 15 3-3-3-3" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Path Ribbon */}
