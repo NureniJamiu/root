@@ -83,24 +83,24 @@ const TYPE_ORDER: readonly NodeType[] = [
 ];
 
 /**
- * Palette color used for the selected type button's border and for the
- * body counter's normal state — pulled directly from the DESIGN.md
- * primary token so no ad-hoc hex leaks in.
+ * Palette color used for the selected type button's border — uses
+ * DESIGN.md color.surface.strong token so the selection indicator
+ * matches the card selection border and the overall accent.
  */
-const PRIMARY = '#0051c3';
+const SURFACE_STRONG = '#ff3c00'; // color.surface.strong
 
 /**
  * Palette color used when the character counter is in warn state, and
- * for the drop-zone-rejected border flash.
+ * for the drop-zone-rejected border flash. Uses color.surface.strong
+ * as the single "alert/action" accent in the new palette.
  */
-const SECONDARY = '#de5052';
+const SECONDARY = '#ff3c00'; // color.surface.strong
 
 /**
  * How long the drop-zone border flashes when a non-image payload is
- * dropped. 150 ms matches the app-wide transition duration from
- * DESIGN.md so the flash feels part of the design language.
+ * dropped. motion.duration.normal = 150ms from DESIGN.md.
  */
-const FLASH_MS = 150;
+const FLASH_MS = 150; // motion.duration.normal
 
 /* -------------------------------------------------------------------------- */
 /* Public types                                                               */
@@ -346,9 +346,9 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
   const bodyLength = node?.body.length ?? 0;
   const counterWarn = bodyLength > BODY_COUNTER_WARN_AT;
 
-  // Drop zone border: solid neutral-700 normally, red during a flash.
+  // Drop zone border: solid text.tertiary normally, surface.strong during a flash.
   const dropZoneBorder = useMemo(() => {
-    return dropFlash ? `2px solid ${SECONDARY}` : '2px dashed #404040';
+    return dropFlash ? `2px solid ${SECONDARY}` : '2px dashed #312e2e'; // color.text.tertiary
   }, [dropFlash]);
 
   /* ------------------------------------------------------------------ */
@@ -364,7 +364,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
       // Backdrop: full-viewport overlay. `data-testid` lets component
       // tests target the click-away zone unambiguously.
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0, 0, 0, 0.35)' }}
+      style={{ background: 'rgba(0, 0, 0, 0.55)' }}
       data-testid="node-editor-backdrop"
       onMouseDown={onBackdropMouseDown}
       role="dialog"
@@ -378,11 +378,12 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
         // itself, so this container does not need to `stopPropagation`.
         className="flex flex-col gap-3"
         style={{
-          background: '#ffffff',
-          color: '#000000',
-          border: '1px solid #404040',
-          borderRadius: 5,
-          padding: 16,
+          background: '#ffffff',         // color.surface.raised
+          color: '#191818',              // color.text.primary
+          border: '1px solid #312e2e',   // color.text.tertiary
+          borderRadius: 8,               // radius.sm
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.22)',
+          padding: 16,                   // space.7
           width: 480,
           maxWidth: '90vw',
           maxHeight: '90vh',
@@ -393,7 +394,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
       >
         {/* Title -------------------------------------------------------- */}
         <label className="flex flex-col gap-1 text-body">
-          <span style={{ color: '#595959' }}>Title</span>
+          <span style={{ color: '#312e2e' }}>Title</span>
           <input
             ref={titleRef}
             type="text"
@@ -403,13 +404,12 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
             autoFocus
             className="text-body"
             style={{
-              border: '1px solid #404040',
-              borderRadius: 2,
-              padding: '4px 6px',
-              background: '#ffffff',
-              color: '#000000',
+              border: '1px solid #312e2e',   // color.text.tertiary
+              borderRadius: 6,               // radius.xs
+              padding: '4px 6px',            // space.1 / space.2
+              background: '#ffffff',         // color.surface.raised
+              color: '#191818',              // color.text.primary
               outline: 'none',
-              fontFamily: 'Times, serif',
             }}
             data-testid="node-editor-title"
           />
@@ -417,7 +417,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
 
         {/* Body --------------------------------------------------------- */}
         <label className="flex flex-col gap-1 text-body">
-          <span style={{ color: '#595959' }}>Body</span>
+          <span style={{ color: '#312e2e' }}>Body</span>
           <textarea
             value={node.body}
             onChange={onBodyChange}
@@ -425,14 +425,13 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
             rows={8}
             className="text-body"
             style={{
-              border: '1px solid #404040',
-              borderRadius: 2,
+              border: '1px solid #312e2e',   // color.text.tertiary
+              borderRadius: 6,               // radius.xs
               padding: '4px 6px',
-              background: '#ffffff',
-              color: '#000000',
+              background: '#ffffff',         // color.surface.raised
+              color: '#191818',              // color.text.primary
               outline: 'none',
               resize: 'vertical',
-              fontFamily: 'Times, serif',
             }}
             data-testid="node-editor-body"
           />
@@ -440,7 +439,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
             className="text-body"
             style={{
               alignSelf: 'flex-end',
-              color: counterWarn ? SECONDARY : '#595959',
+              color: counterWarn ? SECONDARY : '#312e2e', // warn: surface.strong, normal: text.tertiary
             }}
             data-testid="node-editor-body-counter"
           >
@@ -450,7 +449,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
 
         {/* Type picker -------------------------------------------------- */}
         <div className="flex flex-col gap-1 text-body">
-          <span style={{ color: '#595959' }}>Type</span>
+          <span style={{ color: '#312e2e' }}>Type</span>
           <div
             className="flex flex-row gap-2"
             data-testid="node-editor-type-buttons"
@@ -466,16 +465,15 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
                   aria-pressed={isSelected}
                   className="rounded-xs text-body transition-colors"
                   style={{
-                    // Selection swaps the border to the 2 px primary
-                    // stroke (matches NodeCard selection rule); the
-                    // base stroke tracks the type's own border color.
+                    // Selection swaps the border to the 2 px surface.strong
+                    // stroke (matches NodeCard selection rule); the base
+                    // stroke tracks the type's own border color.
                     border: isSelected
-                      ? `2px solid ${PRIMARY}`
+                      ? `2px solid ${SURFACE_STRONG}`
                       : `1px solid ${style.border}`,
                     background: style.background,
                     color: style.text,
                     padding: isSelected ? '3px 7px' : '4px 8px',
-                    fontFamily: 'Times, serif',
                     cursor: 'pointer',
                   }}
                   data-testid={`node-editor-type-${t}`}
@@ -489,7 +487,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
 
         {/* Images ------------------------------------------------------- */}
         <div className="flex flex-col gap-2 text-body">
-          <span style={{ color: '#595959' }}>Images</span>
+          <span style={{ color: '#312e2e' }}>Images</span>
 
           <div
             // Drop zone: dashed border, hollow center. Border flashes
@@ -500,10 +498,10 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
             className="flex flex-col items-center justify-center gap-2 text-body transition-colors"
             style={{
               border: dropZoneBorder,
-              borderRadius: 5,
-              padding: 12,
+              borderRadius: 8,              // radius.sm
+              padding: 12,                  // space.6
               minHeight: 72,
-              color: '#595959',
+              color: '#312e2e',             // color.text.tertiary
             }}
             data-testid="node-editor-drop-zone"
             data-flashing={dropFlash ? 'true' : 'false'}
@@ -514,12 +512,11 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
               onClick={openFilePicker}
               className="rounded-xs text-body"
               style={{
-                border: '1px solid #404040',
-                background: '#ffffff',
-                color: '#000000',
+                border: '1px solid #312e2e',   // color.text.tertiary
+                background: '#ffffff',          // color.surface.raised
+                color: '#191818',               // color.text.primary
                 padding: '3px 8px',
                 cursor: 'pointer',
-                fontFamily: 'Times, serif',
               }}
               data-testid="node-editor-pick-file"
             >
@@ -557,10 +554,10 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
                   key={img.id}
                   className="relative"
                   style={{
-                    border: '1px solid #404040',
-                    borderRadius: 2,
+                    border: '1px solid #312e2e',   // color.text.tertiary
+                    borderRadius: 6,               // radius.xs
                     padding: 2,
-                    background: '#ffffff',
+                    background: '#ffffff',         // color.surface.raised
                   }}
                 >
                   <img
@@ -582,12 +579,11 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
                       position: 'absolute',
                       top: 2,
                       right: 2,
-                      border: '1px solid #404040',
-                      background: '#ffffff',
-                      color: '#000000',
+                      border: '1px solid #312e2e',   // color.text.tertiary
+                      background: '#ffffff',          // color.surface.raised
+                      color: '#191818',               // color.text.primary
                       padding: '0 4px',
                       cursor: 'pointer',
-                      fontFamily: 'Times, serif',
                       lineHeight: 1.2,
                     }}
                     data-testid={`node-editor-remove-image-${img.id}`}
@@ -607,12 +603,11 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
             onClick={close}
             className="rounded-xs text-body"
             style={{
-              border: '1px solid #404040',
-              background: '#ffffff',
-              color: '#000000',
+              border: '1px solid #312e2e',   // color.text.tertiary
+              background: '#ffffff',          // color.surface.raised
+              color: '#191818',               // color.text.primary
               padding: '4px 10px',
               cursor: 'pointer',
-              fontFamily: 'Times, serif',
             }}
             data-testid="node-editor-close"
           >

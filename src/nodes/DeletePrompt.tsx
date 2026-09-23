@@ -156,13 +156,13 @@ export function DeletePrompt({
         aria-describedby="delete-prompt-body"
         className="rounded-sm"
         style={{
-          background: '#ffffff',
-          color: '#000000',
-          border: '1px solid #404040',
-          borderRadius: 5,
+          background: '#ffffff',         // color.surface.raised
+          color: '#191818',              // color.text.primary
+          border: '1px solid #312e2e',   // color.text.tertiary
+          borderRadius: 8,               // radius.sm
           minWidth: 360,
           maxWidth: 480,
-          padding: 16,
+          padding: 16,                   // space.7
         }}
         data-testid="delete-prompt"
       >
@@ -252,12 +252,10 @@ function ChoiceButton({
       data-testid={testId}
       className="rounded-xs px-2 py-1 text-body transition-colors"
       style={{
-        border: `1px solid ${filled ? '#0051c3' : '#404040'}`,
-        background: filled ? (disabled ? '#ebebeb' : '#0051c3') : '#ffffff',
-        color: filled ? (disabled ? '#595959' : '#ffffff') : '#000000',
+        border: `1px solid ${filled ? '#ff3c00' : '#312e2e'}`, // strong : text.tertiary
+        background: filled ? (disabled ? '#f6f5f4' : '#ff3c00') : '#ffffff', // muted : strong : raised
+        color: filled ? (disabled ? '#312e2e' : '#ffffff') : '#191818',       // tertiary : raised : primary
         cursor: disabled ? 'not-allowed' : 'pointer',
-        // Selection ring color inherits from the primary palette (R11.7)
-        // but we do not paint any shadow — flat material only.
         boxShadow: 'none',
       }}
     >

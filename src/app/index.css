@@ -2,7 +2,105 @@
 @tailwind components;
 @tailwind utilities;
 
-/* DESIGN.md: Times is the primary font family for all text (Requirement 11.2). */
+/*
+ * DESIGN.md — Editorial Research Workbench
+ * Academic / Editorial Brutalism: EB Garamond + JetBrains Mono
+ * Zero-Shadow Mandate, 1px #ebebeb hairline boundaries, micro-radii (2px).
+ */
+:root {
+  /* Typography */
+  --font-family-serif: 'EB Garamond', Georgia, serif;
+  --font-family-mono: 'JetBrains Mono', monospace;
+  --font-size-base: 13px;
+  --line-height-base: 20px;
+  --font-weight-base: 400;
+
+  /* Typographic Neutrals */
+  --color-text-primary: #000000;    /* Obsidian */
+  --color-text-secondary: #404040;  /* Primary Reading Ink */
+  --color-text-tertiary: #595959;   /* Annotation / Muted */
+  --color-text-inverse: #ffffff;
+
+  /* Surfaces */
+  --color-surface-base: #fbf9f8;
+  --color-surface-canvas: #f9f9fb;
+  --color-surface-muted: #f5f3f3;
+  --color-surface-container: #f0eded;
+  --color-surface-raised: #ffffff;
+  --color-surface-strong: #0051c3;
+
+  /* Structural Hairlines */
+  --color-border-rule: #ebebeb;
+  --color-outline: #737785;
+  --color-outline-variant: #c3c6d6;
+
+  /* Semantic Research Nodes */
+  --color-semantic-topic: #0051c3;
+  --color-semantic-finding: #2d7a4c;
+  --color-semantic-question: #de5052;
+  --color-semantic-conclusion: #521010;
+
+  /* Micro-radii (DESIGN.md: 2px - 4px) */
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-full: 9999px;
+
+  /* Motion: 150ms ease-out */
+  --motion-instant: 100ms;
+  --motion-fast: 120ms;
+  --motion-normal: 150ms;
+}
+
 body {
-  font-family: Times, serif;
+  font-family: var(--font-family-serif);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  font-weight: var(--font-weight-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-surface-canvas);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* React Flow canvas refinements */
+.react-flow__pane {
+  cursor: grab;
+}
+
+.react-flow__pane:active {
+  cursor: grabbing;
+}
+
+.react-flow__edge-path {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 150ms ease, stroke-width 150ms ease;
+}
+
+.react-flow__selection {
+  border: 1px dashed var(--color-semantic-topic) !important;
+  background: rgba(0, 81, 195, 0.05) !important;
+  border-radius: var(--radius-xs) !important;
+  box-shadow: none !important;
+}
+
+/* Precision scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c3c6d6;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #737785;
 }

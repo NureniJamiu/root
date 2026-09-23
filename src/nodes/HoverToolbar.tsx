@@ -22,6 +22,15 @@ import type { ReactNode } from 'react';
 import { canvasActions, useCanvasStore } from '../data';
 import type { Node, NodeType, UUID } from '../data';
 
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  CycleIcon,
+  ImageIcon,
+  PencilIcon,
+  PlusIcon,
+} from './icons';
 import { useToolbarCallbacks } from './toolbarCallbacks';
 
 /**
@@ -93,38 +102,43 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
 
   return (
     <div
-      className="flex flex-row gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+      className="flex flex-row items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
       data-testid="hover-toolbar"
     >
       <ToolbarButton label="Add child" onClick={handleAddChild} testId="btn-add-child">
-        +
+        <PlusIcon />
       </ToolbarButton>
       <ToolbarButton label="Edit" onClick={onEdit} testId="btn-edit">
-        ✎
+        <PencilIcon />
       </ToolbarButton>
       <ToolbarButton label="Add image" onClick={onAddImage} testId="btn-add-image">
-        🖼
+        <ImageIcon />
       </ToolbarButton>
       <ToolbarButton
         label={`Cycle type (current: ${node.type})`}
         onClick={onCycleType}
         testId="btn-cycle-type"
       >
-        ⟳
+        <CycleIcon />
       </ToolbarButton>
       {/* Collapse affordance (R6.1): only when node has children and is not
           collapsed. Expand affordance (R6.3): when node is collapsed. */}
       {node.collapsed ? (
         <ToolbarButton label="Expand subtree" onClick={onExpand} testId="btn-expand">
-          ▶
+          <ChevronRightIcon />
         </ToolbarButton>
       ) : hasChildren ? (
         <ToolbarButton label="Collapse subtree" onClick={onCollapse} testId="btn-collapse">
-          ▼
+          <ChevronDownIcon />
         </ToolbarButton>
       ) : null}
-      <ToolbarButton label="Delete" onClick={onDelete} testId="btn-delete">
-        ✕
+      <ToolbarButton
+        label="Delete"
+        onClick={onDelete}
+        testId="btn-delete"
+        variant="destructive"
+      >
+        <CloseIcon />
       </ToolbarButton>
     </div>
   );
@@ -139,6 +153,7 @@ interface ToolbarButtonProps {
   readonly onClick: () => void;
   readonly testId: string;
   readonly children: ReactNode;
+  readonly variant?: 'default' | 'destructive';
 }
 
 function ToolbarButton({
@@ -146,6 +161,7 @@ function ToolbarButton({
   onClick,
   testId,
   children,
+  variant = 'default',
 }: ToolbarButtonProps): JSX.Element {
   return (
     <button
@@ -163,11 +179,18 @@ function ToolbarButton({
         // into a canvas drag.
         e.stopPropagation();
       }}
-      className="rounded-xs px-1 text-body transition-colors"
+      className={`inline-flex items-center justify-center rounded-[2px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#0051c3] cursor-pointer ${
+        variant === 'destructive'
+          ? 'hover:bg-[#de5052] hover:text-[#ffffff] hover:border-[#de5052]'
+          : 'hover:bg-[#f5f3f3] hover:border-[#000000] hover:text-[#000000]'
+      }`}
       style={{
-        border: '1px solid #404040',
+        width: 22,
+        height: 22,
+        border: '1px solid #ebebeb',
         background: '#ffffff',
-        color: '#000000',
+        color: '#404040',
+        boxShadow: 'none',
       }}
       data-testid={testId}
     >

@@ -1,302 +1,213 @@
-# Design Language: Attention Required! | Cloudflare
+---
+name: Editorial Research Workbench
+colors:
+  surface: '#fbf9f8'
+  surface-dim: '#dcd9d9'
+  surface-bright: '#fbf9f8'
+  surface-container-lowest: '#ffffff'
+  surface-container-low: '#f5f3f3'
+  surface-container: '#f0eded'
+  surface-container-high: '#eae8e7'
+  surface-container-highest: '#e4e2e1'
+  on-surface: '#1b1c1c'
+  on-surface-variant: '#434653'
+  inverse-surface: '#303030'
+  inverse-on-surface: '#f3f0f0'
+  outline: '#737785'
+  outline-variant: '#c3c6d6'
+  surface-tint: '#1357c9'
+  primary: '#003b93'
+  on-primary: '#ffffff'
+  primary-container: '#0051c3'
+  on-primary-container: '#beceff'
+  inverse-primary: '#b1c5ff'
+  secondary: '#af2d33'
+  on-secondary: '#ffffff'
+  secondary-container: '#fd6767'
+  on-secondary-container: '#69000f'
+  tertiary: '#722825'
+  on-tertiary: '#ffffff'
+  tertiary-container: '#903f3b'
+  on-tertiary-container: '#ffc0ba'
+  error: '#ba1a1a'
+  on-error: '#ffffff'
+  error-container: '#ffdad6'
+  on-error-container: '#93000a'
+  primary-fixed: '#dae2ff'
+  primary-fixed-dim: '#b1c5ff'
+  on-primary-fixed: '#001947'
+  on-primary-fixed-variant: '#00419f'
+  secondary-fixed: '#ffdad8'
+  secondary-fixed-dim: '#ffb3b0'
+  on-secondary-fixed: '#410006'
+  on-secondary-fixed-variant: '#8d131f'
+  tertiary-fixed: '#ffdad7'
+  tertiary-fixed-dim: '#ffb3ad'
+  on-tertiary-fixed: '#3f0305'
+  on-tertiary-fixed-variant: '#7a2e2b'
+  background: '#fbf9f8'
+  on-background: '#1b1c1c'
+  surface-variant: '#e4e2e1'
+typography:
+  headline-xl:
+    fontFamily: EB Garamond
+    fontSize: 60px
+    fontWeight: '300'
+    lineHeight: 68px
+    letterSpacing: -0.02em
+  headline-lg:
+    fontFamily: EB Garamond
+    fontSize: 30px
+    fontWeight: '300'
+    lineHeight: 36px
+    letterSpacing: -0.01em
+  headline-md:
+    fontFamily: EB Garamond
+    fontSize: 22px
+    fontWeight: '400'
+    lineHeight: 28px
+  headline-sm:
+    fontFamily: EB Garamond
+    fontSize: 18px
+    fontWeight: '500'
+    lineHeight: 24px
+  body-lg:
+    fontFamily: EB Garamond
+    fontSize: 16px
+    fontWeight: '400'
+    lineHeight: 24px
+  body-md:
+    fontFamily: EB Garamond
+    fontSize: 13px
+    fontWeight: '400'
+    lineHeight: 20px
+  body-sm:
+    fontFamily: EB Garamond
+    fontSize: 11px
+    fontWeight: '400'
+    lineHeight: 16px
+  label-md:
+    fontFamily: JetBrains Mono
+    fontSize: 11px
+    fontWeight: '500'
+    lineHeight: 14px
+    letterSpacing: 0.04em
+  label-sm:
+    fontFamily: JetBrains Mono
+    fontSize: 9px
+    fontWeight: '500'
+    lineHeight: 12px
+    letterSpacing: 0.06em
+rounded:
+  sm: 0.125rem
+  DEFAULT: 0.25rem
+  md: 0.375rem
+  lg: 0.5rem
+  xl: 0.75rem
+  full: 9999px
+spacing:
+  gutter: 1rem
+  margin: 1.5rem
+  space-xs: 0.25rem
+  space-sm: 0.5rem
+  space-md: 0.75rem
+  space-lg: 1.25rem
+  space-xl: 2rem
+---
 
-> Extracted from `https://replit.com` on May 28, 2026
-> 47 elements analyzed
+## Brand & Style
 
-This document describes the complete design language of the website. It is structured for AI/LLM consumption — use it to faithfully recreate the visual design in any framework.
+This design system delivers an intentional, rigorous desktop-first workspace tailored for research synthesis, academic inquiry, and critical analysis. The aesthetic synthesizes the typographic discipline of classical broadsheets and scholarly monographs with the mechanical clarity of mid-century technical drafting systems.
 
-## Color Palette
+### Core Philosophy
+- **Scholarship over Spectacle:** Chromatic noise and decorative novelties are eliminated. Visual hierarchy is achieved strictly via typographic scale, crisp hairline divisions, and disciplined spatial positioning.
+- **Architectonic Rigor:** Interfaces operate on an uncompromising structural grid. Information sits within defined rectangular cells reminiscent of catalog indices and ledger sheets.
+- **Instrumental Precision:** Rather than simulating physical materials through skeuomorphic rendering or fuzzy drop shadows, surfaces are strictly flat, using 1px boundary rules, micro-radii, and an engineered millimeter coordinate plane.
 
-### Primary Colors
+### Visual Style
+The system embodies an **Editorial Brutalism** informed by academic publishing: high-contrast black ink, archival paper white, surgical hairline rules, classical transitional serif typography, and acute, purpose-driven chromatic accents to flag semantic research nodes.
 
-| Role | Hex | RGB | HSL | Usage Count |
-|------|-----|-----|-----|-------------|
-| Primary | `#0051c3` | rgb(0, 81, 195) | hsl(215, 100%, 38%) | 4 |
-| Secondary | `#de5052` | rgb(222, 80, 82) | hsl(359, 68%, 59%) | 1 |
-| Accent | `#521010` | rgb(82, 16, 16) | hsl(0, 67%, 19%) | 1 |
+## Colors
 
-### Neutral Colors
+The palette establishes an authoritative, high-legibility scholarly environment rooted in ink-on-vellum tonality with semantic taxonomy markers.
 
-| Hex | HSL | Usage Count |
-|-----|-----|-------------|
-| `#404040` | hsl(0, 0%, 25%) | 53 |
-| `#000000` | hsl(0, 0%, 0%) | 30 |
-| `#595959` | hsl(0, 0%, 35%) | 4 |
-| `#ffffff` | hsl(0, 0%, 100%) | 3 |
-| `#ebebeb` | hsl(0, 0%, 92%) | 2 |
+### Palette Architecture
+- **Primary Canvas (`#f9f9fb`):** An engineered neutral backdrop providing soft contrast beneath dense black text without eye strain.
+- **Pure Surface (`#ffffff`):** Reserved for card containers, inspect panels, and reading panes to ensure maximum contrast.
+- **Structural Dividing Rules (`#ebebeb`):** Used for grid lines, panel dividers, and canvas dot matrices.
+- **Typographic Neutrals:**
+  - `#000000` (Obsidian): Document headlines, active indicators, and high-priority titles.
+  - `#404040` (Primary Reading Ink): Optimized for long-form synthesis body copy and data table cells.
+  - `#595959` (Annotation/Muted): Secondary metadata, timestamps, keyboard shortcuts, and millimeter coordinates.
 
-### Background Colors
-
-Used on large-area elements: `#ffffff`, `#ebebeb`
-
-### Text Colors
-
-Text color palette: `#000000`, `#404040`, `#ffffff`, `#595959`, `#0051c3`
-
-### Gradients
-
-```css
-background-image: -webkit-gradient(linear, 0% 0%, 0% 100%, from(rgb(222, 222, 222)), color-stop(0.03, rgb(235, 235, 235)), color-stop(0.97, rgb(235, 235, 235)), to(rgb(222, 222, 222)));
-```
-
-### Full Color Inventory
-
-| Hex | Contexts | Count |
-|-----|----------|-------|
-| `#404040` | text, border | 53 |
-| `#000000` | text, border | 30 |
-| `#595959` | text, border | 4 |
-| `#0051c3` | text, border | 4 |
-| `#ffffff` | text, background | 3 |
-| `#ebebeb` | background, border | 2 |
-| `#de5052` | background | 1 |
-| `#521010` | border | 1 |
+### Semantic Research Nodes
+- **Topic Node (`#0051c3`):** Cobalt blue indicative of core subject anchors, primary structural threads, and active focus states.
+- **Finding Node (`#2d7a4c`):** Deep botanical green reserved for verified facts, data points, citations, and validated outcomes.
+- **Question Node (`#de5052`):** Crimson coral highlighting active inquiries, unresolved hypotheses, and critical anomalies.
+- **Conclusion Node (`#521010`):** Deep oxblood signaling consolidated theses, synthesized outcomes, and definitive closures.
 
 ## Typography
 
-### Font Families
+The typographical engine mirrors the precision of academic presses. The foundation uses classical transitional and old-style serifs (`EB Garamond` or system serif fallbacks: `Times New Roman`, `Times`, `Georgia`), paired with an austere technical monospaced face (`JetBrains Mono`) for navigational chrome, node indices, metadata, and data points.
 
-- **Times** — used for body (15 elements)
+### Typographic Rules
+- **Headline Lightness:** Major titles (`headline-xl` at 60px and `headline-lg` at 30px) must always maintain a light weight (`300`), allowing classical serifs to project literary authority without overwhelming interface chrome.
+- **Reading Proportion:** Core analytical body text is set to `13px` with a generous `20px` leading (`1.538`), producing optimal reading rhythm for dense multi-column synthesis.
+- **Monospace Taxonomy:** All technical chrome—such as node IDs, status badges, timestamps, tags, and coordinates—uses uppercase, tracked monospaced labels to visually separate analytical metadata from authored prose.
 
-### Type Scale
+## Layout & Spacing
 
-| Size (px) | Size (rem) | Weight | Line Height | Letter Spacing | Used On |
-|-----------|------------|--------|-------------|----------------|---------|
-| 60px | 3.75rem | 300 | 72px | normal | h1 |
-| 30px | 1.875rem | 300 | 39px | normal | h2, span |
-| 16px | 1rem | 400 | normal | normal | html, head, title, meta |
-| 15px | 0.9375rem | 400 | 22.5px | normal | div, span, p, script |
-| 13px | 0.8125rem | 400 | 19.5px | normal | div, p, span, strong |
+The layout is built for desktop-first immersion, featuring multi-pane research views, horizontal reading ribbons, and split canvas-inspector patterns.
 
-### Heading Scale
+### Spatial Engine & Grid
+- **Desktop Primary Grid:** 12-column or 16-column continuous fluid layout bounded by a structured framing edge. Fixed side rails (index navigator at 280px, document inspector at 360px) frame an expansive central research canvas.
+- **Millimeter Canvas:** The visual canvas underlay employs a precise 16px × 16px geometric coordinate grid rendered with 1px `#ebebeb` intersection points or rules, grounding spatial graph nodes in an analytical drafting environment.
+- **Strict Hairline Rules:** Structural spatial division relies on continuous `1px solid #ebebeb` rules instead of open white gaps, maintaining high-density editorial structure without clutter.
+- **Responsive Adaptations:** Below 1024px, the multi-column workbench folds secondary inspectors into slide-over sheets, maintaining the 13px base reading scale.
 
-```css
-h1 { font-size: 60px; font-weight: 300; line-height: 72px; }
-h2 { font-size: 30px; font-weight: 300; line-height: 39px; }
-```
+## Elevation & Depth
 
-### Body Text
+This system operates under a **Zero-Shadow Mandate**. Ambient blur, drop shadows, and diffusion filters are prohibited across all standard and floating chrome.
 
-```css
-body { font-size: 13px; font-weight: 400; line-height: 19.5px; }
-```
+### Mechanical Elevation Hierarchy
+- **Level 0 (Underlay Canvas):** Ground `#f9f9fb` etched with 1px `#ebebeb` dot matrix or millimeter rule pattern.
+- **Level 1 (Structural Panes & Cards):** Flat `#ffffff` surfaces bounded by crisp `1px solid #ebebeb` borders.
+- **Level 2 (Active / Focused Nodes):** Flat `#ffffff` surface with a high-contrast `1px solid #000000` perimeter boundary or corresponding semantic edge (`#0051c3`, `#de5052`, `#521010`, `#2d7a4c`).
+- **Level 3 (Modals & Command Overlays):** `#ffffff` solid container encased in `2px solid #000000` with an opaque, unblurred structural backdrop mask of `rgba(0, 0, 0, 0.4)`.
 
-### Font Weights in Use
+## Shapes
 
-`400` (43x), `300` (3x), `600` (1x)
+Form geometry leans into technical architectural drawing instruments: sharp, deliberate, and structural.
 
-## Spacing
+### Geometry Standards
+- **Corner Radii:** Set strictly between 2px and 4px (Soft level 1). Pill shapes, round capsules, and high-radius cards are banned.
+- **Sharp Utility Elements:** Table cells, vertical tab splitters, canvas framing lines, and inspector dividers use hard right angles (`0px`).
+- **Micro-Radiused Nodes:** Interactive nodes, inputs, and chips utilize a uniform `2px` to `3px` corner radius, preventing pixelated corner abrasion while sustaining a brutalist, print-like edge.
 
-| Token | Value | Rem |
-|-------|-------|-----|
-| spacing-3 | 3px | 0.1875rem |
-| spacing-23 | 23px | 1.4375rem |
-| spacing-53 | 53px | 3.3125rem |
-| spacing-160 | 160px | 10rem |
+## Components
 
-## Border Radii
+Components follow desktop-first information density, featuring sharp hairline framing, print-inspired states, and instantaneous micro-transitions (`150ms ease-out`).
 
-| Label | Value | Count |
-|-------|-------|-------|
-| xs | 2px | 1 |
-| sm | 5px | 1 |
+### Buttons
+- **Primary:** Solid `#000000` background, `#ffffff` label text, `2px` micro-radius, `0 12px` padding, 32px height. Hover state shifts instantly to `#0051c3`.
+- **Secondary / Ghost:** `#ffffff` surface, `1px solid #ebebeb` boundary, `#404040` label text. Hover state switches to `1px solid #000000` and text to `#000000`.
+- **Destructive:** `1px solid #de5052` outline, `#de5052` text, filling to solid `#de5052` with `#ffffff` text on active confirmation.
 
-## CSS Custom Properties
+### Research Nodes (Canvas Elements)
+- **Shared Architecture:** Crisp `#ffffff` container, `2px` corner radius, surrounded by a 1px border.
+- **Topic Node:** Top boundary or full border accented with `#0051c3`. Node index badge rendered in `label-sm` with `#0051c3` text on `#0051c3` (8% opacity) tint.
+- **Finding Node:** Tagged with `#2d7a4c` metadata label; citation indicator anchored in `#2d7a4c`.
+- **Question Node:** Border rule highlighted in `#de5052`; query indicator flagged with monospaced question mark token in coral crimson.
+- **Conclusion Node:** Bordered in rich `#521010` oxblood; headline text styled in italicized transitional serif.
 
-### Semantic
+### Text Input & Filter Fields
+- Minimalist architectural box: `#ffffff` surface, `1px solid #ebebeb` default border, `2px` radius. Focus transition (`150ms`) upgrades border to `1px solid #000000` without glow rings. Placeholder copy rendered in `#595959`.
 
-```css
-success: [object Object];
-warning: [object Object];
-error: [object Object];
-info: [object Object];
-```
+### Chips & Semantic Tags
+- Monospace micro-pills (`label-sm`), strictly rectangular with `2px` radius, `2px 6px` padding. Bordered in `1px solid #ebebeb`. Active node filters adopt respective semantic colors (`#0051c3`, `#2d7a4c`, `#de5052`, `#521010`) for borders and typography.
 
-## Breakpoints
+### Checkboxes & Radios
+- Hard geometric boxes (`0px` or `2px` radius) sized precisely at `14px × 14px`. Unchecked: `1px solid #404040`. Checked: `#000000` fill with sharp, unrounded white hairline glyphs.
 
-| Name | Value | Type |
-|------|-------|------|
-| md | 787px | min-width |
-| lg | 1056px | min-width |
-
-## Transitions & Animations
-
-**Durations:** `0.15s`
-
-### Common Transitions
-
-```css
-transition: all;
-transition: color 0.15s;
-transition: 0.15s;
-```
-
-## Component Patterns
-
-Detected UI component patterns and their most common styles:
-
-### Buttons (1 instances)
-
-```css
-.button {
-  color: rgb(0, 81, 195);
-  font-size: 13px;
-  font-weight: 400;
-  padding-top: 0px;
-  padding-right: 0px;
-  border-radius: 0px;
-}
-```
-
-### Links (1 instances)
-
-```css
-.link {
-  color: rgb(0, 81, 195);
-  font-size: 13px;
-  font-weight: 400;
-}
-```
-
-### Navigation (1 instances)
-
-```css
-.navigatio {
-  color: rgb(64, 64, 64);
-  padding-top: 35px;
-  padding-bottom: 0px;
-  padding-left: 0px;
-  padding-right: 0px;
-  position: static;
-}
-```
-
-### Footer (7 instances)
-
-```css
-.foote {
-  color: rgb(64, 64, 64);
-  padding-top: 0px;
-  padding-bottom: 0px;
-  font-size: 13px;
-}
-```
-
-## Component Clusters
-
-Reusable component instances grouped by DOM structure and style similarity:
-
-### Button — 1 instance, 1 variant
-
-**Variant 1** (1 instance)
-
-```css
-  background: rgba(0, 0, 0, 0);
-  color: rgb(0, 81, 195);
-  padding: 0px 0px 0px 0px;
-  border-radius: 0px;
-  border: 0px none rgb(0, 81, 195);
-  font-size: 13px;
-  font-weight: 400;
-```
-
-## Layout System
-
-**0 grid containers** and **0 flex containers** detected.
-
-## Accessibility (WCAG 2.1)
-
-**Overall Score: 100%** — 0 passing, 0 failing color pairs
-
-## Design System Score
-
-**Overall: 84/100 (Grade: B)**
-
-| Category | Score |
-|----------|-------|
-| Color Discipline | 100/100 |
-| Typography Consistency | 100/100 |
-| Spacing System | 55/100 |
-| Shadow Consistency | 85/100 |
-| Border Radius Consistency | 100/100 |
-| Accessibility | 100/100 |
-| CSS Tokenization | 50/100 |
-
-**Strengths:** Tight, disciplined color palette, Consistent typography system, Clean elevation system, Consistent border radii, Strong accessibility compliance
-
-**Issues:**
-- No consistent spacing base unit detected — values appear arbitrary
-- 16 !important rules — prefer specificity over overrides
-- 69% of CSS is unused — consider purging
-- 241 duplicate CSS declarations
-
-## Gradients
-
-**1 unique gradients** detected.
-
-| Type | Direction | Stops | Classification |
-|------|-----------|-------|----------------|
-| linear | — | 7 | complex |
-
-```css
-background: gradient(linear, 0% 0%, 0% 100%, from(rgb(222, 222, 222)), color-stop(0.03, rgb(235, 235, 235)), color-stop(0.97, rgb(235, 235, 235)), to(rgb(222, 222, 222)));
-```
-
-## Z-Index Map
-
-**1 unique z-index values** across 1 layers.
-
-| Layer | Range | Elements |
-|-------|-------|----------|
-| modal | 999999999,999999999 | div |
-
-**Issues:**
-- [object Object]
-
-## Motion Language
-
-**Feel:** mixed · **Scroll-linked:** yes
-
-### Duration Tokens
-
-| name | value | ms |
-|---|---|---|
-| `xs` | `150ms` | 150 |
-
-## Brand Voice
-
-**Tone:** neutral · **Pronoun:** third-person · **Headings:** unknown (tight)
-
-### Top CTA Verbs
-
-- **click** (1)
-
-### Button Copy Patterns
-
-- "click to reveal" (1×)
-
-## Page Intent
-
-**Type:** `landing` (confidence 0.45)
-
-## Material Language
-
-**Label:** `flat` (confidence 0.55)
-
-| Metric | Value |
-|--------|-------|
-| Avg saturation | 0.306 |
-| Shadow profile | none |
-| Avg shadow blur | 0px |
-| Max radius | 5px |
-| backdrop-filter in use | no |
-| Gradients | 1 |
-
-## Quick Start
-
-To recreate this design in a new project:
-
-1. **Install fonts:** Add `Times` from Google Fonts or your font provider
-2. **Import CSS variables:** Copy `variables.css` into your project
-3. **Tailwind users:** Use the generated `tailwind.config.js` to extend your theme
-4. **Design tokens:** Import `design-tokens.json` for tooling integration
+### Inspector Panels & Document Drawers
+- Docked flush against the window edges. Structured via header ribbons containing breadcrumb coordinates in `label-md` and segmented by continuous `1px solid #ebebeb` horizontal and vertical lines.

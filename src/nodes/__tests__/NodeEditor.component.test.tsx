@@ -128,10 +128,11 @@ describe('NodeEditor — component', () => {
 
     expect(counter.textContent).toBe('19900/20000');
 
-    // Warning state: counter color must be the #de5052 red. jsdom may
-    // normalize inline styles from hex to rgb(), so we accept both forms.
+    // Warning state: counter color must be the #ff3c00 surface.strong accent
+    // (DESIGN.md color.surface.strong). jsdom may normalize inline styles
+    // from hex to rgb(), so we accept both forms.
     const color = (counter as HTMLElement).style.color;
-    const isWarnColor = color === '#de5052' || color === 'rgb(222, 80, 82)';
+    const isWarnColor = color === '#ff3c00' || color === 'rgb(255, 60, 0)';
     expect(isWarnColor).toBe(true);
   });
 

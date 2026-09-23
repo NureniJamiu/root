@@ -10,7 +10,7 @@ The design is organized around a strict separation between three isolated module
 - **Canvas Layer** (`canvas/`) — a React Flow wrapper that renders the infinite surface, handles pan / zoom / drag, and derives edges (Connectors) from `parentId` on each render. Depends on the Data Model Layer for state; does not import from `nodes/` internals.
 - **Node UI Layer** (`nodes/`) — presentational components: `NodeCard`, `NodeEditor`, `DeletePrompt`, hover toolbar. Depends on the Data Model Layer; does not import from `canvas/` internals.
 
-The stack is React 18 + TypeScript + Vite, styled with Tailwind CSS configured from the DESIGN.md tokens (Times font, palette `#0051c3` / `#de5052` / `#521010` + neutrals, radii 2px/5px, 150ms transitions, flat material). State is held in a Zustand store fronted by the Data Model Layer's typed mutators, and a Zustand middleware debounces persistence writes to `localStorage`.
+The stack is React 18 + TypeScript + Vite, styled with Tailwind CSS configured from the DESIGN.md tokens (ABC Diatype Plus Variable font, palette `color.text.*` / `color.surface.*` including `#ff3c00` strong accent, radii 6px/8px, 100–400ms motion scale, flat material). State is held in a Zustand store fronted by the Data Model Layer's typed mutators, and a Zustand middleware debounces persistence writes to `localStorage`.
 
 The design satisfies the requirements as follows: pan / zoom / connectors via React Flow (R1), root and child creation flows through pure mutators that emit properly-shaped nodes (R2, R3), inline `NodeEditor` for title / body / images / type (R4), drag commits final position on release (R5), collapse hides transitive descendants using a computed visibility set (R6), delete prompts with reparent-or-subtree semantics (R7), debounced `localStorage` persistence with Zod-validated load and `beforeunload` flush (R8), a stable JSON shape defined by a single Zod schema (R9), module isolation enforced by folder boundaries and eslint rules (R10), Tailwind tokens sourced from DESIGN.md (R11), viewport culling and memoized selectors (R12), MVP scope kept tight (R13), and an end-to-end walkthrough covered by an integration test (R14).
 
@@ -21,7 +21,7 @@ The design satisfies the requirements as follows: pan / zoom / connectors via Re
 - **Zustand + typed mutators.** Redux is overkill; raw `useState` is under-powered for the cross-cutting concerns (persistence middleware, selectors, viewport). Zustand gives us a small store with subscribe-based selectors that React Flow and node UI can consume without prop-drilling. The store never exposes `set` to feature code — all writes go through mutators defined in the Data Model Layer.
 - **Zod for the persistence boundary.** The Canvas JSON is the contract between manual edits today and AI generation tomorrow (R9, R10.5). A single Zod schema is both runtime validator and TypeScript source of truth via `z.infer`.
 - **Data URLs for images, size-capped.** No object storage in MVP. Images are inlined as data URLs with a per-image cap (2 MB) and a per-canvas soft cap that surfaces a warning. This keeps persistence self-contained.
-- **Flat material and Times body font.** DESIGN.md is strict: no shadows, no backdrop-filter, no decorative gradients beyond the one enumerated, and Times as the primary family. Selection and focus states use 1–2 px palette-color borders, not elevation.
+- **Flat material and ABC Diatype Plus Variable body font.** DESIGN.md is strict: no shadows, no backdrop-filter, no decorative gradients beyond the one enumerated, and ABC Diatype Plus Variable as the primary family. Selection and focus states use 1–2 px palette-color borders, not elevation.
 
 ## Architecture
 
@@ -214,7 +214,7 @@ export function CanvasView(props: { onNodeSelect?: (id: UUID) => void }): JSX.El
 Internally, `CanvasView`:
 - Wraps `<ReactFlowProvider>` and renders `<ReactFlow>`.
 - Registers a single custom node type `'research'` that renders the exported `NodeCard` from `nodes/`.
-- Subscribes to `useCanvasStore` via `useReactFlowGraph()`, which returns `{ nodes: RFNode[], edges: RFEdge[] }` derived from the visible-node set and `childrenIndex`. Edges use `type: 'default'` (bezier) with a 1 px stroke in `#404040`.
+- Subscribes to `useCanvasStore` via `useReactFlowGraph()`, which returns `{ nodes: RFNode[], edges: RFEdge[] }` derived from the visible-node set and `childrenIndex`. Edges use `type: 'default'` (bezier) with a 1 px stroke in `#312e2e` (color.text.tertiary).
 - Uses `nodesDraggable` on, `nodesConnectable` off, `elementsSelectable` on, `minZoom={0.25}`, `maxZoom={2.5}` (R1.4).
 - Wires `onNodeDragStop` to commit the final position via `canvasActions.moveNode` (R5.2). Interim drag positions live inside React Flow's internal state only — we never write to the store per-frame.
 - Uses React Flow's `onlyRenderVisibleElements` to cull off-screen nodes (R12.2).
@@ -251,7 +251,7 @@ graph TD
 - `NodeCard` reads `useCanvasStore(state => state.canvas.nodes.find(n => n.id === nodeId))` via a memoized selector. The card style variant is picked by `typeStyles[node.type]`.
 - `HoverToolbar` renders inside the card and only becomes opaque on `:hover`/`:focus-within`. Buttons dispatch to `canvasActions`.
 - `CollapseBadge` renders only when `node.collapsed === true` and shows `descendantCount(canvas, id)` (R6.5).
-- Selection style: `border: 2px solid #0051c3` (primary). No shadows. (R11.7)
+- Selection style: `border: 2px solid #ff3c00` (color.surface.strong). No shadows. (R11.7)
 
 ### Editor Flow
 
@@ -415,16 +415,16 @@ export type Canvas = z.infer<typeof canvasSchema>;
 
 ### Node_Type Palette Mapping (`nodes/typeStyles.ts`)
 
-Each `Node_Type` gets a distinct pairing drawn only from the DESIGN.md palette. No new colors introduced.
+Each `Node_Type` gets a distinct pairing drawn only from the DESIGN.md §Style Foundations palette. No new colors introduced.
 
 | Node_Type | Border | Title text | Background |
 |-----------|--------|-----------|------------|
-| `topic` | `#0051c3` (primary) | `#000000` | `#ffffff` |
-| `finding` | `#404040` (neutral) | `#000000` | `#ebebeb` |
-| `question` | `#de5052` (secondary) | `#521010` (accent) | `#ffffff` |
-| `conclusion` | `#521010` (accent) | `#ffffff` | `#521010` |
+| `topic` | `#ff3c00` (color.surface.strong) | `#191818` (color.text.primary) | `#ffffff` (color.surface.raised) |
+| `finding` | `#312e2e` (color.text.tertiary) | `#191818` (color.text.primary) | `#f6f5f4` (color.surface.muted) |
+| `question` | `#18191b` (color.text.secondary) | `#312e2e` (color.text.tertiary) | `#ffffff` (color.surface.raised) |
+| `conclusion` | `#ff3c00` (color.surface.strong) | `#ffffff` (color.surface.raised) | `#ff3c00` (color.surface.strong) |
 
-Borders are 1 px (or 2 px when selected). All cards use `border-radius: 5px` (DESIGN.md `sm`).
+Borders are 1 px (or 2 px when selected). All cards use `border-radius: 8px` (DESIGN.md `radius.sm`).
 
 ### Store Shape (`data/store.ts`)
 
@@ -529,7 +529,7 @@ The Data Model Layer is a pure functional core (parentId-only trees, immutable c
 
 ### Property 8: typeStyles palette conformance
 
-*For any* `NodeType` `t ∈ { 'topic', 'finding', 'question', 'conclusion' }`, `typeStyles[t]` returns a `{ border, background, text }` pairing whose values are all drawn from the DESIGN.md palette (`#0051c3`, `#de5052`, `#521010`, `#404040`, `#000000`, `#595959`, `#ffffff`, `#ebebeb`), and the four returned pairings are pairwise distinct.
+*For any* `NodeType` `t ∈ { 'topic', 'finding', 'question', 'conclusion' }`, `typeStyles[t]` returns a `{ border, background, text }` pairing whose values are all drawn from the DESIGN.md §Style Foundations palette (`color.text.primary=#191818`, `color.text.secondary=#18191b`, `color.text.tertiary=#312e2e`, `color.text.inverse=#37383c`, `color.surface.base=#000000`, `color.surface.muted=#f6f5f4`, `color.surface.raised=#ffffff`, `color.surface.strong=#ff3c00`), and the four returned pairings are pairwise distinct.
 
 **Validates: Requirements 4.7**
 

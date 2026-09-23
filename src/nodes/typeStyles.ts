@@ -1,9 +1,9 @@
 /**
  * `Node_Type` → visual style pairing for `NodeCard`.
  *
- * The four pairings are transcribed verbatim from design.md
- * §Node_Type Palette Mapping. Every color is drawn from the DESIGN.md
- * palette — the property test in task 10.2 asserts this invariant
+ * The four pairings are drawn from the DESIGN.md §Style Foundations token
+ * set. Every color references a named semantic token from the palette —
+ * the property test in typeStyles.palette.test.ts asserts this invariant
  * (Property 8, Requirement 4.7).
  *
  * The map is typed as a total mapping from `NodeType` so callers can index
@@ -19,9 +19,9 @@ import type { NodeType } from '../data';
  *   - `background` — the card fill.
  *   - `text`       — the title (and, for `conclusion`, body) text color.
  *
- * All values are literal hex strings from the DESIGN.md palette so
- * consumers can apply them via inline `style` without introducing a
- * dependency on Tailwind arbitrary-value syntax.
+ * All values are literal hex strings from the DESIGN.md palette
+ * (color.text.* and color.surface.*) so consumers can apply them via
+ * inline `style` without depending on Tailwind arbitrary-value syntax.
  */
 export interface TypeStyle {
   readonly border: string;
@@ -30,41 +30,71 @@ export interface TypeStyle {
 }
 
 /**
- * Distinct visual pairing per `NodeType`. Only palette colors are used.
+ * DESIGN.md §Style Foundations — complete color palette.
+ * Kept here as a typed const so `typeStyles` values stay auditable
+ * and the palette test can import this map instead of repeating hex values.
+ */
+export const PALETTE = {
+  // Typographic Neutrals (DESIGN.md §Colors)
+  obsidian:      '#000000', // Document headlines, titles, active indicators
+  readingInk:    '#404040', // Primary reading ink
+  muted:         '#595959', // Secondary metadata, coordinates
+  // Surfaces
+  canvas:        '#f9f9fb', // Primary canvas underlay
+  surface:       '#ffffff', // Pure surface card containers
+  borderRule:    '#ebebeb', // Structural dividing rules
+  surfaceMuted:  '#f5f3f3', // Surface container low
+  // Semantic Research Nodes (DESIGN.md §Semantic Research Nodes)
+  topic:         '#0051c3', // Cobalt blue: core subject anchors, active focus
+  finding:       '#2d7a4c', // Deep botanical green: verified facts, citations
+  question:      '#de5052', // Crimson coral: active inquiries, hypotheses
+  conclusion:    '#521010', // Deep oxblood: consolidated theses, closures
+  // Backward-compatibility aliases
+  textPrimary:   '#000000',
+  textSecondary: '#404040',
+  textTertiary:  '#595959',
+  surfaceBase:   '#000000',
+  surfaceRaised: '#ffffff',
+  surfaceStrong: '#0051c3',
+} as const;
+
+/**
+ * Distinct visual pairing per `NodeType`. Only DESIGN.md palette colors
+ * are used; every value maps to a named token in `PALETTE`.
  *
- * | NodeType     | Border            | Text            | Background        |
- * | ------------ | ----------------- | --------------- | ----------------- |
- * | `topic`      | `#0051c3` primary | `#000000`       | `#ffffff`         |
- * | `finding`    | `#404040` neutral | `#000000`       | `#ebebeb`         |
- * | `question`   | `#de5052` second. | `#521010` acc.  | `#ffffff`         |
- * | `conclusion` | `#521010` accent  | `#ffffff`       | `#521010`         |
+ * | NodeType     | Border                       | Background            | Text                  |
+ * | ------------ | ---------------------------- | --------------------- | --------------------- |
+ * | `topic`      | topic        `#0051c3`     | surface       `#ffffff` | obsidian    `#000000` |
+ * | `finding`    | finding      `#2d7a4c`     | surface       `#ffffff` | obsidian    `#000000` |
+ * | `question`   | question     `#de5052`     | surface       `#ffffff` | obsidian    `#000000` |
+ * | `conclusion` | conclusion   `#521010`     | surface       `#ffffff` | obsidian    `#000000` |
  */
 export const typeStyles: { readonly [K in NodeType]: TypeStyle } = {
   topic: {
-    border: '#0051c3',
-    background: '#ffffff',
-    text: '#000000',
+    border:     PALETTE.topic,
+    background: PALETTE.surface,
+    text:       PALETTE.obsidian,
   },
   finding: {
-    border: '#404040',
-    background: '#ebebeb',
-    text: '#000000',
+    border:     PALETTE.finding,
+    background: PALETTE.surface,
+    text:       PALETTE.obsidian,
   },
   question: {
-    border: '#de5052',
-    background: '#ffffff',
-    text: '#521010',
+    border:     PALETTE.question,
+    background: PALETTE.surface,
+    text:       PALETTE.obsidian,
   },
   conclusion: {
-    border: '#521010',
-    background: '#521010',
-    text: '#ffffff',
+    border:     PALETTE.conclusion,
+    background: PALETTE.surface,
+    text:       PALETTE.obsidian,
   },
 };
 
 /**
- * Selection border color. Design.md §Node UI Layer specifies a 2 px
- * `#0051c3` (primary) border when a node is selected, overriding the
- * type-driven base border.
+ * Selection border color. Uses cobalt blue (`#0051c3`) —
+ * the DESIGN.md active focus accent — applied as a 2 px border when a node
+ * is selected.
  */
-export const SELECTION_BORDER_COLOR = '#0051c3';
+export const SELECTION_BORDER_COLOR = PALETTE.topic; // #0051c3

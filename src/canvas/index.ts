@@ -23,4 +23,4 @@ export {
 } from './placement';
 
 export { CanvasView } from './CanvasView';
-export type { CanvasViewProps, CanvasViewProbeProps } from './CanvasView';
+export type { CanvasViewProps, CanvasViewProbeProps, CanvasViewControls } from './CanvasView';

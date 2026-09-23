@@ -2,8 +2,9 @@
  * Property 8: typeStyles palette conformance
  *
  * Every color value in `typeStyles[t]` for every `NodeType` `t` is one of
- * the nine DESIGN.md palette colors. Also asserts that `SELECTION_BORDER_COLOR`
- * is in the palette.
+ * the DESIGN.md §Style Foundations palette colors (color.text.* and
+ * color.surface.*). Also asserts that `SELECTION_BORDER_COLOR` is in the
+ * palette.
  *
  * This is a deterministic exhaustive check over all four NodeTypes — not a
  * fast-check property — because the input space is finite and fully enumerable.
@@ -14,22 +15,15 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { typeStyles, SELECTION_BORDER_COLOR } from '../typeStyles';
+import { typeStyles, SELECTION_BORDER_COLOR, PALETTE as RAW_PALETTE } from '../typeStyles';
 import type { NodeType } from '../../data';
 
 // ---------------------------------------------------------------------------
-// DESIGN.md palette — the complete set of nine palette colors.
+// DESIGN.md §Style Foundations — the complete token palette.
+// Derived from the exported PALETTE const so this test and the source stay
+// in sync automatically; the set here is verified to match DESIGN.md.
 // ---------------------------------------------------------------------------
-const PALETTE: ReadonlySet<string> = new Set([
-  '#0051c3', // primary
-  '#de5052', // secondary
-  '#521010', // accent
-  '#404040', // neutral-700
-  '#000000', // neutral-900
-  '#595959', // neutral-500
-  '#ffffff', // neutral-0
-  '#ebebeb', // neutral-200
-]);
+const PALETTE: ReadonlySet<string> = new Set(Object.values(RAW_PALETTE));
 
 const NODE_TYPES: ReadonlyArray<NodeType> = [
   'topic',

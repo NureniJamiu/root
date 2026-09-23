@@ -20,7 +20,7 @@ export function ImageThumbStrip({
   if (images.length === 0) return null;
   return (
     <div
-      className="flex flex-row flex-wrap gap-1"
+      className="flex flex-row flex-wrap gap-1.5 mt-2"
       data-testid="image-thumb-strip"
     >
       {images.map((img) => (
@@ -28,10 +28,17 @@ export function ImageThumbStrip({
           key={img.id}
           src={img.dataUrl}
           alt=""
-          className="rounded-xs"
+          className="rounded-xs transition-transform duration-120 hover:scale-105"
           // Fixed thumbnail dimensions keep card layout predictable
           // regardless of source image aspect ratio.
-          style={{ width: 32, height: 32, objectFit: 'cover' }}
+          style={{
+            width: 36,
+            height: 36,
+            objectFit: 'cover',
+            borderRadius: 6,
+            border: '1px solid #312e2e',
+            background: '#ffffff',
+          }}
         />
       ))}
     </div>

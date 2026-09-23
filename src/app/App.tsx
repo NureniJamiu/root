@@ -31,18 +31,26 @@ import {
   Component,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 
 import { CanvasView, computeChildPosition } from '../canvas';
+import type { CanvasViewControls } from '../canvas';
 import {
   canvasActions,
   useCanvasStore,
   onSaveError as onStoreSaveError,
 } from '../data';
-import type { UUID } from '../data';
+import type { NodeType, UUID } from '../data';
+import {
+  AppHeader,
+  EmptyCanvasState,
+  NodeInspectorRail,
+  StructuralIndexRail,
+} from '../layout';
 import {
   DeletePrompt,
   NodeEditor,
@@ -133,7 +141,7 @@ function ToastSurface(): JSX.Element {
       data-testid="toast-surface"
       style={{
         position: 'fixed',
-        bottom: 16,
+        bottom: 24,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
@@ -148,24 +156,34 @@ function ToastSurface(): JSX.Element {
           key={toast.id}
           data-testid="toast"
           style={{
-            background: '#1a1a1a',
-            color: '#ffffff',
-            border: '1px solid #404040',
-            borderRadius: 4,
-            padding: '8px 12px',
+            background: '#191818',         // color.text.primary (dark surface for toasts)
+            color: '#ffffff',              // color.surface.raised
+            border: '1px solid #312e2e',   // color.text.tertiary
+            borderRadius: 6,               // radius.xs
+            padding: '8px 14px',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
             pointerEvents: 'auto',
-            fontFamily: 'Times, serif',
-            fontSize: 14,
+            fontSize: 13,                  // font.size.sm
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
           }}
         >
-          <span>{toast.message}</span>
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: '#ff3c00', // color.surface.strong
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ letterSpacing: '-0.01em' }}>{toast.message}</span>
           <button
             type="button"
             onClick={() => dismissToast(toast.id)}
             aria-label="Dismiss"
+            className="transition-colors hover:text-[#ff3c00]"
             style={{
               background: 'none',
               border: 'none',
@@ -174,7 +192,8 @@ function ToastSurface(): JSX.Element {
               padding: 0,
               lineHeight: 1,
               fontFamily: 'inherit',
-              fontSize: 16,
+              fontSize: 14,
+              opacity: 0.8,
             }}
             data-testid="toast-dismiss"
           >
@@ -224,9 +243,8 @@ class ErrorBoundary extends Component<
             alignItems: 'center',
             justifyContent: 'center',
             height: '100vh',
-            gap: 12,
-            fontFamily: 'Times, serif',
-            color: '#000000',
+            gap: 12,                       // space.6
+            color: '#191818',              // color.text.primary
           }}
         >
           <p style={{ margin: 0 }}>Something went wrong.</p>
@@ -234,12 +252,11 @@ class ErrorBoundary extends Component<
             type="button"
             onClick={() => this.setState({ hasError: false, error: null })}
             style={{
-              border: '1px solid #404040',
-              background: '#ffffff',
-              color: '#000000',
+              border: '1px solid #312e2e',   // color.text.tertiary
+              background: '#ffffff',          // color.surface.raised
+              color: '#191818',               // color.text.primary
               padding: '4px 12px',
               cursor: 'pointer',
-              fontFamily: 'inherit',
             }}
           >
             Try again
@@ -266,6 +283,19 @@ function AppShell(): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const openNodeId = useCanvasStore((s) => s.editor.openNodeId);
   const deleteNodeId = useCanvasStore((s) => s.deletePrompt.nodeId);
+
+  const [canvasControls, setCanvasControls] = useState<CanvasViewControls | null>(null);
+  const [activeTypeFilter, setActiveTypeFilter] = useState<NodeType | null>(null);
+
+  // Compute branch count (distinct non-null parentIds)
+  const branchCount = useMemo(() => {
+    const parentIds = new Set(
+      canvas.nodes
+        .filter((n) => n.parentId !== null)
+        .map((n) => n.parentId),
+    );
+    return parentIds.size;
+  }, [canvas.nodes]);
 
   // Stable cleanup ref so the effect teardown always cancels the latest
   // installed middleware without stale-closure issues.
@@ -306,14 +336,40 @@ function AppShell(): JSX.Element {
     canvasActions.closeEditor();
   }, []);
 
-  const handleCreateRoot = useCallback(() => {
+  const handleCreateRoot = useCallback((premise?: string) => {
     canvasActions.addRoot(ROOT_INITIAL_POSITION);
+    if (premise) {
+      setTimeout(() => {
+        const root = useCanvasStore.getState().canvas.nodes[0];
+        if (root) {
+          canvasActions.updateNode(root.id, { title: premise });
+        }
+      }, 0);
+    }
   }, []);
+
+  // Global shortcut: press 'N' or 'n' to create root node when canvas has no nodes
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (
+        (e.key === 'n' || e.key === 'N') &&
+        !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)
+      ) {
+        if (useCanvasStore.getState().canvas.nodes.length === 0) {
+          e.preventDefault();
+          handleCreateRoot();
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCreateRoot]);
 
   return (
     <ToolbarCallbacksProvider value={toolbarCallbacks}>
       <div
         id="root-app"
+        className="w-screen h-screen flex flex-col bg-[#f9f9fb] overflow-hidden select-none"
         style={{
           width: '100vw',
           height: '100vh',
@@ -321,44 +377,53 @@ function AppShell(): JSX.Element {
           overflow: 'hidden',
         }}
       >
-        {/* Canvas surface — always rendered; CanvasView handles empty state
-            by rendering an empty React Flow surface. The empty-canvas
-            affordance overlay is layered on top when there are no nodes. */}
-        <CanvasView />
+        {/* Top App Header */}
+        <AppHeader
+          title={canvas.title || 'Root — Untitled Research Canvas'}
+          onTitleChange={(title) => {
+            const currentCanvas = useCanvasStore.getState().canvas;
+            useCanvasStore.setState({ canvas: { ...currentCanvas, title } });
+          }}
+          nodeCount={canvas.nodes.length}
+          branchCount={branchCount}
+          zoomPercent={canvasControls?.zoomPercent ?? 100}
+          onZoomIn={() => canvasControls?.zoomIn()}
+          onZoomOut={() => canvasControls?.zoomOut()}
+          onFitView={() => canvasControls?.fitView()}
+          onCenterRoot={() => canvasControls?.centerRoot()}
+          onAddNode={() => {
+            if (canvas.nodes.length === 0) {
+              handleCreateRoot();
+            } else {
+              const root = canvas.nodes[0];
+              if (root) toolbarCallbacks.onAddChild(root.id);
+            }
+          }}
+          activeTypeFilter={activeTypeFilter}
+          onSelectTypeFilter={setActiveTypeFilter}
+        />
 
-        {/* Empty-canvas affordance (R2.1): shown only when the canvas has
-            no nodes yet, so the user has a clear CTA to create the root. */}
-        {canvas.nodes.length === 0 && (
-          <div
-            data-testid="empty-canvas-affordance"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              pointerEvents: 'none',
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleCreateRoot}
-              data-testid="btn-create-root"
-              style={{
-                border: '1px solid #404040',
-                background: '#ffffff',
-                color: '#000000',
-                padding: '8px 20px',
-                cursor: 'pointer',
-                fontFamily: 'Times, serif',
-                fontSize: 16,
-                pointerEvents: 'auto',
-              }}
-            >
-              Create root node
-            </button>
+        {/* 3-Pane Workbench Body */}
+        <div className="flex-1 w-full flex overflow-hidden relative">
+          {/* Left: Structural Index Rail (280px) */}
+          <StructuralIndexRail nodeCount={canvas.nodes.length} />
+
+          {/* Center: Canvas Viewport */}
+          <div className="flex-1 h-full relative overflow-hidden">
+            <CanvasView onControlsReady={setCanvasControls} />
+
+            {/* Empty Canvas Affordance (R2.1) */}
+            {canvas.nodes.length === 0 && (
+              <EmptyCanvasState onCreateRoot={handleCreateRoot} />
+            )}
           </div>
-        )}
+
+          {/* Right: Node Inspector Rail (360px) */}
+          <NodeInspectorRail
+            onOpenEditor={(id) => canvasActions.openEditor(id)}
+            onAddChild={(id) => toolbarCallbacks.onAddChild(id)}
+          />
+        </div>
 
         {/* Node editor — rendered as a fixed overlay when a node is open. */}
         {openNodeId !== null && (

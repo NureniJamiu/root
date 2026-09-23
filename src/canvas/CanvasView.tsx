@@ -30,7 +30,9 @@
 
 import { useCallback, useEffect } from 'react';
 import ReactFlow, {
+  Background,
   ReactFlowProvider,
+  useReactFlow,
   type NodeDragHandler,
   type NodeTypes,
   type OnMove,
@@ -44,7 +46,7 @@ import 'reactflow/dist/style.css';
 
 import { canvasActions } from '../data';
 import type { UUID } from '../data';
-import { NodeCard } from '../nodes';
+import { FitViewIcon, NodeCard, ZoomInIcon, ZoomOutIcon } from '../nodes';
 
 import { useReactFlowGraph } from './useReactFlowGraph';
 
@@ -87,24 +89,29 @@ export interface CanvasViewProbeProps {
   readonly elementsSelectable: boolean;
 }
 
+export interface CanvasViewControls {
+  readonly zoomIn: () => void;
+  readonly zoomOut: () => void;
+  readonly fitView: () => void;
+  readonly centerRoot: () => void;
+  readonly zoomPercent: number;
+}
+
 export interface CanvasViewProps {
   /**
-   * Fired when the user selects a node on the surface. Selection state
-   * itself is owned by the Zustand store (`selection.nodeId`); this
-   * callback is a thin bridge for App-level side effects (e.g. opening
-   * the editor on double-click). Optional so `CanvasView` can render
-   * standalone in tests.
+   * Fired when the user selects a node on the surface.
    */
   readonly onNodeSelect?: (id: UUID) => void;
 
   /**
-   * Test-only prop probe (Task 9.5). Invoked once per mount with the
-   * concrete config props handed to `<ReactFlow>` so component tests can
-   * assert on `minZoom` / `maxZoom` / `onlyRenderVisibleElements` without
-   * inspecting React Flow's internal state. Not called in production
-   * unless a consumer chooses to.
+   * Test-only prop probe (Task 9.5).
    */
   readonly onRFPropsMounted?: (props: CanvasViewProbeProps) => void;
+
+  /**
+   * Optional callback exposing canvas viewport controls.
+   */
+  readonly onControlsReady?: (controls: CanvasViewControls) => void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -112,14 +119,33 @@ export interface CanvasViewProps {
 /* -------------------------------------------------------------------------- */
 
 function CanvasViewInner(props: CanvasViewProps): JSX.Element {
-  const { onNodeSelect, onRFPropsMounted } = props;
+  const { onNodeSelect, onRFPropsMounted, onControlsReady } = props;
   const { nodes, edges } = useReactFlowGraph();
+  const reactFlow = useReactFlow();
+
+  const handleZoomIn = useCallback(() => {
+    reactFlow?.zoomIn?.({ duration: 150 });
+  }, [reactFlow]);
+
+  const handleZoomOut = useCallback(() => {
+    reactFlow?.zoomOut?.({ duration: 150 });
+  }, [reactFlow]);
+
+  const handleFitView = useCallback(() => {
+    reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+  }, [reactFlow]);
+
+  const handleCenterRoot = useCallback(() => {
+    const rootNode = nodes.find((n) => n.id);
+    if (rootNode) {
+      reactFlow?.setCenter(rootNode.position.x + 120, rootNode.position.y + 60, { duration: 200, zoom: 1 });
+    } else {
+      reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+    }
+  }, [nodes, reactFlow]);
 
   /**
-   * Commit the final drag position to the store. React Flow keeps interim
-   * positions in its own internal state during the drag; we only write on
-   * `onNodeDragStop` so the store — and therefore persistence — sees a
-   * single move per gesture (R5.2).
+   * Commit the final drag position to the store.
    */
   const handleNodeDragStop = useCallback<NodeDragHandler>((_event, node) => {
     canvasActions.moveNode(node.id, {
@@ -129,18 +155,14 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, []);
 
   /**
-   * Mirror React Flow's viewport (pan + zoom) into the store. Non-React
-   * consumers (initial-child placement, persistence) then read pan/zoom
-   * from the store without holding a reference to the RF instance.
+   * Mirror React Flow's viewport into the store.
    */
   const handleMove = useCallback<OnMove>((_event, viewport) => {
     canvasActions.setViewport(viewport);
   }, []);
 
   /**
-   * Bridge React Flow's node-click into the App-level `onNodeSelect`
-   * callback and the Zustand selection slice. Kept as a memoized handler
-   * so React Flow's shallow-equality-guarded prop diffing works.
+   * Bridge React Flow's node-click into onNodeSelect and Zustand selection.
    */
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: { id: string }): void => {
@@ -150,11 +172,19 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     [onNodeSelect],
   );
 
-  // Fire the test-only probe exactly once per mount, after commit. Tests
-  // that want to inspect the exact config props handed to `<ReactFlow>`
-  // read them here rather than reaching into RF's internals. `useEffect`
-  // (not `useMemo`) is the correct hook — the probe is a side effect,
-  // not a computation whose value we consume during render.
+  const viewport = reactFlow?.getViewport?.() ?? { x: 0, y: 0, zoom: 1 };
+  const zoomPercent = Math.round(viewport.zoom * 100);
+
+  useEffect(() => {
+    onControlsReady?.({
+      zoomIn: handleZoomIn,
+      zoomOut: handleZoomOut,
+      fitView: handleFitView,
+      centerRoot: handleCenterRoot,
+      zoomPercent,
+    });
+  }, [handleZoomIn, handleZoomOut, handleFitView, handleCenterRoot, zoomPercent, onControlsReady]);
+
   useEffect(() => {
     if (onRFPropsMounted === undefined) return;
     onRFPropsMounted({
@@ -165,14 +195,16 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       nodesConnectable: false,
       elementsSelectable: true,
     });
-    // The probe intentionally fires on mount only; the values it reports
-    // are module-level constants that cannot change.
   }, [onRFPropsMounted]);
 
   return (
     <div
-      className="h-full w-full"
-      style={{ width: '100%', height: '100%' }}
+      className="relative h-full w-full select-none flex flex-col"
+      style={{
+        width: '100%',
+        height: '100%',
+        background: '#f9f9fb',
+      }}
       data-testid="canvas-view"
       data-min-zoom={MIN_ZOOM}
       data-max-zoom={MAX_ZOOM}
@@ -181,21 +213,188 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       data-nodes-connectable="false"
       data-elements-selectable="true"
     >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={NODE_TYPES}
-        minZoom={MIN_ZOOM}
-        maxZoom={MAX_ZOOM}
-        nodesDraggable
-        nodesConnectable={false}
-        elementsSelectable
-        onlyRenderVisibleElements
-        onNodeDragStop={handleNodeDragStop}
-        onMove={handleMove}
-        onNodeClick={handleNodeClick}
-        proOptions={{ hideAttribution: true }}
-      />
+      {/* Top Coordinate & Stats Ribbon */}
+      <div className="h-8 w-full border-b border-[#ebebeb] bg-[#ffffff] px-3 flex items-center justify-between z-10 shrink-0">
+        <div className="flex items-center gap-2 font-mono text-[9px] text-[#595959] tracking-wide">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#737785]" />
+          <span>
+            COORD: X:{viewport.x.toFixed(1)} Y:{viewport.y.toFixed(1)}
+          </span>
+          <span className="text-[#c3c6d6]">|</span>
+          <span className="text-[#0051c3] font-medium">{viewport.zoom.toFixed(2)}x</span>
+          <span className="text-[#c3c6d6]">|</span>
+          <span>
+            {nodes.length} nodes rendered (0.0ms)
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <div className="inline-flex items-center border border-[#ebebeb] rounded-[2px] bg-[#ffffff] h-6">
+            <button
+              type="button"
+              onClick={handleZoomOut}
+              className="w-5 h-full flex items-center justify-center font-mono text-[11px] text-[#404040] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
+              title="Zoom out"
+            >
+              −
+            </button>
+            <span className="font-mono text-[9px] text-[#1b1c1c] px-1.5 border-x border-[#ebebeb]">
+              {zoomPercent}%
+            </span>
+            <button
+              type="button"
+              onClick={handleZoomIn}
+              className="w-5 h-full flex items-center justify-center font-mono text-[11px] text-[#404040] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
+              title="Zoom in"
+            >
+              +
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCenterRoot}
+            className="h-6 px-2 border border-[#ebebeb] rounded-[2px] bg-[#ffffff] font-mono text-[9px] text-[#404040] hover:text-[#000000] hover:border-[#000000] transition-colors cursor-pointer"
+          >
+            Center
+          </button>
+          <button
+            type="button"
+            onClick={handleFitView}
+            className="h-6 px-2 border border-[#ebebeb] rounded-[2px] bg-[#ffffff] font-mono text-[9px] text-[#404040] hover:text-[#000000] hover:border-[#000000] transition-colors cursor-pointer"
+          >
+            Fit
+          </button>
+        </div>
+      </div>
+
+      {/* React Flow Surface */}
+      <div className="relative flex-1 w-full h-full overflow-hidden">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={NODE_TYPES}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
+          nodesDraggable
+          nodesConnectable={false}
+          elementsSelectable
+          onlyRenderVisibleElements
+          onNodeDragStop={handleNodeDragStop}
+          onMove={handleMove}
+          onNodeClick={handleNodeClick}
+          proOptions={{ hideAttribution: true }}
+        >
+          {/* 16px geometric coordinate grid dot matrix per DESIGN.md §Spatial Engine */}
+          <Background gap={16} size={1} color="#c3c6d6" style={{ opacity: 0.55 }} />
+        </ReactFlow>
+
+        {/* Floating Canvas Controls HUD (Bottom Right) */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 16,
+            right: 16,
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            background: '#ffffff',
+            border: '1px solid #ebebeb',
+            borderRadius: 2,
+            padding: 2,
+            boxShadow: 'none',
+          }}
+          data-testid="canvas-hud"
+        >
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            aria-label="Zoom in"
+            title="Zoom in"
+            className="inline-flex items-center justify-center rounded-[2px] transition-colors duration-150 hover:bg-[#f5f3f3] hover:text-[#000000]"
+            style={{
+              width: 26,
+              height: 26,
+              border: 'none',
+              background: 'transparent',
+              color: '#404040',
+              cursor: 'pointer',
+            }}
+          >
+            <ZoomInIcon />
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            aria-label="Zoom out"
+            title="Zoom out"
+            className="inline-flex items-center justify-center rounded-[2px] transition-colors duration-150 hover:bg-[#f5f3f3] hover:text-[#000000]"
+            style={{
+              width: 26,
+              height: 26,
+              border: 'none',
+              background: 'transparent',
+              color: '#404040',
+              cursor: 'pointer',
+            }}
+          >
+            <ZoomOutIcon />
+          </button>
+          <div
+            style={{
+              width: 1,
+              height: 14,
+              background: '#ebebeb',
+              margin: '0 2px',
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleFitView}
+            aria-label="Fit view"
+            title="Fit view to graph"
+            className="inline-flex items-center justify-center rounded-[2px] transition-colors duration-150 hover:bg-[#f5f3f3] hover:text-[#000000]"
+            style={{
+              width: 26,
+              height: 26,
+              border: 'none',
+              background: 'transparent',
+              color: '#404040',
+              cursor: 'pointer',
+            }}
+          >
+            <FitViewIcon />
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom Canvas Status Bar */}
+      <div className="h-6 w-full border-t border-[#ebebeb] bg-[#ffffff] px-3 flex items-center justify-between shrink-0 font-mono text-[9px] text-[#595959] z-10">
+        <div className="flex items-center gap-2">
+          <span>COORD: X: {viewport.x.toFixed(1)}</span>
+          <span className="text-[#ebebeb]">|</span>
+          <span>Y: {viewport.y.toFixed(1)}</span>
+          <span className="text-[#ebebeb]">|</span>
+          <span>SCALE: {viewport.zoom.toFixed(2)}x</span>
+          <span className="text-[#ebebeb]">|</span>
+          <span>RENDER: {nodes.length} nodes</span>
+          <span className="text-[#ebebeb]">|</span>
+          <span>PROJECTION: Cartesian Orthographic</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[#737785]">SHORTCUTS:</span>
+          <span className="text-[#1b1c1c]">Space + Drag</span>
+          <span className="text-[#737785]">Pan</span>
+          <span>•</span>
+          <span className="text-[#1b1c1c]">Click +</span>
+          <span className="text-[#737785]">Branch</span>
+          <span>•</span>
+          <span className="text-[#1b1c1c]">Del</span>
+          <span className="text-[#737785]">Prune</span>
+        </div>
+      </div>
     </div>
   );
 }

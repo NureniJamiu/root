@@ -29,3 +29,5 @@ export {
   useToolbarCallbacks,
 } from './toolbarCallbacks';
 export type { ToolbarCallbacks } from './toolbarCallbacks';
+
+export * from './icons';
