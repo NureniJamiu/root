@@ -267,7 +267,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Cancel: canvas snapshot unchanged
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-- [ ] 13. App shell
+- [x] 13. App shell
   - [x] 13.1 Implement App shell, toolbar, empty-canvas affordance, ErrorBoundary, toast surface
     - Create `src/app/ErrorBoundary.tsx` (class component) — catches render/effect errors, renders "Something went wrong. Your work has been saved." with a Reload button
     - Create `src/app/Toast.tsx` — minimal toast surface subscribed to `persistenceEvents` (load error, save error, image-too-large echo)
@@ -276,31 +276,31 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Update `src/app/App.tsx` to: call `loadInitialCanvas()` on mount, install persistence middleware, wrap `<CanvasView />` + modals in `<ErrorBoundary>`, render `<Toast />`, render `<CreateRootAffordance />` when canvas is empty, render `<NodeEditor />` when `editor.openNodeId` is set, render `<DeletePrompt />` when `deletePrompt.nodeId` is set
     - _Requirements: 2.1, 2.3, 2.4, 8.4, 8.5_
 
-  - [-] 13.2 Integration tests for App shell
+  - [x] 13.2 Integration tests for App shell
     - Empty canvas: create-root affordance visible; after `addRoot`, affordance hidden and editor open with title focused (R2.1, R2.3, R2.4)
     - Load error surface: seed `localStorage` with `"{"`, mount `<App />`, assert error toast rendered and `RAW_KEY` preserved (R8.5)
     - _Requirements: 2.1, 2.3, 2.4, 8.4, 8.5_
 
-- [ ] 14. Module-boundary import-graph test
-  - [-] 14.1 Implement runtime import-graph test
+- [x] 14. Module-boundary import-graph test
+  - [x] 14.1 Implement runtime import-graph test
     - Create `src/__tests__/module-boundaries.test.ts` — walks `src/` using `es-module-lexer` (or `@typescript-eslint/parser`) and asserts: no file under `src/data/` imports from `src/canvas/`, `src/nodes/`, `reactflow`, or `react`; no file under `src/canvas/` imports from `src/nodes/*` except the public `NodeCard` re-export; no file under `src/nodes/` imports from `src/canvas/`
     - This test guards against ESLint config drift
     - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 15. End-to-end Playwright tests (R14 walkthrough)
-  - [-] 15.1 E2E: MVP walkthrough (build tree)
+- [x] 15. End-to-end Playwright tests (R14 walkthrough)
+  - [x] 15.1 E2E: MVP walkthrough (build tree)
     - Create `e2e/mvp-walkthrough.spec.ts` — start with empty `localStorage`; click "Create root"; edit title and body; add a child, then a grandchild; edit each; drop an image into one node; assert final DOM shows all node cards with correct type styling and connectors between the correct pairs
     - _Requirements: 14.1_
 
-  - [-] 15.2 E2E: Collapse and expand a subtree
+  - [x] 15.2 E2E: Collapse and expand a subtree
     - Create `e2e/collapse-expand.spec.ts` — build a three-level tree; collapse the middle node; assert all descendants absent from the DOM and their connectors gone; expand; assert all descendants restored
     - _Requirements: 6.2, 6.4, 14.2_
 
-  - [-] 15.3 E2E: Reload preserves state exactly
+  - [x] 15.3 E2E: Reload preserves state exactly
     - Create `e2e/reload-restore.spec.ts` — build the R14.1 tree; reload the page; assert every node's rendered title, body, image, type, position, and collapse state matches pre-reload state
     - _Requirements: 8.3, 14.3_
 
-- [~] 16. Final checkpoint — Ensure all tests pass
+- [x] 16. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

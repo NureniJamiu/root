@@ -56,8 +56,8 @@ describe('Property 8: typeStyles palette conformance', () => {
     // Two pairings are considered distinct if any of their three slots differ.
     for (let i = 0; i < NODE_TYPES.length; i++) {
       for (let j = i + 1; j < NODE_TYPES.length; j++) {
-        const a = typeStyles[NODE_TYPES[i]];
-        const b = typeStyles[NODE_TYPES[j]];
+        const a = typeStyles[NODE_TYPES[i]!];
+        const b = typeStyles[NODE_TYPES[j]!];
         const same =
           a.border === b.border &&
           a.background === b.background &&

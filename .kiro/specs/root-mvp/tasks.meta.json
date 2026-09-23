@@ -856,6 +856,11 @@
         "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790183164311
+      },
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184502006
       }
     ],
     "14.1 Implement runtime import-graph test": [
@@ -873,6 +878,11 @@
         "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790183164534
+      },
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184502373
       }
     ],
     "15.1 E2E: MVP walkthrough (build tree)": [
@@ -890,6 +900,11 @@
         "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790183164975
+      },
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184524399
       }
     ],
     "15.2 E2E: Collapse and expand a subtree": [
@@ -907,6 +922,11 @@
         "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790183165620
+      },
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184524936
       }
     ],
     "15.3 E2E: Reload preserves state exactly": [
@@ -924,6 +944,11 @@
         "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790183166133
+      },
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184525219
       }
     ],
     "16. Final checkpoint — Ensure all tests pass": [
@@ -936,6 +961,16 @@
         "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790183080074
+      },
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184546179
+      },
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184939160
       }
     ],
     "1. Bootstrap project and toolchain": [
@@ -1013,6 +1048,27 @@
         "executionId": "f8102781-e302-49e9-993d-98ccdd40a33c",
         "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
         "timestamp": 1790183119820
+      }
+    ],
+    "13. App shell": [
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184502296
+      }
+    ],
+    "14. Module-boundary import-graph test": [
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184502490
+      }
+    ],
+    "15. End-to-end Playwright tests (R14 walkthrough)": [
+      {
+        "executionId": "af03c667-a317-44ea-8c1a-efbcd59c94df",
+        "chatSessionId": "sess_a186a7c8-ad4b-443a-993d-b1854064a7f4",
+        "timestamp": 1790184525336
       }
     ]
   }
