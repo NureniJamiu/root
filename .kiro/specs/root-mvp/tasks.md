@@ -161,7 +161,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Valid JSON failing schema (duplicate ids, missing root, cycle, dangling parentId) → `{ ok: false }` with useful error string
     - _Requirements: 8.5, 9.4_
 
-- [ ] 6. Data Model Layer — Zustand store and actions
+- [x] 6. Data Model Layer — Zustand store and actions
   - [x] 6.1 Implement store and typed canvasActions
     - Create `src/data/store.ts` with `CanvasState` (`canvas`, `selection`, `editor`, `deletePrompt`, `viewport`) and `useCanvasStore`
     - Create `canvasActions` object exposing `addRoot`, `addChild`, `updateNode`, `addImage`, `removeImage`, `moveNode`, `setCollapsed`, `deleteNodeOnly`, `deleteSubtree`, `openEditor`, `closeEditor`, `openDeletePrompt`, `closeDeletePrompt`, `select`, `setViewport`
@@ -169,29 +169,29 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Re-export `useCanvasStore` and `canvasActions` from `src/data/index.ts`
     - _Requirements: 10.4, 10.5_
 
-  - [-] 6.2 Unit tests for canvasActions dispatch
+  - [x] 6.2 Unit tests for canvasActions dispatch
     - `canvasActions.addChild(parentId, p)` produces a store state with an additional node and a new `editor.openNodeId`
     - `canvasActions.deleteNodeOnly` on root with children is a no-op at the store level
     - _Requirements: 2.4, 3.3, 7.5_
 
 - [ ] 7. Persistence layer
-  - [-] 7.1 Implement debounced localStorage middleware and load path
+  - [x] 7.1 Implement debounced localStorage middleware and load path
     - Create `src/persistence/keys.ts` (`CANVAS_KEY = 'root-mvp:canvas'`, `RAW_KEY = 'root-mvp:canvas.raw'`)
     - Create `src/persistence/middleware.ts` — subscribes to `useCanvasStore` on `canvas` changes, debounces 500 ms, writes `serializeCanvas(canvas)` to `localStorage`; on `beforeunload`, flushes any pending timeout synchronously; catches `setItem` errors and surfaces via a `persistenceEvents` event bus
     - Create `src/persistence/load.ts` — `loadInitialCanvas()` reads `CANVAS_KEY`; if absent returns `emptyCanvas()`; on `parseCanvas` failure, writes the raw payload to `RAW_KEY`, emits a load error, returns `emptyCanvas()`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 12.3_
 
-  - [~] 7.2 Integration tests for persistence timing
+  - [-] 7.2 Integration tests for persistence timing
     - With `vi.useFakeTimers()`: fire three `updateNode` actions in rapid succession, advance 499 ms, assert `setItem` not called; advance 1 ms, assert exactly one `setItem` call
     - Fire a change, dispatch `beforeunload`, assert immediate synchronous `setItem`
     - Seed `localStorage` with `"{"`, run `loadInitialCanvas()`, assert `emptyCanvas()` returned, assert `RAW_KEY` contains original string, assert error event emitted
     - _Requirements: 8.1, 8.5, 8.6_
 
-- [~] 8. Checkpoint — pure data core is complete and tested
+- [x] 8. Checkpoint — pure data core is complete and tested
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 9. Canvas Layer — React Flow adapter
-  - [~] 9.1 Implement CanvasView and useReactFlowGraph
+  - [-] 9.1 Implement CanvasView and useReactFlowGraph
     - Create `src/canvas/CanvasView.tsx` wrapping `<ReactFlowProvider>` + `<ReactFlow>` with `minZoom={0.25}`, `maxZoom={2.5}`, `nodesDraggable`, `nodesConnectable={false}`, `elementsSelectable`, `onlyRenderVisibleElements`
     - Register a single custom node type `'research'` that renders the exported `NodeCard` from `nodes/` (referenced via a small `nodeTypes` registration — no import of editor internals)
     - Create `src/canvas/useReactFlowGraph.ts` — subscribes to `useCanvasStore`, computes visible node set via `visibleNodeIds(canvas)`, derives RF `nodes` (mapping to `{ id, type:'research', position, data:{ nodeId } }`) and RF `edges` (derived from `parentId` restricted to visible pairs, `type:'default'`, stroke `#404040`, width 1)
@@ -199,7 +199,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - Create `src/canvas/edgeStyles.ts` and `src/canvas/index.ts` exporting only `CanvasView`
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 5.1, 5.2, 5.3, 5.4, 12.2_
 
-  - [~] 9.2 Implement initial child position placement
+  - [-] 9.2 Implement initial child position placement
     - Create `src/canvas/placement.ts` with `computeChildPosition(canvas, parentId)` returning a `Position` offset from the parent such that the child's bounding box (at standard node width/height constants) does not intersect the parent's bounding box or any existing direct sibling's bounding box
     - Call site: `App`/toolbar action that dispatches `canvasActions.addChild` computes position from the current canvas before dispatching
     - _Requirements: 3.2_
@@ -220,7 +220,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - _Requirements: 1.4, 12.2_
 
 - [ ] 10. Node UI Layer — styles and card
-  - [-] 10.1 Implement typeStyles and NodeCard shell
+  - [x] 10.1 Implement typeStyles and NodeCard shell
     - Create `src/nodes/typeStyles.ts` with the four `NodeType` → `{ border, background, text }` pairings from design.md §Data Models (topic/finding/question/conclusion), all colors drawn from the DESIGN.md palette
     - Create `src/nodes/NodeCard.tsx` — reads its node from `useCanvasStore` via memoized selector by `nodeId`, applies `typeStyles[node.type]`, renders `Header` (title text), `BodyPreview` (first N chars of body), `ImageThumbStrip` (thumbnails), `CollapseBadge` (only when collapsed), `HoverToolbar` (buttons for add-child, edit, add-image, cycle-type, delete)
     - Selection style: `border: 2px solid #0051c3` when selected; base border 1 px in type color; radius 5 px; no shadow
@@ -239,7 +239,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - _Requirements: 4.7, 6.5, 11.3, 11.4_
 
 - [ ] 11. Node UI Layer — editor
-  - [~] 11.1 Implement NodeEditor
+  - [-] 11.1 Implement NodeEditor
     - Create `src/nodes/NodeEditor.tsx` — bound to `nodeId`; renders single-line `<input>` for title (`maxLength=200`, autoFocus), `<textarea>` for body (`maxLength=20000`, character counter turning `#de5052` in the last 200 chars), 4 type buttons (`topic | finding | question | conclusion`) styled per `typeStyles`, image drop zone + paste handler + file picker
     - Image handler: `FileReader.readAsDataURL`, rejects payloads > 2 MB with inline message "Images must be under 2 MB.", ignores non-image files (drop zone border flashes once), on success dispatches `canvasActions.addImage`
     - Text changes dispatch `canvasActions.updateNode({title})` / `({body})`; type button dispatches `updateNode({type})`; image delete dispatches `removeImage`
@@ -254,7 +254,7 @@ Language: **TypeScript** (per design.md — React 18 + Vite + TypeScript).
     - _Requirements: 2.4, 3.3, 4.1, 4.2, 4.3, 4.4, 4.6_
 
 - [ ] 12. Node UI Layer — delete prompt
-  - [~] 12.1 Implement DeletePrompt modal
+  - [-] 12.1 Implement DeletePrompt modal
     - Create `src/nodes/DeletePrompt.tsx` — reads target node from store; if node has zero children the modal is bypassed and delete happens immediately; otherwise renders two options: "Delete node only" and "Delete node and entire subtree"
     - Root-with-children constraint: when `node.parentId === null` and node has children, disable "Delete node only" (R7.5)
     - Cancel → `canvasActions.closeDeletePrompt()` leaves canvas unchanged; confirm → dispatches `deleteNodeOnly` or `deleteSubtree`

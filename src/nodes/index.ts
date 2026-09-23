@@ -23,3 +23,9 @@ export type { NodeEditorProps } from './NodeEditor';
 
 export { DeletePrompt } from './DeletePrompt';
 export type { DeletePromptProps } from './DeletePrompt';
+
+export {
+  ToolbarCallbacksProvider,
+  useToolbarCallbacks,
+} from './toolbarCallbacks';
+export type { ToolbarCallbacks } from './toolbarCallbacks';

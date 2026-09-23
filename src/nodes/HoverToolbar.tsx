@@ -10,16 +10,19 @@
  *                    the modal for leaves (Requirement 7.1) and enforces
  *                    root-with-children rules (Requirement 7.5).
  *
- * Buttons dispatch through `canvasActions`; no direct store writes. The
- * initial child position used by `add-child` here is a simple offset from
- * the parent — task 9.2 will replace this with `computeChildPosition` for
- * proper non-overlap placement (Requirement 3.2).
+ * Most buttons dispatch directly through `canvasActions`. The `add-child`
+ * action routes through the `ToolbarCallbacks` context so the app layer
+ * can compute a non-overlapping initial position via
+ * `computeChildPosition` (task 9.2, Requirement 3.2) without the
+ * `nodes/` layer having to import from `canvas/` (Requirement 10.3).
  */
 
 import type { ReactNode } from 'react';
 
 import { canvasActions } from '../data';
 import type { Node, NodeType } from '../data';
+
+import { useToolbarCallbacks } from './toolbarCallbacks';
 
 /**
  * The cycle order used by the type button. Follows the four-button
@@ -38,24 +41,18 @@ function nextType(current: NodeType): NodeType {
   return NEXT_TYPE[current];
 }
 
-/**
- * Offset used when placing a new child near its parent. Task 9.2 replaces
- * this with `computeChildPosition` which guarantees no bounding-box
- * overlap with existing siblings (Requirement 3.2). Kept as a small
- * diagonal shift so the two cards do not perfectly stack in the interim.
- */
-const CHILD_OFFSET = { x: 240, y: 120 } as const;
-
 export interface HoverToolbarProps {
   readonly node: Node;
 }
 
 export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
-  const onAddChild = (): void => {
-    canvasActions.addChild(node.id, {
-      x: node.position.x + CHILD_OFFSET.x,
-      y: node.position.y + CHILD_OFFSET.y,
-    });
+  const { onAddChild } = useToolbarCallbacks();
+  const handleAddChild = (): void => {
+    // The provider is responsible for computing the child position and
+    // dispatching `canvasActions.addChild`. In production the App shell
+    // supplies `computeChildPosition`; in isolated tests a naive
+    // diagonal-offset fallback keeps behavior consistent.
+    onAddChild(node.id);
   };
   const onEdit = (): void => {
     canvasActions.openEditor(node.id);
@@ -79,7 +76,7 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
       className="flex flex-row gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
       data-testid="hover-toolbar"
     >
-      <ToolbarButton label="Add child" onClick={onAddChild} testId="btn-add-child">
+      <ToolbarButton label="Add child" onClick={handleAddChild} testId="btn-add-child">
         +
       </ToolbarButton>
       <ToolbarButton label="Edit" onClick={onEdit} testId="btn-edit">
