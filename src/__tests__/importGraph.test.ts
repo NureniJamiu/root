@@ -18,6 +18,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
+import { describe, expect, it } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -57,7 +58,7 @@ function extractImportSpecifiers(content: string): string[] {
   const re = /(?:^|\n)\s*import\s+(?:[^'"]*from\s+)?['"]([^'"]+)['"]/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(content)) !== null) {
-    specifiers.push(m[1]);
+    if (m[1] !== undefined) specifiers.push(m[1]);
   }
   return specifiers;
 }
@@ -73,9 +74,9 @@ describe('Layer boundary: data/', () => {
    * Validates: Requirements 10.1
    * The Data_Model_Layer has no dependency on rendering or interaction code.
    */
-  it.each(dataFiles.map((f) => [f.replace(SRC_ROOT + '/', ''), f]))(
+  it.each(dataFiles.map((f) => [f.replace(SRC_ROOT + '/', ''), f] as [string, string]))(
     '%s — must not import canvas/, nodes/, react, or reactflow',
-    (_rel, filePath) => {
+    (_rel: string, filePath: string) => {
       const content = readFileSync(filePath, 'utf-8');
       const imports = extractImportSpecifiers(content);
 
@@ -116,9 +117,9 @@ describe('Layer boundary: canvas/', () => {
    *   '@/nodes/index', '../../nodes', etc.
    * Forbidden: '../nodes/NodeCard', '../nodes/HoverToolbar', etc.
    */
-  it.each(canvasFiles.map((f) => [f.replace(SRC_ROOT + '/', ''), f]))(
+  it.each(canvasFiles.map((f) => [f.replace(SRC_ROOT + '/', ''), f] as [string, string]))(
     '%s — must not deep-import nodes/ internals',
-    (_rel, filePath) => {
+    (_rel: string, filePath: string) => {
       const content = readFileSync(filePath, 'utf-8');
       const imports = extractImportSpecifiers(content);
 
@@ -156,9 +157,9 @@ describe('Layer boundary: nodes/', () => {
    * Validates: Requirements 10.3
    * The Node_UI_Layer must not depend on the Canvas_Layer.
    */
-  it.each(nodesFiles.map((f) => [f.replace(SRC_ROOT + '/', ''), f]))(
+  it.each(nodesFiles.map((f) => [f.replace(SRC_ROOT + '/', ''), f] as [string, string]))(
     '%s — must not import from canvas/',
-    (_rel, filePath) => {
+    (_rel: string, filePath: string) => {
       const content = readFileSync(filePath, 'utf-8');
       const imports = extractImportSpecifiers(content);
 
