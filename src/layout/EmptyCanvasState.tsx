@@ -11,6 +11,11 @@ export interface EmptyCanvasStateProps {
 
 const TEMPLATES = [
   {
+    title: 'Cellular Senescence',
+    subtitle: 'Telomere Dynamics',
+    premise: 'Mechanisms of Cellular Senescence & Telomere Dynamics',
+  },
+  {
     title: 'Hypothesis Tree',
     subtitle: 'Deductive Path',
     premise: 'Primary Hypothesis: Core Premise & Deductive Path',

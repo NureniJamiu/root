@@ -38,7 +38,7 @@ import {
 import type { ErrorInfo, ReactNode } from 'react';
 
 import { CanvasView, computeChildPosition } from '../canvas';
-import type { CanvasViewControls } from '../canvas';
+import type { CanvasViewControls, DragState } from '../canvas';
 import {
   canvasActions,
   emptyCanvas,
@@ -294,6 +294,7 @@ function AppShell(): JSX.Element {
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
   const [isInspectorOpen, setIsInspectorOpen] = useState(true);
   const [isPanActive, setIsPanActive] = useState(false);
+  const [dragInfo, setDragInfo] = useState<DragState | null>(null);
 
   // Projects list state
   const [projects, setProjects] = useState<readonly ProjectItem[]>([]);
@@ -326,7 +327,9 @@ function AppShell(): JSX.Element {
       if (stored) {
         initialProjects = JSON.parse(stored);
       }
-    } catch {}
+    } catch (_err) {
+      /* ignore */
+    }
 
     if (!initialProjects.length) {
       initialProjects = [
@@ -383,7 +386,9 @@ function AppShell(): JSX.Element {
     setActiveProjectId(newCanvas.id);
     try {
       localStorage.setItem('root-mvp:projects', JSON.stringify(nextProjects));
-    } catch {}
+    } catch (_err) {
+      /* ignore */
+    }
     useCanvasStore.setState({
       canvas: newCanvas,
       selection: { nodeId: null },
@@ -404,7 +409,9 @@ function AppShell(): JSX.Element {
             const parsed = parseCanvas(raw);
             if (parsed.ok) targetCanvas = parsed.canvas;
           }
-        } catch {}
+        } catch (_err) {
+          /* ignore */
+        }
         if (!targetCanvas) {
           targetCanvas = {
             ...emptyCanvas(),
@@ -445,14 +452,60 @@ function AppShell(): JSX.Element {
 
   const handleCreateRoot = useCallback((premise?: string) => {
     canvasActions.addRoot(ROOT_INITIAL_POSITION);
-    if (premise) {
-      setTimeout(() => {
-        const root = useCanvasStore.getState().canvas.nodes[0];
-        if (root) {
-          canvasActions.updateNode(root.id, { title: premise });
+    const chosen = premise || 'Mechanisms of Cellular Senescence & Telomere Dynamics';
+    setTimeout(() => {
+      const root = useCanvasStore.getState().canvas.nodes[0];
+      if (root) {
+        if (chosen.includes('Cellular Senescence') || !premise) {
+          canvasActions.updateNode(root.id, {
+            title: 'Mechanisms of Cellular Senescence & Telomere Dynamics',
+            body: 'Investigating the molecular pathways linking shelterin complex erosion to p53/p21 checkpoint activation in human somatic cells.',
+          });
+
+          // Pre-populate branches matching visual guide
+          canvasActions.addChild(root.id, { x: root.position.x + 380, y: root.position.y - 140 });
+          canvasActions.addChild(root.id, { x: root.position.x + 380, y: root.position.y + 40 });
+          canvasActions.addChild(root.id, { x: root.position.x + 380, y: root.position.y + 280 });
+
+          setTimeout(() => {
+            const nodes = useCanvasStore.getState().canvas.nodes;
+            const qNode = nodes[1];
+            const fNode = nodes[2];
+            const cNode = nodes[3];
+            if (qNode) {
+              canvasActions.updateNode(qNode.id, {
+                title: 'Does Shelterin Dissociation Prepare Double-Strand Breaks?',
+                type: 'question',
+                body: 'Assessing whether TRF2 shelterin depletion exposes ends directly or triggers ATM/ATR response pathways in human somatic cells.',
+              });
+            }
+            if (fNode) {
+              canvasActions.updateNode(fNode.id, {
+                title: 'TRF2 Shelterin Complex Degradation Observed',
+                type: 'finding',
+                body: 'Confocal immunofluorescence shows 73% TRF2 delocalization within 48h of induced stress. γ-H2AX foci colocalize at telomeres (TIFs).',
+              });
+              canvasActions.addImage(fNode.id, {
+                id: crypto.randomUUID(),
+                dataUrl:
+                  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225"><rect width="400" height="225" fill="%23060a12"/><g stroke="%2338bdf8" stroke-width="2.5" fill="none" opacity="0.85"><path d="M60 40 Q70 60 90 70 M80 50 Q110 65 130 90 M140 30 Q160 55 170 80 M200 45 Q210 70 230 85 M250 30 Q270 55 285 75 M310 40 Q330 65 345 80 M50 140 Q75 150 95 175 M110 130 Q130 155 145 180 M170 145 Q190 160 210 190 M230 135 Q250 160 270 185 M295 130 Q315 155 330 175 M350 140 Q365 160 380 180"/></g><g stroke="%234ade80" stroke-width="3" fill="none"><circle cx="90" cy="70" r="2.5" fill="%234ade80"/><circle cx="130" cy="90" r="2.5" fill="%234ade80"/><circle cx="170" cy="80" r="2.5" fill="%234ade80"/><circle cx="230" cy="85" r="2.5" fill="%234ade80"/><circle cx="285" cy="75" r="2.5" fill="%234ade80"/><circle cx="95" cy="175" r="2.5" fill="%234ade80"/><circle cx="145" cy="180" r="2.5" fill="%234ade80"/><circle cx="210" cy="190" r="2.5" fill="%234ade80"/><circle cx="270" cy="185" r="2.5" fill="%234ade80"/></g></svg>',
+                addedAt: new Date().toISOString(),
+              });
+              canvasActions.select(fNode.id);
+            }
+            if (cNode) {
+              canvasActions.updateNode(cNode.id, {
+                title: 'p53-Dependent Cell Cycle Arrest Irreversible',
+                type: 'conclusion',
+                body: 'Downstream p21/CIP1 accumulation locks CDK preventing retinoblastoma phosphorylation permanent cessation.',
+              });
+            }
+          }, 0);
+        } else {
+          canvasActions.updateNode(root.id, { title: chosen });
         }
-      }, 0);
-    }
+      }
+    }, 0);
   }, []);
 
   // When a node is selected, ensure the node inspector slides open
@@ -620,6 +673,7 @@ function AppShell(): JSX.Element {
               onControlsReady={setCanvasControls}
               onNodeSelect={handleNodeSelect}
               onPaneClick={handleCanvasPaneClick}
+              onDragChange={setDragInfo}
               isPanActive={isPanActive}
             />
 
@@ -642,6 +696,7 @@ function AppShell(): JSX.Element {
               onClose={() => setIsInspectorOpen(false)}
               onOpenEditor={(id) => canvasActions.openEditor(id)}
               onAddChild={(id) => toolbarCallbacks.onAddChild(id)}
+              dragInfo={dragInfo}
             />
           </div>
         </div>

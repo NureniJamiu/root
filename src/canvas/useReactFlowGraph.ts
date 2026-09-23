@@ -33,6 +33,9 @@ import type { Canvas, UUID } from '../data';
 import {
   DEFAULT_EDGE_STYLE,
   DEFAULT_EDGE_TYPE,
+  DRAGGING_EDGE_STYLE,
+  QUESTION_EDGE_STYLE,
+  SELECTED_EDGE_STYLE,
 } from './edgeStyles';
 
 /**
@@ -42,6 +45,14 @@ import {
  */
 export interface ResearchNodeData {
   readonly nodeId: UUID;
+}
+
+/**
+ * Options controlling connector styles in the derived graph.
+ */
+export interface DeriveGraphOptions {
+  readonly selectedNodeId?: UUID | null;
+  readonly draggingNodeId?: UUID | null;
 }
 
 /**
@@ -61,7 +72,10 @@ export interface ReactFlowGraph {
  * Pure derivation of `{ nodes, edges }` from a canvas. Split from the hook
  * so property tests can call it without mounting React or the store.
  */
-export function deriveReactFlowGraph(canvas: Canvas): ReactFlowGraph {
+export function deriveReactFlowGraph(
+  canvas: Canvas,
+  options?: DeriveGraphOptions,
+): ReactFlowGraph {
   const visible = visibleNodeIds(canvas);
   const rfNodes: RFNode<ResearchNodeData>[] = [];
   const rfEdges: Edge[] = [];
@@ -80,12 +94,25 @@ export function deriveReactFlowGraph(canvas: Canvas): ReactFlowGraph {
     // parent hidden behind a collapsed grandparent never produces a
     // dangling edge (Property 2, Requirement 1.5 / 6.4).
     if (node.parentId !== null && visible.has(node.parentId)) {
+      const isDragging = options?.draggingNodeId === node.id;
+      const isSelected = options?.selectedNodeId === node.id;
+      const isQuestion = node.type === 'question';
+
+      let style = DEFAULT_EDGE_STYLE;
+      if (isDragging) {
+        style = DRAGGING_EDGE_STYLE;
+      } else if (isSelected) {
+        style = SELECTED_EDGE_STYLE;
+      } else if (isQuestion) {
+        style = QUESTION_EDGE_STYLE;
+      }
+
       rfEdges.push({
         id: `e:${node.parentId}->${node.id}`,
         source: node.parentId,
         target: node.id,
         type: DEFAULT_EDGE_TYPE,
-        style: DEFAULT_EDGE_STYLE,
+        style,
       });
     }
   }
@@ -106,13 +133,25 @@ function selectCanvas(s: { canvas: Canvas }): Canvas {
   return s.canvas;
 }
 
+function selectSelectedNodeId(s: { selection: { nodeId: UUID | null } }): UUID | null {
+  return s.selection.nodeId;
+}
+
 /**
- * React hook returning the RF-ready `{ nodes, edges }`. Memoized on the
- * canvas reference — mutators return a new `Canvas` on every write, so any
- * relevant change invalidates the memo; unrelated store slices (viewport,
- * selection) leave the cached derivation intact.
+ * React hook returning the RF-ready `{ nodes, edges }`. Memoized on canvas,
+ * selection, and dragging states.
  */
-export function useReactFlowGraph(): ReactFlowGraph {
+export function useReactFlowGraph(options?: DeriveGraphOptions): ReactFlowGraph {
   const canvas = useCanvasStore(selectCanvas);
-  return useMemo(() => deriveReactFlowGraph(canvas), [canvas]);
+  const selectedNodeId = useCanvasStore(selectSelectedNodeId);
+  const draggingNodeId = options?.draggingNodeId ?? null;
+
+  return useMemo(
+    () =>
+      deriveReactFlowGraph(canvas, {
+        selectedNodeId: options?.selectedNodeId !== undefined ? options.selectedNodeId : selectedNodeId,
+        draggingNodeId,
+      }),
+    [canvas, selectedNodeId, options?.selectedNodeId, draggingNodeId],
+  );
 }
