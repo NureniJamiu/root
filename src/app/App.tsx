@@ -43,6 +43,7 @@ import {
   canvasActions,
   emptyCanvas,
   parseCanvas,
+  serializeCanvas,
   useCanvasStore,
   onSaveError as onStoreSaveError,
 } from '../data';
@@ -315,12 +316,7 @@ function AppShell(): JSX.Element {
   const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    // 1. Load persisted canvas and seed the store.
-    const initialCanvas = loadInitialCanvas();
-    canvasActions; // ensure the actions object is initialized
-    useCanvasStore.setState({ canvas: initialCanvas });
-
-    // Initialize projects list from localStorage if available
+    // 1. Initialize projects list from localStorage if available
     let initialProjects: ProjectItem[] = [];
     try {
       const stored = localStorage.getItem('root-mvp:projects');
@@ -331,6 +327,35 @@ function AppShell(): JSX.Element {
       /* ignore */
     }
 
+    let savedActiveId: string | null = null;
+    try {
+      savedActiveId = localStorage.getItem('root-mvp:active-project-id');
+    } catch (_err) {
+      /* ignore */
+    }
+
+    let initialCanvas: Canvas | null = null;
+    if (savedActiveId) {
+      try {
+        const raw = localStorage.getItem(`root-mvp:project:${savedActiveId}`);
+        if (raw) {
+          const parsed = parseCanvas(raw);
+          if (parsed.ok) {
+            initialCanvas = parsed.canvas;
+          }
+        }
+      } catch (_err) {
+        /* ignore */
+      }
+    }
+
+    if (!initialCanvas) {
+      initialCanvas = loadInitialCanvas();
+    }
+
+    canvasActions; // ensure the actions object is initialized
+    useCanvasStore.setState({ canvas: initialCanvas });
+
     if (!initialProjects.length) {
       initialProjects = [
         {
@@ -340,9 +365,27 @@ function AppShell(): JSX.Element {
           updatedAt: initialCanvas.updatedAt,
         },
       ];
+      try {
+        localStorage.setItem('root-mvp:projects', JSON.stringify(initialProjects));
+        localStorage.setItem(`root-mvp:project:${initialCanvas.id}`, serializeCanvas(initialCanvas));
+      } catch (_err) {}
+    } else {
+      const exists = initialProjects.some((p) => p.id === initialCanvas!.id);
+      if (!exists) {
+        initialProjects.push({
+          id: initialCanvas.id,
+          title: initialCanvas.title || 'Interactive Graph',
+          nodeCount: initialCanvas.nodes.length,
+          updatedAt: initialCanvas.updatedAt,
+        });
+      }
     }
+
     setProjects(initialProjects);
     setActiveProjectId(initialCanvas.id);
+    try {
+      localStorage.setItem('root-mvp:active-project-id', initialCanvas.id);
+    } catch (_err) {}
 
     // 2. Install the debounced persistence middleware.
     cleanupRef.current = installPersistenceMiddleware();
@@ -353,11 +396,14 @@ function AppShell(): JSX.Element {
     };
   }, []);
 
-  // Sync active project title and node count in real time
+  // Sync active project canvas, title and node count in real time
   useEffect(() => {
     if (!activeProjectId) return;
-    setProjects((prev) =>
-      prev.map((p) =>
+    try {
+      localStorage.setItem(`root-mvp:project:${activeProjectId}`, serializeCanvas(canvas));
+    } catch (_err) {}
+    setProjects((prev) => {
+      const next = prev.map((p) =>
         p.id === activeProjectId
           ? {
               ...p,
@@ -366,11 +412,21 @@ function AppShell(): JSX.Element {
               updatedAt: canvas.updatedAt,
             }
           : p,
-      ),
-    );
-  }, [canvas.title, canvas.nodes.length, canvas.updatedAt, activeProjectId]);
+      );
+      try {
+        localStorage.setItem('root-mvp:projects', JSON.stringify(next));
+      } catch (_err) {}
+      return next;
+    });
+  }, [canvas, activeProjectId]);
 
   const handleNewProject = useCallback(() => {
+    // Flush current canvas before creating new project
+    const currentCanvas = useCanvasStore.getState().canvas;
+    try {
+      localStorage.setItem(`root-mvp:project:${currentCanvas.id}`, serializeCanvas(currentCanvas));
+    } catch (_err) {}
+
     const newCanvas: Canvas = {
       ...emptyCanvas(),
       title: `Project ${projects.length + 1}`,
@@ -386,6 +442,8 @@ function AppShell(): JSX.Element {
     setActiveProjectId(newCanvas.id);
     try {
       localStorage.setItem('root-mvp:projects', JSON.stringify(nextProjects));
+      localStorage.setItem(`root-mvp:project:${newCanvas.id}`, serializeCanvas(newCanvas));
+      localStorage.setItem('root-mvp:active-project-id', newCanvas.id);
     } catch (_err) {
       /* ignore */
     }
@@ -399,9 +457,19 @@ function AppShell(): JSX.Element {
   const handleSelectProject = useCallback(
     (id: string) => {
       if (id === activeProjectId) return;
+      // Flush current project canvas before switching
+      const currentCanvas = useCanvasStore.getState().canvas;
+      try {
+        localStorage.setItem(`root-mvp:project:${currentCanvas.id}`, serializeCanvas(currentCanvas));
+      } catch (_err) {}
+
       const target = projects.find((p) => p.id === id);
       if (target) {
         setActiveProjectId(id);
+        try {
+          localStorage.setItem('root-mvp:active-project-id', id);
+        } catch (_err) {}
+
         let targetCanvas: Canvas | null = null;
         try {
           const raw = localStorage.getItem(`root-mvp:project:${id}`);
@@ -428,6 +496,76 @@ function AppShell(): JSX.Element {
       }
     },
     [activeProjectId, projects, canvasControls],
+  );
+
+  const handleDeleteProject = useCallback(
+    (idToDelete: string) => {
+      const remaining = projects.filter((p) => p.id !== idToDelete);
+      try {
+        localStorage.removeItem(`root-mvp:project:${idToDelete}`);
+        localStorage.setItem('root-mvp:projects', JSON.stringify(remaining));
+      } catch (_err) {}
+
+      if (idToDelete === activeProjectId) {
+        if (remaining.length > 0) {
+          const next = remaining[0]!;
+          setProjects(remaining);
+          setActiveProjectId(next.id);
+          try {
+            localStorage.setItem('root-mvp:active-project-id', next.id);
+          } catch (_err) {}
+
+          let targetCanvas: Canvas | null = null;
+          try {
+            const raw = localStorage.getItem(`root-mvp:project:${next.id}`);
+            if (raw) {
+              const parsed = parseCanvas(raw);
+              if (parsed.ok) targetCanvas = parsed.canvas;
+            }
+          } catch (_err) {}
+          if (!targetCanvas) {
+            targetCanvas = {
+              ...emptyCanvas(),
+              id: next.id,
+              title: next.title,
+            };
+          }
+          useCanvasStore.setState({
+            canvas: targetCanvas,
+            selection: { nodeId: null },
+            editor: { openNodeId: null },
+          });
+          setTimeout(() => canvasControls?.fitView(), 50);
+        } else {
+          // If all projects deleted, create a fresh default project
+          const newCanvas: Canvas = {
+            ...emptyCanvas(),
+            title: 'Interactive Graph',
+          };
+          const newProjectItem: ProjectItem = {
+            id: newCanvas.id,
+            title: newCanvas.title,
+            nodeCount: 0,
+            updatedAt: newCanvas.updatedAt,
+          };
+          setProjects([newProjectItem]);
+          setActiveProjectId(newCanvas.id);
+          try {
+            localStorage.setItem('root-mvp:projects', JSON.stringify([newProjectItem]));
+            localStorage.setItem(`root-mvp:project:${newCanvas.id}`, serializeCanvas(newCanvas));
+            localStorage.setItem('root-mvp:active-project-id', newCanvas.id);
+          } catch (_err) {}
+          useCanvasStore.setState({
+            canvas: newCanvas,
+            selection: { nodeId: null },
+            editor: { openNodeId: null },
+          });
+        }
+      } else {
+        setProjects(remaining);
+      }
+    },
+    [projects, activeProjectId, canvasControls],
   );
 
   const handleDeleteConfirm = useCallback(
@@ -628,6 +766,7 @@ function AppShell(): JSX.Element {
               activeProjectId={activeProjectId}
               onSelectProject={handleSelectProject}
               onNewProject={handleNewProject}
+              onDeleteProject={handleDeleteProject}
             />
           </div>
 

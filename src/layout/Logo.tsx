@@ -59,7 +59,7 @@ export function RootLogo(props: SVGProps<SVGSVGElement>): JSX.Element {
 /**
  * Official Root Mark / Logo component replacing the old black-and-white tree icon with root-logo.svg.
  */
-export function RootMarkIcon({ className = '', size = 28 }: { className?: string; size?: number }): JSX.Element {
+export function RootMarkIcon({ className = '', size = 48 }: { className?: string; size?: number }): JSX.Element {
   return (
     <RootLogo
       className={`inline-block select-none shrink-0 ${className}`}

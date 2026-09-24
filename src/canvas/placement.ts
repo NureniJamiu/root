@@ -51,7 +51,7 @@ import type { Canvas, Position, UUID } from '../data';
  * toolbar. Kept as a shared constant so tests can reason about the
  * exact bounding box `computeChildPosition` assumes.
  */
-export const NODE_WIDTH = 240;
+export const NODE_WIDTH = 300;
 
 /**
  * Standard card height in canvas units used by the placement algorithm.
@@ -60,7 +60,7 @@ export const NODE_WIDTH = 240;
  * on-screen footprint (which would let siblings visually collide even
  * though the bounding-box math says they don't).
  */
-export const NODE_HEIGHT = 140;
+export const NODE_HEIGHT = 160;
 
 /**
  * Minimum gap, in canvas units, between the parent's bounding box and
@@ -68,7 +68,7 @@ export const NODE_HEIGHT = 140;
  * new child). Ensures the two cards don't visually kiss even when the
  * bounding-box math reports "no overlap".
  */
-export const SIBLING_GAP = 40;
+export const SIBLING_GAP = 80;
 
 /**
  * Axis-aligned bounding box in canvas units. Kept local to this module

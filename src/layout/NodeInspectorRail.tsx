@@ -92,17 +92,17 @@ export function NodeInspectorRail({
 
   return (
     <aside
-      className="w-[360px] min-w-[360px] h-full bg-[#ffffff] border-l border-[#ebebeb] flex flex-col justify-between shrink-0 select-none z-20 overflow-y-auto"
+      className="w-[360px] min-w-[360px] max-w-[360px] h-full bg-[#ffffff] border-l border-[#ebebeb] flex flex-col justify-between shrink-0 select-none z-20 overflow-hidden box-border"
       style={{ boxShadow: 'none' }}
       data-testid="node-inspector-rail"
     >
       {/* Top Header & Breadcrumb */}
       <div className="flex flex-col shrink-0">
         {/* Rail Title Header */}
-        <div className="h-10 px-3 border-b border-[#ebebeb] flex items-center justify-between bg-[#ffffff]">
-          <div className="flex items-center gap-2">
+        <div className="h-11 px-4 border-b border-[#ebebeb] flex items-center justify-between bg-[#ffffff] shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <svg
-              className="w-3.5 h-3.5 text-[#000000]"
+              className="w-4 h-4 text-[#000000] shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -113,12 +113,12 @@ export function NodeInspectorRail({
               <line x1="21" y1="14" x2="3" y2="14" />
               <line x1="21" y1="18" x2="3" y2="18" />
             </svg>
-            <span className="font-mono text-[11px] font-medium tracking-[0.04em] uppercase text-[#1b1c1c]">
+            <span className="font-mono text-[11px] font-medium tracking-[0.04em] uppercase text-[#1b1c1c] whitespace-nowrap">
               Node Inspector
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {selectedNode && (
               <span className="font-mono text-[10px] text-[#1b1c1c] border border-[#ebebeb] bg-[#ffffff] px-1.5 py-0.5 rounded-[2px]">
                 {shortId}
@@ -150,14 +150,14 @@ export function NodeInspectorRail({
         </div>
 
         {/* Path Ribbon */}
-        <div className="px-3 py-1.5 border-b border-[#ebebeb] bg-[#fbf9f8] font-mono text-[9px] text-[#595959] tracking-wide truncate">
+        <div className="px-4 py-2 border-b border-[#ebebeb] bg-[#fbf9f8] font-mono text-[9px] text-[#595959] tracking-wide truncate shrink-0">
           <span className="text-[#737785] uppercase">PATH: </span>
           <span>{pathString}</span>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 p-3.5 flex flex-col gap-4 overflow-y-auto">
+      <div className="flex-1 px-4 py-4 flex flex-col gap-4 overflow-y-auto overflow-x-hidden">
         {selectedNode ? (
           <>
             {/* View A: Collapsed Subtree View (Screenshot 3) */}
@@ -260,13 +260,13 @@ export function NodeInspectorRail({
 
             {/* View B: Standard Node Inspector Form */}
             {(!isInspectingCollapsedSubtree || !isCollapsed) && (
-              <div className="flex flex-col gap-3.5">
+              <div className="flex flex-col gap-4">
                 {/* 1. Classification Type */}
                 <div className="flex flex-col gap-1.5">
                   <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-[#595959]">
                     CLASSIFICATION TYPE
                   </span>
-                  <div className="grid grid-cols-4 gap-1 border border-[#ebebeb] p-0.5 rounded-[2px] bg-[#fbf9f8]">
+                  <div className="grid grid-cols-4 gap-1 border border-[#ebebeb] p-1 rounded-[2px] bg-[#fbf9f8]">
                     {(['topic', 'finding', 'question', 'conclusion'] as const).map((type) => {
                       const isActive = selectedNode.type === type;
                       const label = type === 'conclusion' ? 'Concl.' : type.charAt(0).toUpperCase() + type.slice(1);
@@ -275,9 +275,9 @@ export function NodeInspectorRail({
                           key={type}
                           type="button"
                           onClick={() => handleTypeChange(type)}
-                          className={`h-6 text-[10px] font-mono rounded-[1px] transition-colors cursor-pointer ${
+                          className={`h-7 text-[10px] font-mono rounded-[1px] transition-all cursor-pointer flex items-center justify-center font-medium ${
                             isActive
-                              ? 'bg-[#003b93] text-[#ffffff] font-medium shadow-none'
+                              ? 'bg-[#003b93] text-[#ffffff] shadow-sm'
                               : 'text-[#404040] hover:text-[#000000] hover:bg-[#ffffff]'
                           }`}
                         >
@@ -303,7 +303,7 @@ export function NodeInspectorRail({
                       })
                     }
                     placeholder="Enter scholarly node title..."
-                    className="w-full px-2.5 py-1.5 font-serif text-[16px] font-medium leading-tight text-[#000000] border border-[#ebebeb] rounded-[2px] focus:outline-none focus:border-[#000000] transition-colors"
+                    className="w-full px-3 py-2 font-serif text-[15px] font-medium leading-tight text-[#000000] border border-[#ebebeb] bg-[#ffffff] rounded-[2px] focus:outline-none focus:border-[#000000] transition-colors box-border"
                   />
                 </div>
 
@@ -320,7 +320,7 @@ export function NodeInspectorRail({
                       canvasActions.updateNode(selectedNode.id, { body: e.target.value })
                     }
                     placeholder="Record analytical evidentiary notes, methods, and observations..."
-                    className="w-full p-2.5 font-serif text-[13px] leading-[20px] text-[#404040] border border-[#ebebeb] rounded-[2px] focus:outline-none focus:border-[#000000] resize-y transition-colors"
+                    className="w-full p-3 font-serif text-[13px] leading-[20px] text-[#404040] border border-[#ebebeb] bg-[#ffffff] rounded-[2px] focus:outline-none focus:border-[#000000] resize-y transition-colors box-border"
                   />
                 </div>
 
@@ -373,9 +373,9 @@ export function NodeInspectorRail({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-2.5 border border-dashed border-[#c3c6d6] hover:border-[#000000] bg-[#fbf9f8] hover:bg-[#ffffff] rounded-[2px] flex items-center justify-center gap-1.5 font-mono text-[9px] text-[#404040] hover:text-[#000000] transition-colors cursor-pointer"
+                    className="w-full py-3 px-3 border border-dashed border-[#c3c6d6] hover:border-[#000000] bg-[#fbf9f8] hover:bg-[#ffffff] rounded-[2px] flex items-center justify-center gap-2 font-mono text-[9.5px] text-[#404040] hover:text-[#000000] transition-colors cursor-pointer box-border"
                   >
-                    <svg className="w-3.5 h-3.5 text-[#737785]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg className="w-4 h-4 text-[#737785]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
                       <circle cx="8.5" cy="8.5" r="1.5" />
                       <path d="m21 15-5-5L5 21" />
@@ -389,9 +389,9 @@ export function NodeInspectorRail({
                   <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-[#595959]">
                     INDEXED DOIS & CITATIONS
                   </span>
-                  <div className="flex items-center justify-between p-2 border border-[#ebebeb] rounded-[2px] bg-[#ffffff] font-mono text-[9.5px]">
+                  <div className="flex items-center justify-between p-2.5 border border-[#ebebeb] rounded-[2px] bg-[#ffffff] font-mono text-[9.5px]">
                     <div className="flex items-center gap-1.5 text-[#1b1c1c] truncate">
-                      <svg className="w-3 h-3 text-[#737785] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <svg className="w-3.5 h-3.5 text-[#737785] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                       </svg>
@@ -425,7 +425,7 @@ export function NodeInspectorRail({
       </div>
 
       {/* Footer Area: Drag Telemetry & Action Buttons */}
-      <div className="border-t border-[#ebebeb] bg-[#ffffff] p-3 flex flex-col gap-2.5 shrink-0 select-none">
+      <div className="border-t border-[#ebebeb] bg-[#ffffff] p-4 flex flex-col gap-3 shrink-0 select-none">
         {selectedNode && (
           <div className="flex flex-col gap-1 font-mono text-[9px] text-[#595959]">
             <div className="flex items-center justify-between">
@@ -469,7 +469,7 @@ export function NodeInspectorRail({
           </div>
         ) : selectedNode ? (
           /* Normal Footer State (Screenshot 1) */
-          <div className="flex flex-col gap-2 pt-1 border-t border-[#ebebeb]">
+          <div className="flex flex-col gap-2.5 pt-2 border-t border-[#ebebeb]">
             <div className="flex items-center gap-1.5 font-mono text-[9px] text-[#737785]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#0051c3]" />
               <span>Auto-saved to LocalStorage (508ms debounce)</span>
@@ -480,7 +480,7 @@ export function NodeInspectorRail({
                 size="sm"
                 variant="primary"
                 onClick={() => onAddChild?.(selectedNode.id)}
-                className="flex-1 font-mono text-[10px] h-8 bg-[#0051c3] hover:bg-[#003b93]"
+                className="flex-1 font-mono text-[10px] h-8 bg-[#0051c3] hover:bg-[#003b93] justify-center"
               >
                 + Branch Child
               </Button>
@@ -488,7 +488,7 @@ export function NodeInspectorRail({
                 size="sm"
                 variant="destructive"
                 onClick={() => canvasActions.openDeletePrompt(selectedNode.id)}
-                className="font-mono text-[10px] h-8 px-3"
+                className="font-mono text-[10px] h-8 px-3 justify-center"
               >
                 Prune...
               </Button>

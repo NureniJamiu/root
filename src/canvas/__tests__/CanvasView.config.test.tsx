@@ -128,7 +128,7 @@ describe('CanvasView — React Flow config (task 9.5)', () => {
 
     // Requirement 12.2 — interaction mode config
     expect(captured!.nodesDraggable).toBe(true);
-    expect(captured!.nodesConnectable).toBe(false);
+    expect(captured!.nodesConnectable).toBe(true);
     expect(captured!.elementsSelectable).toBe(true);
   });
 

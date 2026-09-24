@@ -15,6 +15,7 @@ export interface StructuralIndexRailProps {
   readonly activeProjectId?: string;
   readonly onSelectProject?: (id: string) => void;
   readonly onNewProject?: () => void;
+  readonly onDeleteProject?: (id: string) => void;
 }
 
 export function StructuralIndexRail({
@@ -24,6 +25,7 @@ export function StructuralIndexRail({
   activeProjectId,
   onSelectProject,
   onNewProject,
+  onDeleteProject,
 }: StructuralIndexRailProps): JSX.Element {
   const projectList: readonly ProjectItem[] =
     projects && projects.length > 0
@@ -118,16 +120,23 @@ export function StructuralIndexRail({
             const isActive = project.id === currentActiveId;
             const indexStr = String(idx + 1).padStart(2, '0') + '.';
             return (
-              <button
+              <div
                 key={project.id}
-                type="button"
                 onClick={() => onSelectProject?.(project.id)}
-                className={`flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-l-2 ${
+                className={`group flex items-center justify-between px-3 py-2 text-left transition-colors cursor-pointer border-l-2 ${
                   isActive
                     ? 'bg-[#eae8e7] border-[#000000] text-[#000000]'
                     : 'border-transparent text-[#404040] hover:bg-[#f0eded] hover:text-[#000000]'
                 }`}
                 data-testid={`project-item-${project.id}`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectProject?.(project.id);
+                  }
+                }}
               >
                 <div className="flex items-center gap-2 truncate pr-2">
                   <span
@@ -141,10 +150,31 @@ export function StructuralIndexRail({
                     {project.title || `Project ${idx + 1}`}
                   </span>
                 </div>
-                <span className="font-mono text-[10px] text-[#595959] bg-[#ffffff] border border-[#ebebeb] px-1.5 py-0.5 rounded-[2px] shrink-0">
-                  {project.nodeCount} {project.nodeCount === 1 ? 'node' : 'nodes'}
-                </span>
-              </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="font-mono text-[10px] text-[#595959] bg-[#ffffff] border border-[#ebebeb] px-1.5 py-0.5 rounded-[2px]">
+                    {project.nodeCount} {project.nodeCount === 1 ? 'node' : 'nodes'}
+                  </span>
+                  {onDeleteProject && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteProject(project.id);
+                      }}
+                      className="p-1 text-[#737785] hover:text-[#ba1a1a] hover:bg-[#ffffff] rounded-[2px] transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                      title={`Delete ${project.title || `Project ${idx + 1}`}`}
+                      aria-label={`Delete ${project.title || `Project ${idx + 1}`}`}
+                      data-testid={`btn-delete-project-${project.id}`}
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
             );
           })}
         </nav>

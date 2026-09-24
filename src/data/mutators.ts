@@ -35,7 +35,7 @@
 
 import { newId } from './ids';
 import { now } from './time';
-import { subtreeIds } from './tree';
+import { hasCycle, subtreeIds } from './tree';
 import type { Canvas, ImageEntry, Node, NodeType, Position, UUID } from './types';
 
 /* -------------------------------------------------------------------------- */
@@ -363,3 +363,31 @@ export function deleteSubtree(c: Canvas, id: UUID): Canvas {
   const nextNodes = c.nodes.filter((n) => !doomed.has(n.id));
   return withNodes(c, nextNodes);
 }
+
+/* -------------------------------------------------------------------------- */
+/* reparentChild                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Re-parent a child node under a new parent node.
+ * Guarded against cycles, self-parenting, reparenting the root node,
+ * or unknown node IDs.
+ */
+export function reparentChild(c: Canvas, childId: UUID, newParentId: UUID): Canvas {
+  if (childId === newParentId) return c;
+  const child = c.nodes.find((n) => n.id === childId);
+  const parent = c.nodes.find((n) => n.id === newParentId);
+  if (!child || !parent) return c;
+  if (child.parentId === null) return c;
+  if (hasCycle(c, childId, newParentId)) return c;
+
+  const ts = now();
+  const nextNodes = replaceNode(c.nodes, childId, (n) => ({
+    ...n,
+    parentId: newParentId,
+    updatedAt: ts,
+  }));
+  if (nextNodes === null) return c;
+  return { ...c, nodes: nextNodes, updatedAt: ts };
+}
+

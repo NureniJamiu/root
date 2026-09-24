@@ -59,7 +59,7 @@ export function AppHeader({
 
   return (
     <header
-      className="h-12 w-full bg-[#ffffff] border-b border-[#ebebeb] flex items-center justify-between px-3 shrink-0 select-none z-30"
+      className="h-14 w-full bg-[#ffffff] border-b border-[#ebebeb] flex items-center justify-between px-3 shrink-0 select-none z-30"
       style={{ boxShadow: 'none' }}
     >
       {/* Left: Brand Mark & Title */}
@@ -83,7 +83,7 @@ export function AppHeader({
           </button>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 py-2">
           <RootLogo className="h-8 w-auto min-w-[70px]" />
         </div>
 

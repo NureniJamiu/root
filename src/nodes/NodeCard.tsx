@@ -21,7 +21,7 @@ import { memo } from 'react';
 import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
-import { canvasActions, descendantCount, useCanvasStore } from '../data';
+import { useCanvasStore } from '../data';
 import type { Node, UUID } from '../data';
 
 import { CollapseBadge } from './CollapseBadge';
@@ -70,7 +70,6 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
   const directChildren = canvas.nodes.filter((n) => n.parentId === node.id);
   const childCount = directChildren.length;
   const hasCollapsedChildren = directChildren.some((c) => c.collapsed);
-  const hiddenDescendantCount = descendantCount(canvas, node.id);
 
   // Short ID label
   const isRoot = node.parentId === null;
@@ -130,21 +129,38 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         </div>
       )}
 
-      {/* Target handle: Incoming edge from parent on LEFT */}
+      {/* Target handles: Incoming edges on all 4 sides */}
       <Handle
+        id="target-left"
         type="target"
         position={RFPosition.Left}
-        style={{
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 6,
-          height: 6,
-          background: '#c3c6d6',
-          border: '1px solid #ffffff',
-          opacity: 0,
-          pointerEvents: 'none',
-        }}
-        isConnectable={false}
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        isConnectable={true}
+      />
+      <Handle
+        id="target-right"
+        type="target"
+        position={RFPosition.Right}
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        isConnectable={true}
+      />
+      <Handle
+        id="target-top"
+        type="target"
+        position={RFPosition.Top}
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        isConnectable={true}
+      />
+      <Handle
+        id="target-bottom"
+        type="target"
+        position={RFPosition.Bottom}
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        isConnectable={true}
       />
 
       {/* Top 3px colored accent bar */}
@@ -183,64 +199,57 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
           </div>
         )}
 
-        {/* Collapsed Subtree Banner (Screenshot 3 & Screenshot 1 conclusion) */}
-        {node.collapsed ? (
-          <div className="p-2 bg-[#fdf2f2] border border-[#f5c2c7] rounded-[2px] flex items-center justify-between text-[#842029]">
-            <div className="flex items-center gap-1.5 font-mono text-[9px]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#de5052]" />
-              <span>{hiddenDescendantCount} hidden descendants</span>
-            </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                canvasActions.setCollapsed(node.id, false);
-              }}
-              className="px-1.5 py-0.5 bg-white border border-[#f5c2c7] hover:border-black font-mono text-[9px] text-[#1b1c1c] rounded-[2px] cursor-pointer"
-            >
-              [+] Expand Subtree
-            </button>
-            <div className="hidden">
-              <CollapseBadge nodeId={node.id} />
-            </div>
-          </div>
-        ) : isConclusion && hiddenDescendantCount > 0 ? (
-          <div className="flex items-center gap-1.5 font-mono text-[9px] text-[#521010] pt-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#521010]" />
-            <span>{hiddenDescendantCount} hidden descendants</span>
-          </div>
-        ) : null}
-
-        {/* Card Footer: Metadata and Branch Stats */}
+        {/* Card Footer: Metadata, Branch Stats, and Clean Collapsed Badge */}
         <div className="flex items-center justify-between pt-1.5 border-t border-[#ebebeb] font-mono text-[9px] text-[#737785] tracking-wide select-none">
           <span>{shortId}</span>
-          <span>
-            {isRoot
-              ? hasCollapsedChildren
-                ? `${childCount} Branches (1 Collapsed)`
-                : `${childCount} Branches`
-              : childCount > 0
-              ? `${childCount} ${childCount === 1 ? 'child' : 'children'}`
-              : ''}
-          </span>
+          {node.collapsed ? (
+            <CollapseBadge nodeId={node.id} />
+          ) : (
+            <span>
+              {isRoot
+                ? hasCollapsedChildren
+                  ? `${childCount} Branches (1 Collapsed)`
+                  : `${childCount} Branches`
+                : childCount > 0
+                ? `${childCount} ${childCount === 1 ? 'child' : 'children'}`
+                : ''}
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Source handle: Outgoing edges to children on RIGHT */}
+      {/* Source handles: Outgoing edges on all 4 sides */}
       <Handle
+        id="source-right"
         type="source"
         position={RFPosition.Right}
-        style={{
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 6,
-          height: 6,
-          background: '#c3c6d6',
-          border: '1px solid #ffffff',
-          opacity: 0,
-          pointerEvents: 'none',
-        }}
-        isConnectable={false}
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        isConnectable={true}
+      />
+      <Handle
+        id="source-left"
+        type="source"
+        position={RFPosition.Left}
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        isConnectable={true}
+      />
+      <Handle
+        id="source-top"
+        type="source"
+        position={RFPosition.Top}
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        isConnectable={true}
+      />
+      <Handle
+        id="source-bottom"
+        type="source"
+        position={RFPosition.Bottom}
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        isConnectable={true}
       />
     </div>
   );

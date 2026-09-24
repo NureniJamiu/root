@@ -94,6 +94,33 @@ export function deriveReactFlowGraph(
     // parent hidden behind a collapsed grandparent never produces a
     // dangling edge (Property 2, Requirement 1.5 / 6.4).
     if (node.parentId !== null && visible.has(node.parentId)) {
+      const parent = canvas.nodes.find((n) => n.id === node.parentId);
+      let sourceHandle = 'source-right';
+      let targetHandle = 'target-left';
+
+      if (parent) {
+        const dx = node.position.x - parent.position.x;
+        const dy = node.position.y - parent.position.y;
+
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          if (dx >= 0) {
+            sourceHandle = 'source-right';
+            targetHandle = 'target-left';
+          } else {
+            sourceHandle = 'source-left';
+            targetHandle = 'target-right';
+          }
+        } else {
+          if (dy >= 0) {
+            sourceHandle = 'source-bottom';
+            targetHandle = 'target-top';
+          } else {
+            sourceHandle = 'source-top';
+            targetHandle = 'target-bottom';
+          }
+        }
+      }
+
       const isDragging = options?.draggingNodeId === node.id;
       const isSelected = options?.selectedNodeId === node.id;
       const isQuestion = node.type === 'question';
@@ -111,6 +138,8 @@ export function deriveReactFlowGraph(
         id: `e:${node.parentId}->${node.id}`,
         source: node.parentId,
         target: node.id,
+        sourceHandle,
+        targetHandle,
         type: DEFAULT_EDGE_TYPE,
         style,
       });

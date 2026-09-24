@@ -58,6 +58,7 @@ export {
   emptyCanvas,
   moveNode,
   removeImage,
+  reparentChild,
   setCollapsed,
   updateNode,
 } from './mutators';

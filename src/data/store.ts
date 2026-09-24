@@ -45,6 +45,7 @@ import {
   emptyCanvas,
   moveNode as mutMoveNode,
   removeImage as mutRemoveImage,
+  reparentChild as mutReparentChild,
   setCollapsed as mutSetCollapsed,
   updateNode as mutUpdateNode,
 } from './mutators';
@@ -286,6 +287,17 @@ export const canvasActions = {
     commitCanvasWrite(
       'moveNode',
       (s) => mutMoveNode(s.canvas, id, position),
+      () => ({}),
+    );
+  },
+
+  /**
+   * Re-parent a child node under a new parent node.
+   */
+  reparentChild(childId: UUID, newParentId: UUID): void {
+    commitCanvasWrite(
+      'reparentChild',
+      (s) => mutReparentChild(s.canvas, childId, newParentId),
       () => ({}),
     );
   },

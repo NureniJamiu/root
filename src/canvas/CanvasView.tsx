@@ -15,6 +15,7 @@ import ReactFlow, {
   ReactFlowProvider,
   applyNodeChanges,
   useReactFlow,
+  type Connection,
   type NodeChange,
   type NodeDragHandler,
   type NodeTypes,
@@ -231,6 +232,11 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     onPaneClick?.();
   }, [onPaneClick]);
 
+  const handleConnect = useCallback((connection: Connection) => {
+    if (!connection.source || !connection.target || connection.source === connection.target) return;
+    canvasActions.reparentChild(connection.target, connection.source);
+  }, []);
+
   const zoomPercent = Math.round(storeViewport.zoom * 100);
 
   useEffect(() => {
@@ -250,7 +256,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       maxZoom: MAX_ZOOM,
       onlyRenderVisibleElements: true,
       nodesDraggable: true,
-      nodesConnectable: false,
+      nodesConnectable: true,
       elementsSelectable: true,
     });
   }, [onRFPropsMounted]);
@@ -356,7 +362,8 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
           panOnDrag={isPanActive ? true : [1, 2]}
           selectionOnDrag={!isPanActive}
           nodesDraggable={!isPanActive}
-          nodesConnectable={false}
+          nodesConnectable={!isPanActive}
+          onConnect={handleConnect}
           elementsSelectable={!isPanActive}
           onlyRenderVisibleElements
           onMove={handleMove}
