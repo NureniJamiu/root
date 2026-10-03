@@ -104,3 +104,27 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #737785;
 }
+
+/* Edge updater reconnection anchors */
+.react-flow__edgeupdater {
+  cursor: grab !important;
+  pointer-events: all !important;
+  transition: r 150ms ease, fill 150ms ease, stroke 150ms ease;
+}
+
+.react-flow__edgeupdater:hover {
+  cursor: grabbing !important;
+  fill: #0051c3 !important;
+  stroke: #ffffff !important;
+  stroke-width: 2px !important;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #0051c3 !important;
+  stroke-width: 2.5px !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #0051c3 !important;
+  stroke-width: 2.5px !important;
+}

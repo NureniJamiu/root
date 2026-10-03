@@ -67,6 +67,8 @@ import {
   onLoadError,
   onSaveError as onPersistenceSaveError,
 } from '../persistence';
+import { AuthProvider } from '../auth';
+import { RouterProvider, RootRouter } from '../routing';
 
 /* -------------------------------------------------------------------------- */
 /* ToolbarCallbacks — module scope so identity is stable across renders      */
@@ -218,7 +220,7 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-class ErrorBoundary extends Component<
+export class ErrorBoundary extends Component<
   { readonly children: ReactNode },
   ErrorBoundaryState
 > {
@@ -283,7 +285,7 @@ class ErrorBoundary extends Component<
  */
 const ROOT_INITIAL_POSITION = { x: 400, y: 300 } as const;
 
-function AppShell(): JSX.Element {
+export function AppShell(): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const openNodeId = useCanvasStore((s) => s.editor.openNodeId);
   const deleteNodeId = useCanvasStore((s) => s.deletePrompt.nodeId);
@@ -746,6 +748,23 @@ function AppShell(): JSX.Element {
           onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
           activeTypeFilter={activeTypeFilter}
           onSelectTypeFilter={setActiveTypeFilter}
+          onNavigateHome={() => {
+            if (typeof window !== 'undefined') {
+              window.history.pushState({}, '', '/');
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }
+          }}
+          onSignOut={() => {
+            try {
+              localStorage.removeItem('root-auth:user');
+            } catch (_err) {
+              /* ignore */
+            }
+            if (typeof window !== 'undefined') {
+              window.history.pushState({}, '', '/auth/login');
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }
+          }}
         />
 
         {/* 3-Pane Workbench Body */}
@@ -869,7 +888,11 @@ function AppShell(): JSX.Element {
 export function App(): JSX.Element {
   return (
     <ErrorBoundary>
-      <AppShell />
+      <AuthProvider>
+        <RouterProvider>
+          <RootRouter />
+        </RouterProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

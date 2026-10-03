@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import type { ChangeEvent } from 'react';
-import { useCanvasStore, canvasActions, descendantCount } from '../data';
+import { useCanvasStore, canvasActions, descendantCount, hasCycle } from '../data';
 import type { Node, NodeType, UUID } from '../data';
 import type { DragState } from '../canvas';
 import { Button } from '../ui/Button';
@@ -436,6 +436,36 @@ export function NodeInspectorRail({
               <span>CREATED: 2025-02-14</span>
               <span>UPDATED: Just now</span>
             </div>
+            {selectedNode.parentId !== null && (
+              <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[#ebebeb]">
+                <span className="shrink-0 text-[#595959]">RECONNECT TO:</span>
+                <select
+                  value={selectedNode.parentId ?? ''}
+                  onChange={(e) => {
+                    const newParent = e.target.value;
+                    if (newParent && newParent !== selectedNode.parentId) {
+                      canvasActions.reparentChild(selectedNode.id, newParent);
+                    }
+                  }}
+                  className="font-mono text-[9px] bg-white border border-[#ebebeb] rounded-[2px] px-1 py-0.5 text-[#1b1c1c] focus:outline-none focus:border-[#0051c3] cursor-pointer max-w-[160px] truncate"
+                  title="Reconnect to a different parent"
+                  data-testid="reconnect-parent-select"
+                >
+                  {canvas.nodes
+                    .filter((n) => n.id !== selectedNode.id && !hasCycle(canvas, selectedNode.id, n.id))
+                    .map((n) => {
+                      const label = n.parentId === null
+                        ? `ROOT: ${n.title ? n.title.slice(0, 16) : 'Interactive Graph'}`
+                        : `N-${n.id.slice(0, 2).toUpperCase()}: ${n.title ? n.title.slice(0, 14) : n.type}`;
+                      return (
+                        <option key={n.id} value={n.id}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+            )}
           </div>
         )}
 

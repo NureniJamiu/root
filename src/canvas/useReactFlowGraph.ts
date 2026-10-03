@@ -142,6 +142,9 @@ export function deriveReactFlowGraph(
         targetHandle,
         type: DEFAULT_EDGE_TYPE,
         style,
+        reconnectable: true,
+        updatable: true,
+        interactionWidth: 30,
       });
     }
   }

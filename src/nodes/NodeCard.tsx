@@ -134,7 +134,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="target-left"
         type="target"
         position={RFPosition.Left}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-30"
         style={{ top: '50%', transform: 'translateY(-50%)' }}
         isConnectable={true}
       />
@@ -142,7 +142,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="target-right"
         type="target"
         position={RFPosition.Right}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-10"
         style={{ top: '50%', transform: 'translateY(-50%)' }}
         isConnectable={true}
       />
@@ -150,7 +150,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="target-top"
         type="target"
         position={RFPosition.Top}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-30"
         style={{ left: '50%', transform: 'translateX(-50%)' }}
         isConnectable={true}
       />
@@ -158,7 +158,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="target-bottom"
         type="target"
         position={RFPosition.Bottom}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-10"
         style={{ left: '50%', transform: 'translateX(-50%)' }}
         isConnectable={true}
       />
@@ -223,7 +223,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="source-right"
         type="source"
         position={RFPosition.Right}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-30"
         style={{ top: '50%', transform: 'translateY(-50%)' }}
         isConnectable={true}
       />
@@ -231,7 +231,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="source-left"
         type="source"
         position={RFPosition.Left}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-10"
         style={{ top: '50%', transform: 'translateY(-50%)' }}
         isConnectable={true}
       />
@@ -239,7 +239,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="source-top"
         type="source"
         position={RFPosition.Top}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-10"
         style={{ left: '50%', transform: 'translateX(-50%)' }}
         isConnectable={true}
       />
@@ -247,7 +247,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="source-bottom"
         type="source"
         position={RFPosition.Bottom}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-20"
+        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-30"
         style={{ left: '50%', transform: 'translateX(-50%)' }}
         isConnectable={true}
       />

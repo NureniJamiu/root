@@ -24,3 +24,5 @@ export {
 
 export { CanvasView } from './CanvasView';
 export type { CanvasViewProps, CanvasViewProbeProps, CanvasViewControls, DragState } from './CanvasView';
+export { determineReconnect, determineReparent } from './reconnect';
+export type { ReparentResolution } from './reconnect';

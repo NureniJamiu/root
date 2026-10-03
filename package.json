@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:full": "concurrently \"npm run dev\" \"npm run auth-server\"",
+    "auth-server": "npx tsx --env-file=.env server.ts",
+    "auth:migrate": "npx tsx migrate.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .ts,.tsx",
@@ -13,6 +16,10 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "better-auth": "^1.7.7",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "reactflow": "11.11.4",
@@ -24,6 +31,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@testing-library/user-event": "^14.5.2",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "22.9.0",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
@@ -31,10 +39,14 @@
     "@typescript-eslint/parser": "7.18.0",
     "@vitejs/plugin-react": "4.3.3",
     "@vitest/ui": "^2.1.4",
+    "autoprefixer": "^10.6.1",
+    "concurrently": "^10.0.5",
     "eslint": "8.57.1",
     "eslint-plugin-react": "7.37.2",
     "fast-check": "^3.23.1",
     "jsdom": "^25.0.1",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.23.15",
     "typescript": "5.5.4",
     "vite": "5.4.10",
     "vitest": "^2.1.4"

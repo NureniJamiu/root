@@ -29,7 +29,7 @@ import { canvasActions, useCanvasStore } from '../../data/store';
 import type { CanvasState } from '../../data/store';
 import { serializeCanvas } from '../../data/serialize';
 import { CANVAS_KEY } from '../../persistence/keys';
-import { App } from '../App';
+import { AppShell } from '../App';
 
 /* -------------------------------------------------------------------------- */
 /* Module mocks                                                               */
@@ -93,7 +93,7 @@ describe('App shell — integration', () => {
 
   it('shows btn-create-root when the canvas has no nodes (R2.1)', async () => {
     await act(async () => {
-      render(<App />);
+      render(<AppShell />);
     });
 
     expect(screen.getByTestId('btn-create-root')).toBeVisible();
@@ -103,7 +103,7 @@ describe('App shell — integration', () => {
     const user = userEvent.setup();
 
     await act(async () => {
-      render(<App />);
+      render(<AppShell />);
     });
 
     const btn = screen.getByTestId('btn-create-root');
@@ -126,7 +126,7 @@ describe('App shell — integration', () => {
     localStorage.setItem(CANVAS_KEY, serialized);
 
     await act(async () => {
-      render(<App />);
+      render(<AppShell />);
     });
 
     expect(useCanvasStore.getState().canvas.nodes.length).toBeGreaterThan(0);
@@ -145,7 +145,7 @@ describe('App shell — integration', () => {
     localStorage.setItem(CANVAS_KEY, serializeCanvas(canvas));
 
     await act(async () => {
-      render(<App />);
+      render(<AppShell />);
     });
 
     // Manually open the editor for the persisted node.
@@ -164,7 +164,7 @@ describe('App shell — integration', () => {
     localStorage.setItem(CANVAS_KEY, serializeCanvas(canvas));
 
     await act(async () => {
-      render(<App />);
+      render(<AppShell />);
     });
 
     // Open the editor.

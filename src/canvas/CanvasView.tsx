@@ -12,10 +12,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import ReactFlow, {
   Background,
+  ConnectionMode,
   ReactFlowProvider,
   applyNodeChanges,
   useReactFlow,
   type Connection,
+  type Edge,
   type NodeChange,
   type NodeDragHandler,
   type NodeTypes,
@@ -25,11 +27,12 @@ import ReactFlow, {
 // React Flow stylesheet
 import 'reactflow/dist/style.css';
 
-import { canvasActions, useCanvasStore } from '../data';
+import { canvasActions, hasCycle, useCanvasStore } from '../data';
 import type { UUID } from '../data';
 import { FitViewIcon, NodeCard, ZoomInIcon, ZoomOutIcon } from '../nodes';
 
 import { useReactFlowGraph } from './useReactFlowGraph';
+import { determineReconnect, determineReparent } from './reconnect';
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
@@ -234,7 +237,20 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
 
   const handleConnect = useCallback((connection: Connection) => {
     if (!connection.source || !connection.target || connection.source === connection.target) return;
-    canvasActions.reparentChild(connection.target, connection.source);
+    const { canvas } = useCanvasStore.getState();
+    const resolution = determineReparent(canvas, connection);
+    if (resolution && !hasCycle(canvas, resolution.childId, resolution.parentId)) {
+      canvasActions.reparentChild(resolution.childId, resolution.parentId);
+    }
+  }, []);
+
+  const handleReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
+    if (!newConnection.source || !newConnection.target) return;
+    const { canvas } = useCanvasStore.getState();
+    const resolution = determineReconnect(canvas, oldEdge, newConnection);
+    if (resolution && !hasCycle(canvas, resolution.childId, resolution.parentId)) {
+      canvasActions.reparentChild(resolution.childId, resolution.parentId);
+    }
   }, []);
 
   const zoomPercent = Math.round(storeViewport.zoom * 100);
@@ -363,7 +379,12 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
           selectionOnDrag={!isPanActive}
           nodesDraggable={!isPanActive}
           nodesConnectable={!isPanActive}
+          edgesUpdatable={!isPanActive}
+          edgesFocusable={!isPanActive}
+          connectionMode={ConnectionMode.Loose}
+          reconnectRadius={20}
           onConnect={handleConnect}
+          onReconnect={handleReconnect}
           elementsSelectable={!isPanActive}
           onlyRenderVisibleElements
           onMove={handleMove}

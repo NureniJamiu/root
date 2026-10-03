@@ -23,6 +23,8 @@ export interface AppHeaderProps {
   readonly onToggleInspector?: () => void;
   readonly activeTypeFilter?: NodeType | null;
   readonly onSelectTypeFilter?: (type: NodeType | null) => void;
+  readonly onSignOut?: () => void;
+  readonly onNavigateHome?: () => void;
 }
 
 export function AppHeader({
@@ -44,6 +46,8 @@ export function AppHeader({
   onToggleInspector,
   activeTypeFilter,
   onSelectTypeFilter,
+  onSignOut,
+  onNavigateHome,
 }: AppHeaderProps): JSX.Element {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
@@ -83,8 +87,12 @@ export function AppHeader({
           </button>
         )}
 
-        <div className="flex items-center gap-2 py-2">
-          <RootLogo className="h-8 w-auto min-w-[70px]" />
+        <div
+          className={`flex items-center gap-2 py-2 ${onNavigateHome ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+          onClick={onNavigateHome}
+          title={onNavigateHome ? 'Return to Home' : undefined}
+        >
+          <RootLogo className="h-10 w-auto min-w-[90px]" />
         </div>
 
         {/* Project title shifted far more to the right */}
@@ -266,9 +274,9 @@ export function AppHeader({
           size="sm"
           variant="primary"
           onClick={onAddNode}
-          className="h-7 text-[11px] font-mono"
+          className="text-[11px] font-mono px-3"
           icon={
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="16" />
               <line x1="8" y1="12" x2="16" y2="12" />
@@ -282,7 +290,7 @@ export function AppHeader({
         <Button
           size="sm"
           variant="secondary"
-          className="h-7 text-[10px] font-mono"
+          className="text-[10px] font-mono px-3"
           icon={
             <svg className="w-3 h-3 text-[#595959]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
@@ -314,15 +322,27 @@ export function AppHeader({
           </button>
         )}
 
-        {/* User avatar */}
-        <div
-          className="w-7 h-7 rounded-full bg-[#0051c3] text-[#ffffff] flex items-center justify-center shrink-0 font-mono text-[11px] font-medium select-none cursor-pointer"
-          title="Researcher Profile"
-        >
-          <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
+        {/* User avatar & Sign Out */}
+        <div className="flex items-center gap-2">
+          <div
+            className="w-7 h-7 rounded-full bg-[#0051c3] text-[#ffffff] flex items-center justify-center shrink-0 font-mono text-[11px] font-medium select-none"
+            title="Researcher Profile"
+          >
+            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          {onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="px-2 py-1 text-[11px] font-mono text-[#737785] hover:text-[#ba1a1a] transition-colors"
+              title="Sign Out"
+            >
+              Sign out
+            </button>
+          )}
         </div>
       </div>
     </header>

@@ -86,20 +86,6 @@ const config: Config = {
       xl: '6px',
       full: '9999px',
     },
-    // DESIGN.md spacing scale
-    spacing: {
-      '0': '0px',
-      '1': '4px',
-      '2': '6px',
-      '3': '8px',
-      '4': '10px',
-      '5': '11px',
-      '6': '12px',
-      '7': '16px',
-      '8': '17px',
-      'gutter': '1rem',
-      'margin': '1.5rem',
-    },
     transitionDuration: {
       DEFAULT: '150ms',
       instant: '100ms',
@@ -109,6 +95,10 @@ const config: Config = {
       slower: '400ms',
     },
     extend: {
+      spacing: {
+        'gutter': '1rem',
+        'margin': '1.5rem',
+      },
       fontSize: {
         // DESIGN.md typography scale
         'headline-xl': ['60px', { lineHeight: '68px', letterSpacing: '-0.02em', fontWeight: '300' }],

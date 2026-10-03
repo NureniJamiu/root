@@ -21,9 +21,9 @@ export function Button({
   ...rest
 }: ButtonProps): JSX.Element {
   const sizeClasses: Record<ButtonSize, string> = {
-    sm: 'h-6 px-2 text-[11px] gap-1',
-    md: 'h-8 px-3 text-[13px] gap-1.5',
-    lg: 'h-9 px-4 text-[14px] gap-2',
+    sm: 'h-7 px-3 py-1 text-[11px] gap-1.5',
+    md: 'h-9 px-4 py-1.5 text-[13px] gap-2',
+    lg: 'h-10 px-5 py-2 text-[14px] gap-2.5',
   };
 
   const variantStyles: Record<ButtonVariant, { base: string; inline: React.CSSProperties }> = {
