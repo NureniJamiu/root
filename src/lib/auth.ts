@@ -8,6 +8,11 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  trustedOrigins: [
+    process.env.VITE_APP_URL ?? 'http://localhost:5173',
+    'http://localhost:5173',
+    'http://localhost:3001',
+  ],
   // Add social providers here if you set up OAuth credentials in your .env.
   // Example (uncomment and fill in your credentials):
   // socialProviders: {
