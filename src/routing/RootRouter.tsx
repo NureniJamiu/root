@@ -18,14 +18,14 @@ export function RootRouter(): JSX.Element {
       return (
         <StaticPublicPage
           title="About Root"
-          subtitle="A minimal workbench designed to ground scientific and systematic inquiry into directed hypothesis trees."
+          subtitle="A clean visual canvas designed to help creators, writers, and thinkers turn scattered ideas into clear, connected plans."
         />
       );
     case '/pricing':
       return (
         <StaticPublicPage
-          title="Pricing & Plans"
-          subtitle="Free and open for individual researchers. Team collaboration features coming soon."
+          title="Simple, Free While in Beta"
+          subtitle="Free for individual creators and thinkers. Team collaboration and sharing features coming soon."
         />
       );
     case '/auth/login':

@@ -417,7 +417,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
 
         {/* Body --------------------------------------------------------- */}
         <label className="flex flex-col gap-1 text-body">
-          <span style={{ color: '#312e2e' }}>Body</span>
+          <span style={{ color: '#312e2e' }}>Notes & Details</span>
           <textarea
             value={node.body}
             onChange={onBodyChange}
@@ -449,7 +449,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
 
         {/* Type picker -------------------------------------------------- */}
         <div className="flex flex-col gap-1 text-body">
-          <span style={{ color: '#312e2e' }}>Type</span>
+          <span style={{ color: '#312e2e' }}>Card Type</span>
           <div
             className="flex flex-row gap-2"
             data-testid="node-editor-type-buttons"
@@ -487,7 +487,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
 
         {/* Images ------------------------------------------------------- */}
         <div className="flex flex-col gap-2 text-body">
-          <span style={{ color: '#312e2e' }}>Images</span>
+          <span style={{ color: '#312e2e' }}>Images & Visuals</span>
 
           <div
             // Drop zone: dashed border, hollow center. Border flashes
@@ -506,7 +506,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
             data-testid="node-editor-drop-zone"
             data-flashing={dropFlash ? 'true' : 'false'}
           >
-            <div>Drop images here, paste, or</div>
+            <div>Drop images or visuals here, paste, or</div>
             <button
               type="button"
               onClick={openFilePicker}

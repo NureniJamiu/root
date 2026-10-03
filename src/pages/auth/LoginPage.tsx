@@ -24,7 +24,7 @@ export function LoginPage(): JSX.Element {
   };
 
   return (
-    <AuthLayout title="Sign In" subtitle="Sign in to access your research canvases">
+    <AuthLayout title="Sign In" subtitle="Sign in to access your projects and ideas">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
           <label className="block text-xs font-mono uppercase text-[#737785] mb-1.5">
@@ -34,7 +34,7 @@ export function LoginPage(): JSX.Element {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="researcher@institute.org"
+            placeholder="you@example.com"
             className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
           />
         </div>

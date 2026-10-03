@@ -75,10 +75,6 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
   const isRoot = node.parentId === null;
   const shortId = isRoot
     ? 'ROOT-01'
-    : node.type === 'finding'
-    ? 'N-04: TRF2'
-    : node.type === 'question'
-    ? 'N-02: QST'
     : `N-${node.id.slice(0, 2).toUpperCase()}`;
 
   // Top accent bar color
@@ -185,16 +181,16 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
 
         <BodyPreview body={node.body} isConclusion={isConclusion} />
 
-        {/* Microscopy Plate / Image preview */}
+        {/* Image / Asset preview */}
         {node.images.length > 0 && (
           <div className="relative w-full h-[115px] bg-[#000000] rounded-[2px] overflow-hidden border border-[#ebebeb] flex items-center justify-center my-0.5">
             <img
               src={node.images[0]?.dataUrl}
-              alt="Microscopy Plate"
+              alt="Attached Visual"
               className="w-full h-full object-cover"
             />
             <div className="absolute bottom-0 inset-x-0 bg-black/75 px-2 py-0.5 flex items-center justify-between font-mono text-[8px] text-white tracking-wider">
-              <span>Zeiss LSM 880 • Telomere FISH</span>
+              <span>Visual Asset • Reference</span>
             </div>
           </div>
         )}
@@ -208,10 +204,10 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
             <span>
               {isRoot
                 ? hasCollapsedChildren
-                  ? `${childCount} Branches (1 Collapsed)`
-                  : `${childCount} Branches`
+                  ? `${childCount} ${childCount === 1 ? 'Branch' : 'Branches'} (1 Collapsed)`
+                  : `${childCount} ${childCount === 1 ? 'Branch' : 'Branches'}`
                 : childCount > 0
-                ? `${childCount} ${childCount === 1 ? 'child' : 'children'}`
+                ? `${childCount} ${childCount === 1 ? 'sub-idea' : 'sub-ideas'}`
                 : ''}
             </span>
           )}
@@ -303,7 +299,7 @@ function Header({ node, selected, isDragging, isConclusion }: HeaderProps): JSX.
       >
         {node.title || (
           <span style={{ opacity: 0.45, fontStyle: 'italic' }}>
-            Untitled node
+            Untitled idea
           </span>
         )}
       </div>

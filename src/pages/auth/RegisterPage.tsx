@@ -32,7 +32,7 @@ export function RegisterPage(): JSX.Element {
   };
 
   return (
-    <AuthLayout title="Create Account" subtitle="Start modeling hypotheses and research graphs">
+    <AuthLayout title="Create Account" subtitle="Start organizing your ideas and creative projects">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
           <label className="block text-xs font-mono uppercase text-[#737785] mb-1.5">
@@ -42,7 +42,7 @@ export function RegisterPage(): JSX.Element {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Dr. Jane Doe"
+            placeholder="Alex Morgan"
             className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
           />
         </div>
@@ -55,7 +55,7 @@ export function RegisterPage(): JSX.Element {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="jane@institute.org"
+            placeholder="you@example.com"
             className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
           />
         </div>

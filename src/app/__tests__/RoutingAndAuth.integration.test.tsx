@@ -51,8 +51,8 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    expect(screen.getByText(/Deconstruct complex ideas into structured scientific trees/i)).toBeInTheDocument();
-    expect(screen.getByText(/Launch Workbench/i)).toBeInTheDocument();
+    expect(screen.getByText(/Organize your ideas visually/i)).toBeInTheDocument();
+    expect(screen.getByText(/Start Creating/i)).toBeInTheDocument();
   });
 
   it('navigates to auth login page when clicking Sign In', async () => {
@@ -67,7 +67,7 @@ describe('App Router & Auth Gating Structure', () => {
     });
 
     expect(screen.getByRole('heading', { name: /Sign In/i })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/researcher@institute\.org/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/you@example\.com/i)).toBeInTheDocument();
   });
 
   it('navigates to register page when requesting account creation', async () => {
@@ -107,6 +107,6 @@ describe('App Router & Auth Gating Structure', () => {
     });
 
     // AppHeader workbench title should be visible
-    expect(screen.getByText(/Root — Untitled Research Canvas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Root — Untitled Project/i)).toBeInTheDocument();
   });
 });

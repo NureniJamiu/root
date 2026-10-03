@@ -11,24 +11,24 @@ export interface EmptyCanvasStateProps {
 
 const TEMPLATES = [
   {
-    title: 'Cellular Senescence',
-    subtitle: 'Telomere Dynamics',
-    premise: 'Mechanisms of Cellular Senescence & Telomere Dynamics',
+    title: 'Content Plan',
+    subtitle: 'Video or article outline',
+    premise: 'Weekly Content Plan: Ideas, Hooks & Outlines',
   },
   {
-    title: 'Hypothesis Tree',
-    subtitle: 'Deductive Path',
-    premise: 'Primary Hypothesis: Core Premise & Deductive Path',
+    title: 'Brainstorming',
+    subtitle: 'Explore concepts & angles',
+    premise: 'New Project: Creative Concepts & Angles',
   },
   {
-    title: 'Literature Review',
-    subtitle: 'Corpus Synthesis',
-    premise: 'Systematic Literature Review: Corpus Synthesis',
+    title: 'Project Roadmap',
+    subtitle: 'Goals, phases & steps',
+    premise: 'Project Roadmap: Key Milestones & Deliverables',
   },
   {
-    title: 'Protocol Assay',
-    subtitle: 'Method Branches',
-    premise: 'Experimental Protocol Assay & Methodology',
+    title: 'Story Outline',
+    subtitle: 'Key beats & arcs',
+    premise: 'Story Outline: Key Beats, Scenes & Climax',
   },
 ] as const;
 
@@ -60,21 +60,21 @@ export function EmptyCanvasState({ onCreateRoot }: EmptyCanvasStateProps): JSX.E
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5 font-mono text-[9px] font-medium tracking-[0.06em] uppercase text-[#0051c3]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#0051c3]" />
-            Canvas Initializer • Root Node
+            Get Started • Central Idea
           </div>
           <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-[#737785]">
-            STAGE-00
+            STEP 01
           </span>
         </div>
 
         {/* Headline */}
         <h2 className="font-serif text-[30px] font-light leading-[36px] tracking-[-0.01em] text-[#000000] m-0 mb-2">
-          Initiate Research Tree
+          What are you planning today?
         </h2>
 
         {/* Narrative Description */}
         <p className="font-serif text-[13px] leading-[20px] text-[#404040] m-0 mb-6">
-          Every scholarly inquiry begins with a foundational premise or core question. Establish the root topic to branch findings, hypotheses, and evidentiary conclusions.
+          Every great video, article, script, or campaign starts with one core idea. Write your main topic here, then branch out into sub-ideas, key takeaways, questions, and visual assets.
         </p>
 
         {/* Input Premise Form */}
@@ -84,20 +84,20 @@ export function EmptyCanvasState({ onCreateRoot }: EmptyCanvasStateProps): JSX.E
               htmlFor="root-premise-input"
               className="font-mono text-[9px] uppercase font-medium tracking-[0.06em] text-[#595959]"
             >
-              Root Topic Premise
+              Main Topic or Goal
             </label>
             <TextInput
               id="root-premise-input"
               value={premise}
               onChange={(e) => setPremise(e.target.value.slice(0, 120))}
               onKeyDown={handleKeyDown}
-              placeholder="e.g. Molecular Drivers of Cellular Senescence"
+              placeholder="e.g. YouTube Video: 5 Lessons From Starting My Channel"
               maxLength={120}
               className="font-serif text-[14px]"
             />
             <div className="flex items-center justify-between font-mono text-[9px] text-[#595959] pt-0.5">
               <span className="flex items-center gap-1">
-                Classification defaults to <Badge variant="topic">TOPIC</Badge>
+                Starts as a main <Badge variant="topic">TOPIC</Badge> card
               </span>
               <span>{premise.length}/120</span>
             </div>
@@ -117,7 +117,7 @@ export function EmptyCanvasState({ onCreateRoot }: EmptyCanvasStateProps): JSX.E
                 <line x1="12" y1="8" x2="12" y2="16" />
                 <line x1="8" y1="12" x2="16" y2="12" />
               </svg>
-              <span>+ Create Root Node</span>
+              <span>+ Create Main Idea</span>
             </span>
             <span className="font-mono text-[9px] bg-[rgba(255,255,255,0.2)] px-2 py-0.5 rounded-[2px] text-white tracking-wide">
               Return ↵
@@ -126,10 +126,10 @@ export function EmptyCanvasState({ onCreateRoot }: EmptyCanvasStateProps): JSX.E
         </form>
 
         {/* Divider */}
-        <Divider label="OR INITIALIZE FROM TEMPLATE" />
+        <Divider label="OR START WITH A POPULAR TEMPLATE" />
 
-        {/* 3 Template Cards */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* 4 Template Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {TEMPLATES.map((tmpl) => (
             <button
               key={tmpl.title}

@@ -411,13 +411,13 @@ export function AppShell(): JSX.Element {
         // Create initial default project in SQLite database
         const created = await createProjectApi({
           id: fallbackCanvas.id,
-          title: fallbackCanvas.title || 'Interactive Graph',
+          title: fallbackCanvas.title || 'Idea Canvas',
           canvas: fallbackCanvas,
           nodeCount: fallbackCanvas.nodes.length,
         });
         const initialItem: ProjectItem = created ?? {
           id: fallbackCanvas.id,
-          title: fallbackCanvas.title || 'Interactive Graph',
+          title: fallbackCanvas.title || 'Idea Canvas',
           nodeCount: fallbackCanvas.nodes.length,
           updatedAt: fallbackCanvas.updatedAt,
         };
@@ -606,7 +606,7 @@ export function AppShell(): JSX.Element {
           // If all projects deleted, create a fresh default project in database
           const newCanvas: Canvas = {
             ...emptyCanvas(),
-            title: 'Interactive Graph',
+            title: 'Idea Canvas',
           };
           const created = await createProjectApi({
             id: newCanvas.id,
@@ -660,14 +660,14 @@ export function AppShell(): JSX.Element {
 
   const handleCreateRoot = useCallback((premise?: string) => {
     canvasActions.addRoot(ROOT_INITIAL_POSITION);
-    const chosen = premise || 'Mechanisms of Cellular Senescence & Telomere Dynamics';
+    const chosen = premise || 'Content Strategy: Launching a Video Series';
     setTimeout(() => {
       const root = useCanvasStore.getState().canvas.nodes[0];
       if (root) {
-        if (chosen.includes('Cellular Senescence') || !premise) {
+        if (!premise || chosen.includes('Content Strategy') || chosen.includes('Weekly Content Plan')) {
           canvasActions.updateNode(root.id, {
-            title: 'Mechanisms of Cellular Senescence & Telomere Dynamics',
-            body: 'Investigating the molecular pathways linking shelterin complex erosion to p53/p21 checkpoint activation in human somatic cells.',
+            title: chosen || 'Content Strategy: Launching a Video Series',
+            body: 'Outlining topics, hooks, and production steps to produce high-impact, engaging content consistently.',
           });
 
           // Pre-populate branches matching visual guide
@@ -682,30 +682,30 @@ export function AppShell(): JSX.Element {
             const cNode = nodes[3];
             if (qNode) {
               canvasActions.updateNode(qNode.id, {
-                title: 'Does Shelterin Dissociation Prepare Double-Strand Breaks?',
+                title: 'What core questions and hooks hook viewers first?',
                 type: 'question',
-                body: 'Assessing whether TRF2 shelterin depletion exposes ends directly or triggers ATM/ATR response pathways in human somatic cells.',
+                body: 'Reviewing top viewer comments, community questions, and real pain points to frame relatable hooks.',
               });
             }
             if (fNode) {
               canvasActions.updateNode(fNode.id, {
-                title: 'TRF2 Shelterin Complex Degradation Observed',
+                title: 'Short visual breakdowns generate 3x higher retention',
                 type: 'finding',
-                body: 'Confocal immunofluorescence shows 73% TRF2 delocalization within 48h of induced stress. γ-H2AX foci colocalize at telomeres (TIFs).',
+                body: 'Audience testing showed 73% higher completion rate when points are accompanied by clear visual cards and diagrams.',
               });
               canvasActions.addImage(fNode.id, {
                 id: crypto.randomUUID(),
                 dataUrl:
-                  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225"><rect width="400" height="225" fill="%23060a12"/><g stroke="%2338bdf8" stroke-width="2.5" fill="none" opacity="0.85"><path d="M60 40 Q70 60 90 70 M80 50 Q110 65 130 90 M140 30 Q160 55 170 80 M200 45 Q210 70 230 85 M250 30 Q270 55 285 75 M310 40 Q330 65 345 80 M50 140 Q75 150 95 175 M110 130 Q130 155 145 180 M170 145 Q190 160 210 190 M230 135 Q250 160 270 185 M295 130 Q315 155 330 175 M350 140 Q365 160 380 180"/></g><g stroke="%234ade80" stroke-width="3" fill="none"><circle cx="90" cy="70" r="2.5" fill="%234ade80"/><circle cx="130" cy="90" r="2.5" fill="%234ade80"/><circle cx="170" cy="80" r="2.5" fill="%234ade80"/><circle cx="230" cy="85" r="2.5" fill="%234ade80"/><circle cx="285" cy="75" r="2.5" fill="%234ade80"/><circle cx="95" cy="175" r="2.5" fill="%234ade80"/><circle cx="145" cy="180" r="2.5" fill="%234ade80"/><circle cx="210" cy="190" r="2.5" fill="%234ade80"/><circle cx="270" cy="185" r="2.5" fill="%234ade80"/></g></svg>',
+                  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225"><rect width="400" height="225" fill="%230b1120"/><rect x="30" y="30" width="100" height="70" rx="4" fill="%231e293b" stroke="%233b82f6" stroke-width="2"/><text x="80" y="70" fill="%23ffffff" font-family="sans-serif" font-size="12" text-anchor="middle">HOOK</text><path d="M130 65 L170 65" stroke="%233b82f6" stroke-width="2" stroke-dasharray="4"/><rect x="170" y="30" width="100" height="70" rx="4" fill="%231e293b" stroke="%2310b981" stroke-width="2"/><text x="220" y="70" fill="%23ffffff" font-family="sans-serif" font-size="12" text-anchor="middle">BREAKDOWN</text><path d="M270 65 L310 65" stroke="%2310b981" stroke-width="2" stroke-dasharray="4"/><rect x="310" y="30" width="60" height="70" rx="4" fill="%231e293b" stroke="%23f59e0b" stroke-width="2"/><text x="340" y="70" fill="%23ffffff" font-family="sans-serif" font-size="12" text-anchor="middle">CTA</text><path d="M80 140 Q200 110 320 170" stroke="%2338bdf8" stroke-width="3" fill="none"/><circle cx="80" cy="140" r="4" fill="%2338bdf8"/><circle cx="200" cy="125" r="4" fill="%2338bdf8"/><circle cx="320" cy="170" r="4" fill="%2338bdf8"/><text x="200" y="195" fill="%2394a3b8" font-family="sans-serif" font-size="11" text-anchor="middle">Retention Curve Across Video Sections</text></svg>',
                 addedAt: new Date().toISOString(),
               });
               canvasActions.select(fNode.id);
             }
             if (cNode) {
               canvasActions.updateNode(cNode.id, {
-                title: 'p53-Dependent Cell Cycle Arrest Irreversible',
+                title: 'Publish weekly 5-minute guides with actionable takeaways',
                 type: 'conclusion',
-                body: 'Downstream p21/CIP1 accumulation locks CDK preventing retinoblastoma phosphorylation permanent cessation.',
+                body: 'Adopt a simple 3-part formula: intriguing hook, 3 visual examples, and one concrete action step to test immediately.',
               });
             }
           }, 0);
@@ -788,7 +788,7 @@ export function AppShell(): JSX.Element {
       >
         {/* Top App Header */}
         <AppHeader
-          title={canvas.title || 'Root — Untitled Research Canvas'}
+          title={canvas.title || 'Root — Untitled Project'}
           onTitleChange={(title) => {
             const currentCanvas = useCanvasStore.getState().canvas;
             useCanvasStore.setState({ canvas: { ...currentCanvas, title } });

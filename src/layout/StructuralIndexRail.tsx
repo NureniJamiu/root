@@ -33,7 +33,7 @@ export function StructuralIndexRail({
       : [
           {
             id: 'default',
-            title: 'Interactive Graph',
+            title: 'Idea Canvas',
             nodeCount,
           },
         ];
@@ -152,7 +152,7 @@ export function StructuralIndexRail({
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="font-mono text-[10px] text-[#595959] bg-[#ffffff] border border-[#ebebeb] px-1.5 py-0.5 rounded-[2px]">
-                    {project.nodeCount} {project.nodeCount === 1 ? 'node' : 'nodes'}
+                    {project.nodeCount} {project.nodeCount === 1 ? 'idea' : 'ideas'}
                   </span>
                   {onDeleteProject && (
                     <button
@@ -183,10 +183,10 @@ export function StructuralIndexRail({
       {/* Bottom Section: Active Project Meta */}
       <div className="border-t border-[#ebebeb] bg-[#ffffff] p-3">
         <div className="font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-[#595959] mb-1">
-          Workspace Directory
+          Your Workspace
         </div>
         <p className="font-serif text-[12px] text-[#737785] m-0 truncate">
-          {projectList.length} {projectList.length === 1 ? 'project' : 'projects'} active in local storage
+          {projectList.length} {projectList.length === 1 ? 'project' : 'projects'} saved
         </p>
       </div>
     </aside>

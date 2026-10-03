@@ -121,7 +121,7 @@ export function AppHeader({
               title="Click to edit canvas title"
             >
               <span className="font-serif text-[15px] font-medium text-[#000000] tracking-tight">
-                {title || 'Root — Untitled Research Canvas'}
+                {title || 'Root — Untitled Project'}
               </span>
               <svg
                 className="w-3 h-3 text-[#737785] opacity-50 group-hover:opacity-100 transition-opacity"
@@ -231,8 +231,8 @@ export function AppHeader({
       <div className="flex items-center gap-2">
         {/* Count summary */}
         <div className="font-mono text-[10px] tracking-wide text-[#595959] pr-1">
-          <span className="text-[#000000] font-medium">{nodeCount}</span> Nodes ·{' '}
-          <span className="text-[#000000] font-medium">{branchCount}</span> Branches
+          <span className="text-[#000000] font-medium">{nodeCount}</span> {nodeCount === 1 ? 'Idea' : 'Ideas'} ·{' '}
+          <span className="text-[#000000] font-medium">{branchCount}</span> {branchCount === 1 ? 'Branch' : 'Branches'}
         </div>
 
         <div className="h-4 w-px bg-[#ebebeb]" />
@@ -269,7 +269,7 @@ export function AppHeader({
 
         <div className="h-4 w-px bg-[#ebebeb]" />
 
-        {/* + Add Node action */}
+        {/* + Add Idea action */}
         <Button
           size="sm"
           variant="primary"
@@ -283,10 +283,10 @@ export function AppHeader({
             </svg>
           }
         >
-          Add Node
+          Add Idea
         </Button>
 
-        {/* Tour button */}
+        {/* Guide button */}
         <Button
           size="sm"
           variant="secondary"
@@ -299,7 +299,7 @@ export function AppHeader({
             </svg>
           }
         >
-          Tour
+          Guide
         </Button>
 
         {/* Inspector toggle button */}
@@ -310,7 +310,7 @@ export function AppHeader({
             className={`p-1.5 rounded-[2px] transition-colors cursor-pointer ${
               isInspectorOpen ? 'text-[#000000] bg-[#f0eded]' : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
             }`}
-            title={isInspectorOpen ? 'Collapse Inspector (Slide right)' : 'Expand Inspector'}
+            title={isInspectorOpen ? 'Hide Details' : 'Show Details'}
             aria-label="Toggle Inspector"
             data-testid="btn-toggle-inspector"
           >
@@ -326,7 +326,7 @@ export function AppHeader({
         <div className="flex items-center gap-2">
           <div
             className="w-7 h-7 rounded-full bg-[#0051c3] text-[#ffffff] flex items-center justify-center shrink-0 font-mono text-[11px] font-medium select-none"
-            title="Researcher Profile"
+            title="Your Profile"
           >
             <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
