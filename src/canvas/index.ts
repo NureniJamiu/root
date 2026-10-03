@@ -20,6 +20,7 @@ export {
   NODE_WIDTH,
   SIBLING_GAP,
   computeChildPosition,
+  computeTreeLayout,
 } from './placement';
 
 export { CanvasView } from './CanvasView';

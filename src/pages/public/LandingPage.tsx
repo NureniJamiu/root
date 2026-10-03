@@ -10,10 +10,6 @@ export function LandingPage(): JSX.Element {
       <PublicHeader />
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-20 max-w-4xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#ebebeb] bg-[#ffffff] text-[11px] font-mono text-[#737785] mb-8">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#1357c9]" />
-          Visual Idea Mapping & Planning
-        </div>
 
         <h1 className="text-4xl md:text-6xl font-serif font-normal tracking-tight text-[#1b1c1c] mb-6 leading-tight">
           Organize your ideas visually. From initial spark to finished content.

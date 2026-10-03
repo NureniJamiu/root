@@ -73,13 +73,13 @@ export function rootNode(c: Canvas): Node | undefined {
  */
 export function visibleNodeIds(c: Canvas): Set<UUID> {
   const visible = new Set<UUID>();
-  const root = rootNode(c);
-  if (root === undefined) return visible;
+  const roots = c.nodes.filter((n) => n.parentId === null);
+  if (roots.length === 0) return visible;
 
   const children = childrenIndex(c);
   // Iterative DFS. Each frame is a node we have already marked visible; we
   // only enqueue its children when it is not collapsed.
-  const stack: Node[] = [root];
+  const stack: Node[] = [...roots];
   while (stack.length > 0) {
     const node = stack.pop() as Node;
     visible.add(node.id);

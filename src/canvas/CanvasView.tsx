@@ -9,7 +9,7 @@
  * - Live connector recalculation during drag.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactFlow, {
   Background,
   ConnectionMode,
@@ -32,7 +32,8 @@ import type { UUID } from '../data';
 import { FitViewIcon, NodeCard, ZoomInIcon, ZoomOutIcon } from '../nodes';
 
 import { useReactFlowGraph } from './useReactFlowGraph';
-import { determineReconnect, determineReparent } from './reconnect';
+import { determineReconnect, determineReparent, resolveConnectionSides } from './reconnect';
+import { computeTreeLayout } from './placement';
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
@@ -71,6 +72,7 @@ export interface CanvasViewControls {
   readonly zoomOut: () => void;
   readonly fitView: () => void;
   readonly centerRoot: () => void;
+  readonly autoLayout?: () => void;
   readonly zoomPercent: number;
 }
 
@@ -99,8 +101,16 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
 
   const [dragState, setDragState] = useState<DragState | null>(null);
 
+  const nodePositions = useMemo(() => {
+    if (!dragState) return undefined;
+    const map = new Map<UUID, { x: number; y: number }>();
+    map.set(dragState.nodeId, { x: dragState.currentX, y: dragState.currentY });
+    return map;
+  }, [dragState]);
+
   const { nodes: derivedNodes, edges } = useReactFlowGraph({
     draggingNodeId: dragState?.nodeId ?? null,
+    nodePositions,
   });
 
   const [rfNodes, setRfNodes] = useState(derivedNodes);
@@ -210,10 +220,38 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     (_event, node) => {
       setDragState(null);
       onDragChange?.(null);
-      canvasActions.moveNode(node.id, {
+      const newPos = {
         x: Math.round(node.position.x),
         y: Math.round(node.position.y),
-      });
+      };
+      canvasActions.moveNode(node.id, newPos);
+
+      // Record updated connection sides for this node and any child connections in store
+      const { canvas: currentCanvas } = useCanvasStore.getState();
+      const updatedNode = currentCanvas.nodes.find((n) => n.id === node.id);
+      if (updatedNode) {
+        if (updatedNode.parentId) {
+          const parent = currentCanvas.nodes.find((n) => n.id === updatedNode.parentId);
+          if (parent) {
+            const resolved = resolveConnectionSides(parent.position, newPos, updatedNode);
+            if (!updatedNode.sourcePinned || !updatedNode.targetPinned) {
+              canvasActions.updateConnection(updatedNode.id, {
+                sourceSide: updatedNode.sourcePinned ? updatedNode.sourceSide : resolved.sourceSide,
+                targetSide: updatedNode.targetPinned ? updatedNode.targetSide : resolved.targetSide,
+              });
+            }
+          }
+        }
+        for (const child of currentCanvas.nodes) {
+          if (child.parentId === node.id && (!child.sourcePinned || !child.targetPinned)) {
+            const resolved = resolveConnectionSides(newPos, child.position, child);
+            canvasActions.updateConnection(child.id, {
+              sourceSide: child.sourcePinned ? child.sourceSide : resolved.sourceSide,
+              targetSide: child.targetPinned ? child.targetSide : resolved.targetSide,
+            });
+          }
+        }
+      }
     },
     [onDragChange],
   );
@@ -236,22 +274,46 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, [onPaneClick]);
 
   const handleConnect = useCallback((connection: Connection) => {
+    console.log('[handleConnect]', connection);
     if (!connection.source || !connection.target || connection.source === connection.target) return;
     const { canvas } = useCanvasStore.getState();
     const resolution = determineReparent(canvas, connection);
+    console.log('[handleConnect resolution]', resolution);
     if (resolution && !hasCycle(canvas, resolution.childId, resolution.parentId)) {
-      canvasActions.reparentChild(resolution.childId, resolution.parentId);
+      canvasActions.updateConnection(resolution.childId, resolution);
     }
   }, []);
 
   const handleReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
+    console.log('[handleReconnect]', oldEdge, newConnection);
     if (!newConnection.source || !newConnection.target) return;
     const { canvas } = useCanvasStore.getState();
     const resolution = determineReconnect(canvas, oldEdge, newConnection);
+    console.log('[handleReconnect resolution]', resolution);
     if (resolution && !hasCycle(canvas, resolution.childId, resolution.parentId)) {
-      canvasActions.reparentChild(resolution.childId, resolution.parentId);
+      canvasActions.updateConnection(resolution.childId, resolution);
     }
   }, []);
+
+  const handleEdgeDoubleClick = useCallback((_event: React.MouseEvent, edge: Edge) => {
+    const { canvas } = useCanvasStore.getState();
+    const child = canvas.nodes.find((n) => n.id === edge.target);
+    if (child && (child.sourcePinned || child.targetPinned)) {
+      canvasActions.updateConnection(child.id, {
+        sourcePinned: false,
+        targetPinned: false,
+      });
+    }
+  }, []);
+
+  const handleAutoLayout = useCallback(() => {
+    const current = useCanvasStore.getState().canvas;
+    const layouted = computeTreeLayout(current);
+    useCanvasStore.setState({ canvas: layouted });
+    setTimeout(() => {
+      reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+    }, 50);
+  }, [reactFlow]);
 
   const zoomPercent = Math.round(storeViewport.zoom * 100);
 
@@ -261,9 +323,10 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       zoomOut: handleZoomOut,
       fitView: handleFitView,
       centerRoot: handleCenterRoot,
+      autoLayout: handleAutoLayout,
       zoomPercent,
     });
-  }, [handleZoomIn, handleZoomOut, handleFitView, handleCenterRoot, zoomPercent, onControlsReady]);
+  }, [handleZoomIn, handleZoomOut, handleFitView, handleCenterRoot, handleAutoLayout, zoomPercent, onControlsReady]);
 
   useEffect(() => {
     if (onRFPropsMounted === undefined) return;
@@ -354,6 +417,14 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
           >
             Fit
           </button>
+          <button
+            type="button"
+            onClick={handleAutoLayout}
+            className="h-6 px-2 border border-[#ebebeb] rounded-[2px] bg-[#ffffff] font-mono text-[9px] text-[#404040] hover:text-[#000000] hover:border-[#000000] transition-colors cursor-pointer"
+            data-testid="ribbon-btn-auto-layout"
+          >
+            Auto Layout
+          </button>
         </div>
       </div>
 
@@ -385,6 +456,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
           reconnectRadius={20}
           onConnect={handleConnect}
           onReconnect={handleReconnect}
+          onEdgeDoubleClick={handleEdgeDoubleClick}
           elementsSelectable={!isPanActive}
           onlyRenderVisibleElements
           onMove={handleMove}
@@ -471,6 +543,38 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
             }}
           >
             <FitViewIcon />
+          </button>
+          <div
+            style={{
+              width: 1,
+              height: 14,
+              background: '#ebebeb',
+              margin: '0 2px',
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleAutoLayout}
+            aria-label="Auto layout"
+            title="Auto layout tree"
+            className="inline-flex items-center justify-center rounded-[2px] transition-colors duration-150 hover:bg-[#f5f3f3] hover:text-[#000000]"
+            style={{
+              width: 26,
+              height: 26,
+              border: 'none',
+              background: 'transparent',
+              color: '#404040',
+              cursor: 'pointer',
+            }}
+            data-testid="hud-btn-auto-layout"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="6" height="5" rx="1" />
+              <rect x="15" y="16" width="6" height="5" rx="1" />
+              <rect x="3" y="16" width="6" height="5" rx="1" />
+              <path d="M6 8v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8" />
+              <path d="M12 14v2" />
+            </svg>
           </button>
         </div>
       </div>

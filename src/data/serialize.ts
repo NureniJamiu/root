@@ -58,6 +58,10 @@ function orderedNode(n: Node): Node {
     collapsed: n.collapsed,
     createdAt: n.createdAt,
     updatedAt: n.updatedAt,
+    ...(n.sourceSide !== undefined ? { sourceSide: n.sourceSide } : {}),
+    ...(n.targetSide !== undefined ? { targetSide: n.targetSide } : {}),
+    ...(n.sourcePinned !== undefined ? { sourcePinned: n.sourcePinned } : {}),
+    ...(n.targetPinned !== undefined ? { targetPinned: n.targetPinned } : {}),
   };
 }
 

@@ -79,6 +79,11 @@ import {
   deleteProjectApi,
 } from '../lib/projects-api';
 
+if (typeof window !== 'undefined') {
+  (window as any).__ROOT_CANVAS_STORE__ = useCanvasStore;
+  (window as any).__ROOT_CANVAS_ACTIONS__ = canvasActions;
+}
+
 /* -------------------------------------------------------------------------- */
 /* ToolbarCallbacks — module scope so identity is stable across renders      */
 /* -------------------------------------------------------------------------- */
@@ -443,6 +448,9 @@ export function AppShell(): JSX.Element {
       const initialCanvas = projDetail?.canvas ?? fallbackCanvas;
       canvasActions; // ensure the actions object is initialized
       useCanvasStore.setState({ canvas: initialCanvas });
+      if (typeof window !== 'undefined') {
+        (window as any).__ROOT_INITIALIZED__ = true;
+      }
     }
 
     initializeDashboard();
@@ -800,6 +808,7 @@ export function AppShell(): JSX.Element {
           onZoomOut={() => canvasControls?.zoomOut()}
           onFitView={() => canvasControls?.fitView()}
           onCenterRoot={() => canvasControls?.centerRoot()}
+          onAutoLayout={() => canvasControls?.autoLayout?.()}
           onAddNode={() => {
             if (canvas.nodes.length === 0) {
               handleCreateRoot();

@@ -41,6 +41,8 @@ export const imageEntrySchema = z.object({
 /* Node schema                                                                */
 /* -------------------------------------------------------------------------- */
 
+export const sideSchema = z.enum(['top', 'right', 'bottom', 'left']);
+
 export const nodeSchema = z.object({
   id: z.string().uuid(),
   parentId: z.string().uuid().nullable(),
@@ -52,6 +54,10 @@ export const nodeSchema = z.object({
   collapsed: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+  sourceSide: sideSchema.optional(),
+  targetSide: sideSchema.optional(),
+  sourcePinned: z.boolean().optional(),
+  targetPinned: z.boolean().optional(),
 });
 
 /* -------------------------------------------------------------------------- */

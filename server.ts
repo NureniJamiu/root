@@ -120,7 +120,7 @@ app.get('/api/projects/:id', async (req, res) => {
 
     const row = db
       .prepare(
-        'SELECT id, title, canvas, nodeCount, createdAt, updatedAt FROM project WHERE id = ? AND (userId = ? OR userId = "guest")',
+        "SELECT id, title, canvas, nodeCount, createdAt, updatedAt FROM project WHERE id = ? AND (userId = ? OR userId = 'guest')",
       )
       .get(id, userId) as Omit<ProjectRow, 'userId'> | undefined;
 
@@ -210,7 +210,7 @@ app.put('/api/projects/:id', async (req, res) => {
     const now = new Date().toISOString();
 
     const existing = db
-      .prepare('SELECT id, title, canvas, nodeCount FROM project WHERE id = ? AND (userId = ? OR userId = "guest")')
+      .prepare("SELECT id, title, canvas, nodeCount FROM project WHERE id = ? AND (userId = ? OR userId = 'guest')")
       .get(id, userId) as ProjectRow | undefined;
 
     if (!existing) {
@@ -245,7 +245,7 @@ app.put('/api/projects/:id', async (req, res) => {
     db.prepare(
       `UPDATE project
        SET title = ?, canvas = ?, nodeCount = ?, updatedAt = ?
-       WHERE id = ? AND (userId = ? OR userId = "guest")`,
+       WHERE id = ? AND (userId = ? OR userId = 'guest')`,
     ).run(title, serializedCanvas, nodeCount, now, id, userId);
 
     return res.json({
@@ -268,7 +268,7 @@ app.delete('/api/projects/:id', async (req, res) => {
     const { id } = req.params;
 
     db.prepare(
-      'DELETE FROM project WHERE id = ? AND (userId = ? OR userId = "guest")',
+      "DELETE FROM project WHERE id = ? AND (userId = ? OR userId = 'guest')",
     ).run(id, userId);
 
     return res.json({ success: true, id });

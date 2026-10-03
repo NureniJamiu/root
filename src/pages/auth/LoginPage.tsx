@@ -17,7 +17,7 @@ export function LoginPage(): JSX.Element {
     setError(null);
     try {
       await signIn(email, password);
-      navigate('/dashboard');
+      window.location.href = '/dashboard';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
     }

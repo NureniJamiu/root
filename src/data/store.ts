@@ -47,9 +47,10 @@ import {
   removeImage as mutRemoveImage,
   reparentChild as mutReparentChild,
   setCollapsed as mutSetCollapsed,
+  updateConnection as mutUpdateConnection,
   updateNode as mutUpdateNode,
 } from './mutators';
-import type { NodePatch } from './mutators';
+import type { ConnectionPatch, NodePatch } from './mutators';
 import { emitSaveError } from './storeEvents';
 import { subtreeIds } from './tree';
 import type { Canvas, ImageEntry, Position, UUID } from './types';
@@ -287,6 +288,17 @@ export const canvasActions = {
     commitCanvasWrite(
       'moveNode',
       (s) => mutMoveNode(s.canvas, id, position),
+      () => ({}),
+    );
+  },
+
+  /**
+   * Update a child node's connection properties (parent, sides, pinned state).
+   */
+  updateConnection(childId: UUID, patch: ConnectionPatch): void {
+    commitCanvasWrite(
+      'updateConnection',
+      (s) => mutUpdateConnection(s.canvas, childId, patch),
       () => ({}),
     );
   },

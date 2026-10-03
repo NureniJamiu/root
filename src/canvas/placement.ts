@@ -152,3 +152,94 @@ export function computeChildPosition(canvas: Canvas, parentId: UUID): Position {
     y: maxBottom + SIBLING_GAP,
   };
 }
+
+/**
+ * Arranges canvas nodes in a top-to-bottom tree layout.
+ * Guarantees:
+ *  1. Root node placed at top.
+ *  2. Children placed vertically below parents (depth * vertical step).
+ *  3. Siblings and subtrees placed side-by-side with non-overlapping bounding boxes.
+ *  4. All connections (parentId) remain intact.
+ *  5. Connection sides update to facing sides (bottom -> top) for unpinned connections.
+ */
+export function computeTreeLayout(canvas: Canvas): Canvas {
+  if (canvas.nodes.length <= 1) return canvas;
+
+  const root = canvas.nodes.find((n) => n.parentId === null);
+  if (!root) return canvas;
+
+  const childrenMap = new Map<UUID, Node[]>();
+  for (const n of canvas.nodes) {
+    if (n.parentId !== null) {
+      const list = childrenMap.get(n.parentId) ?? [];
+      list.push(n);
+      childrenMap.set(n.parentId, list);
+    }
+  }
+
+  const HORIZONTAL_GAP = 60;
+  const VERTICAL_GAP = 120;
+  const LEVEL_HEIGHT = NODE_HEIGHT + VERTICAL_GAP;
+
+  const positions = new Map<UUID, Position>();
+  let currentLeftX = 100;
+
+  function layoutSubtree(nodeId: UUID, depth: number): { minX: number; maxX: number } {
+    const children = childrenMap.get(nodeId) ?? [];
+
+    if (children.length === 0) {
+      const x = currentLeftX;
+      const y = 80 + depth * LEVEL_HEIGHT;
+      positions.set(nodeId, { x, y });
+      currentLeftX += NODE_WIDTH + HORIZONTAL_GAP;
+      return { minX: x, maxX: x + NODE_WIDTH };
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+
+    for (const child of children) {
+      const childSpan = layoutSubtree(child.id, depth + 1);
+      minX = Math.min(minX, childSpan.minX);
+      maxX = Math.max(maxX, childSpan.maxX);
+    }
+
+    // Center parent horizontally above its children span
+    const x = Math.round((minX + maxX - NODE_WIDTH) / 2);
+    const y = 80 + depth * LEVEL_HEIGHT;
+    positions.set(nodeId, { x, y });
+
+    return { minX: Math.min(minX, x), maxX: Math.max(maxX, x + NODE_WIDTH) };
+  }
+
+  layoutSubtree(root.id, 0);
+
+  // Normalize so leftmost node starts at x = 100
+  let minGlobalX = Infinity;
+  for (const pos of positions.values()) {
+    if (pos.x < minGlobalX) minGlobalX = pos.x;
+  }
+  const xOffset = minGlobalX < 100 ? 100 - minGlobalX : 0;
+
+  const nextNodes = canvas.nodes.map((node) => {
+    const pos = positions.get(node.id) ?? node.position;
+    const finalPos = { x: pos.x + xOffset, y: pos.y };
+
+    // For non-root nodes, facing sides in top-to-bottom layout are bottom -> top
+    const sourceSide = node.sourcePinned ? node.sourceSide : 'bottom';
+    const targetSide = node.targetPinned ? node.targetSide : 'top';
+
+    return {
+      ...node,
+      position: finalPos,
+      sourceSide,
+      targetSide,
+    };
+  });
+
+  return {
+    ...canvas,
+    nodes: nextNodes,
+    updatedAt: new Date().toISOString(),
+  };
+}

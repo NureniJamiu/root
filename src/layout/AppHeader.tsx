@@ -14,6 +14,7 @@ export interface AppHeaderProps {
   readonly onZoomOut: () => void;
   readonly onFitView: () => void;
   readonly onCenterRoot: () => void;
+  readonly onAutoLayout?: () => void;
   readonly onAddNode: () => void;
   readonly isPanActive?: boolean;
   readonly onTogglePan?: () => void;
@@ -37,6 +38,7 @@ export function AppHeader({
   onZoomOut,
   onFitView,
   onCenterRoot,
+  onAutoLayout,
   onAddNode,
   isPanActive = false,
   onTogglePan,
@@ -225,6 +227,28 @@ export function AppHeader({
         >
           Root
         </Button>
+
+        {/* Tree Auto Layout */}
+        {onAutoLayout && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onAutoLayout}
+            className="h-7 text-[10px] font-mono"
+            icon={
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="6" height="5" rx="1" />
+                <rect x="15" y="16" width="6" height="5" rx="1" />
+                <rect x="3" y="16" width="6" height="5" rx="1" />
+                <path d="M6 8v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8" />
+                <path d="M12 14v2" />
+              </svg>
+            }
+            data-testid="btn-auto-layout"
+          >
+            Auto Layout
+          </Button>
+        )}
       </div>
 
       {/* Right: Stats, Taxonomy Filter Chips & Actions */}

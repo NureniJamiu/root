@@ -47,12 +47,15 @@ export interface ResearchNodeData {
   readonly nodeId: UUID;
 }
 
+import { resolveConnectionSides } from './reconnect';
+
 /**
  * Options controlling connector styles in the derived graph.
  */
 export interface DeriveGraphOptions {
   readonly selectedNodeId?: UUID | null;
   readonly draggingNodeId?: UUID | null;
+  readonly nodePositions?: Map<UUID, Position>;
 }
 
 /**
@@ -83,10 +86,12 @@ export function deriveReactFlowGraph(
   for (const node of canvas.nodes) {
     if (!visible.has(node.id)) continue;
 
+    const livePos = options?.nodePositions?.get(node.id) ?? node.position;
+
     rfNodes.push({
       id: node.id,
       type: 'research',
-      position: { x: node.position.x, y: node.position.y },
+      position: { x: livePos.x, y: livePos.y },
       data: { nodeId: node.id },
     });
 
@@ -97,28 +102,18 @@ export function deriveReactFlowGraph(
       const parent = canvas.nodes.find((n) => n.id === node.parentId);
       let sourceHandle = 'source-right';
       let targetHandle = 'target-left';
+      let sourceSide = node.sourceSide ?? 'right';
+      let targetSide = node.targetSide ?? 'left';
 
       if (parent) {
-        const dx = node.position.x - parent.position.x;
-        const dy = node.position.y - parent.position.y;
+        const parentPos = options?.nodePositions?.get(parent.id) ?? parent.position;
+        const childPos = options?.nodePositions?.get(node.id) ?? node.position;
 
-        if (Math.abs(dx) >= Math.abs(dy)) {
-          if (dx >= 0) {
-            sourceHandle = 'source-right';
-            targetHandle = 'target-left';
-          } else {
-            sourceHandle = 'source-left';
-            targetHandle = 'target-right';
-          }
-        } else {
-          if (dy >= 0) {
-            sourceHandle = 'source-bottom';
-            targetHandle = 'target-top';
-          } else {
-            sourceHandle = 'source-top';
-            targetHandle = 'target-bottom';
-          }
-        }
+        const resolved = resolveConnectionSides(parentPos, childPos, node);
+        sourceSide = resolved.sourceSide;
+        targetSide = resolved.targetSide;
+        sourceHandle = `source-${sourceSide}`;
+        targetHandle = `target-${targetSide}`;
       }
 
       const isDragging = options?.draggingNodeId === node.id;
@@ -142,6 +137,12 @@ export function deriveReactFlowGraph(
         targetHandle,
         type: DEFAULT_EDGE_TYPE,
         style,
+        data: {
+          sourceSide,
+          targetSide,
+          sourcePinned: node.sourcePinned ?? false,
+          targetPinned: node.targetPinned ?? false,
+        },
         reconnectable: true,
         updatable: true,
         interactionWidth: 30,
@@ -177,13 +178,15 @@ export function useReactFlowGraph(options?: DeriveGraphOptions): ReactFlowGraph 
   const canvas = useCanvasStore(selectCanvas);
   const selectedNodeId = useCanvasStore(selectSelectedNodeId);
   const draggingNodeId = options?.draggingNodeId ?? null;
+  const nodePositions = options?.nodePositions;
 
   return useMemo(
     () =>
       deriveReactFlowGraph(canvas, {
         selectedNodeId: options?.selectedNodeId !== undefined ? options.selectedNodeId : selectedNodeId,
         draggingNodeId,
+        nodePositions,
       }),
-    [canvas, selectedNodeId, options?.selectedNodeId, draggingNodeId],
+    [canvas, selectedNodeId, options?.selectedNodeId, draggingNodeId, nodePositions],
   );
 }

@@ -384,7 +384,66 @@ export function NodeInspectorRail({
                   </button>
                 </div>
 
-                {/* 5. Saved References & Links */}
+                {/* 5. Connections */}
+                <div className="flex flex-col gap-1.5" data-testid="node-inspector-connections">
+                  <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.06em]">
+                    <span className="text-[#595959]">CONNECTIONS</span>
+                    <span className="text-[#0051c3] font-semibold">
+                      {(selectedNode.parentId !== null ? 1 : 0) + canvas.nodes.filter((n) => n.parentId === selectedNode.id).length} TOTAL
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 border border-[#ebebeb] rounded-[2px] p-2.5 bg-[#ffffff] font-mono text-[9.5px]">
+                    {/* Incoming (Parent) */}
+                    {selectedNode.parentId !== null ? (
+                      <div className="flex items-center justify-between py-1 border-b border-[#f0eded]">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="text-[#737785]">IN:</span>
+                          <span className="font-semibold text-[#1b1c1c]">{parentShortId}</span>
+                          <span className="text-[#737785]">
+                            ({selectedNode.sourceSide ?? 'auto'} → {selectedNode.targetSide ?? 'auto'})
+                          </span>
+                        </div>
+                        {selectedNode.targetPinned ? (
+                          <span className="text-[8px] px-1 py-0.5 rounded-[2px] bg-[#fff3cd] text-[#856404] border border-[#ffeeba]">
+                            PINNED
+                          </span>
+                        ) : (
+                          <span className="text-[8px] text-[#737785]">AUTO</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="py-1 border-b border-[#f0eded] text-[#737785] italic">
+                        Root idea (no parent)
+                      </div>
+                    )}
+
+                    {/* Outgoing (Children) */}
+                    {canvas.nodes.filter((n) => n.parentId === selectedNode.id).length > 0 ? (
+                      <div className="flex flex-col gap-1 pt-1">
+                        <span className="text-[#737785] text-[8.5px]">OUTGOING BRANCHES:</span>
+                        {canvas.nodes
+                          .filter((n) => n.parentId === selectedNode.id)
+                          .map((child) => (
+                            <div key={child.id} className="flex items-center justify-between">
+                              <span className="text-[#1b1c1c] font-medium">
+                                N-{child.id.slice(0, 2).toUpperCase()}: {child.title ? child.title.slice(0, 16) : child.type}
+                              </span>
+                              <span className="text-[#737785]">
+                                ({child.sourceSide ?? 'auto'} → {child.targetSide ?? 'auto'})
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="pt-1 text-[#737785] italic">
+                        No sub-ideas attached
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 6. Saved References & Links */}
                 <div className="flex flex-col gap-1.5">
                   <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-[#595959]">
                     SAVED REFERENCES & LINKS

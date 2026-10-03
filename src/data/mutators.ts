@@ -36,7 +36,7 @@
 import { newId } from './ids';
 import { now } from './time';
 import { hasCycle, subtreeIds } from './tree';
-import type { Canvas, ImageEntry, Node, NodeType, Position, UUID } from './types';
+import type { Canvas, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
@@ -365,29 +365,58 @@ export function deleteSubtree(c: Canvas, id: UUID): Canvas {
 }
 
 /* -------------------------------------------------------------------------- */
-/* reparentChild                                                              */
+/* updateConnection & reparentChild                                          */
 /* -------------------------------------------------------------------------- */
 
+export interface ConnectionPatch {
+  parentId?: UUID;
+  sourceSide?: Side;
+  targetSide?: Side;
+  sourcePinned?: boolean;
+  targetPinned?: boolean;
+}
+
 /**
- * Re-parent a child node under a new parent node.
+ * Update connection properties (parent, sides, pinned state) for child node.
  * Guarded against cycles, self-parenting, reparenting the root node,
  * or unknown node IDs.
  */
-export function reparentChild(c: Canvas, childId: UUID, newParentId: UUID): Canvas {
-  if (childId === newParentId) return c;
+export function updateConnection(
+  c: Canvas,
+  childId: UUID,
+  patch: ConnectionPatch,
+): Canvas {
   const child = c.nodes.find((n) => n.id === childId);
-  const parent = c.nodes.find((n) => n.id === newParentId);
-  if (!child || !parent) return c;
-  if (child.parentId === null) return c;
-  if (hasCycle(c, childId, newParentId)) return c;
+  if (!child) return c;
+
+  let newParentId = child.parentId;
+  if (patch.parentId !== undefined && patch.parentId !== child.parentId) {
+    if (patch.parentId === childId) return c;
+    const parent = c.nodes.find((n) => n.id === patch.parentId);
+    if (!parent) return c;
+    if (c.nodes[0]?.id === childId) return c;
+    if (hasCycle(c, childId, patch.parentId)) return c;
+    newParentId = patch.parentId;
+  }
 
   const ts = now();
   const nextNodes = replaceNode(c.nodes, childId, (n) => ({
     ...n,
     parentId: newParentId,
+    ...(patch.sourceSide !== undefined ? { sourceSide: patch.sourceSide } : {}),
+    ...(patch.targetSide !== undefined ? { targetSide: patch.targetSide } : {}),
+    ...(patch.sourcePinned !== undefined ? { sourcePinned: patch.sourcePinned } : {}),
+    ...(patch.targetPinned !== undefined ? { targetPinned: patch.targetPinned } : {}),
     updatedAt: ts,
   }));
   if (nextNodes === null) return c;
   return { ...c, nodes: nextNodes, updatedAt: ts };
+}
+
+/**
+ * Re-parent a child node under a new parent node.
+ */
+export function reparentChild(c: Canvas, childId: UUID, newParentId: UUID): Canvas {
+  return updateConnection(c, childId, { parentId: newParentId });
 }
 
