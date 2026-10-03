@@ -1,7 +1,5 @@
 import { betterAuth } from 'better-auth';
-import Database from 'better-sqlite3';
-
-const db = new Database('./auth.db');
+import { db } from './db';
 
 export const auth = betterAuth({
   database: db,
@@ -13,18 +11,6 @@ export const auth = betterAuth({
     'http://localhost:5173',
     'http://localhost:3001',
   ],
-  // Add social providers here if you set up OAuth credentials in your .env.
-  // Example (uncomment and fill in your credentials):
-  // socialProviders: {
-  //   github: {
-  //     clientId: process.env.GITHUB_CLIENT_ID!,
-  //     clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-  //   },
-  //   google: {
-  //     clientId: process.env.GOOGLE_CLIENT_ID!,
-  //     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  //   },
-  // },
 });
 
 export type Session = typeof auth.$Infer.Session;
