@@ -76,9 +76,9 @@ export function ToastSurface(): JSX.Element {
           key={toast.id}
           data-testid="toast"
           style={{
-            background: '#191818',         // color.text.primary (dark surface for toasts)
-            color: '#ffffff',              // color.surface.raised
-            border: '1px solid #312e2e',   // color.text.tertiary
+            background: 'rgb(var(--ink))',         // inverted surface: ink in light, paper in dark
+            color: 'rgb(var(--on-inverse))',
+            border: '1px solid rgb(var(--ink-2))',   // color.text.tertiary
             borderRadius: 2,
             padding: '8px 14px',
             display: 'flex',
@@ -93,7 +93,7 @@ export function ToastSurface(): JSX.Element {
               width: 6,
               height: 6,
               borderRadius: '50%',
-              background: '#de5052', // warning accent
+              background: 'rgb(var(--question))', // warning accent
               flexShrink: 0,
             }}
           />
@@ -102,11 +102,11 @@ export function ToastSurface(): JSX.Element {
             type="button"
             onClick={() => dismissToast(toast.id)}
             aria-label="Dismiss"
-            className="transition-colors hover:text-[#de5052]"
+            className="transition-colors hover:text-question"
             style={{
               background: 'none',
               border: 'none',
-              color: '#ffffff',
+              color: 'rgb(var(--on-inverse))',
               cursor: 'pointer',
               padding: 0,
               lineHeight: 1,

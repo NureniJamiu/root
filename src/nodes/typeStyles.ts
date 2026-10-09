@@ -19,9 +19,9 @@ import type { NodeType } from '../data';
  *   - `background` — the card fill.
  *   - `text`       — the title (and, for `conclusion`, body) text color.
  *
- * All values are literal hex strings from the DESIGN.md palette
- * (color.text.* and color.surface.*) so consumers can apply them via
- * inline `style` without depending on Tailwind arbitrary-value syntax.
+ * All values are theme tokens (`rgb(var(--topic))`, see theme/tokens.css)
+ * so consumers can apply them via inline `style` and the colours follow
+ * light and dark mode.
  */
 export interface TypeStyle {
   readonly border: string;
@@ -36,26 +36,26 @@ export interface TypeStyle {
  */
 export const PALETTE = {
   // Typographic Neutrals (DESIGN.md §Colors)
-  obsidian:      '#000000', // Document headlines, titles, active indicators
-  readingInk:    '#404040', // Primary reading ink
-  muted:         '#595959', // Secondary metadata, coordinates
+  obsidian:      'rgb(var(--ink-strong))', // Document headlines, titles, active indicators
+  readingInk:    'rgb(var(--ink-read))', // Primary reading ink
+  muted:         'rgb(var(--ink-3))', // Secondary metadata, coordinates
   // Surfaces
-  canvas:        '#f9f9fb', // Primary canvas underlay
-  surface:       '#ffffff', // Pure surface card containers
-  borderRule:    '#ebebeb', // Structural dividing rules
-  surfaceMuted:  '#f5f3f3', // Surface container low
+  canvas:        'rgb(var(--canvas))', // Primary canvas underlay
+  surface:       'rgb(var(--panel))', // Pure surface card containers
+  borderRule:    'rgb(var(--rule))', // Structural dividing rules
+  surfaceMuted:  'rgb(var(--sunken))', // Surface container low
   // Semantic Research Nodes (DESIGN.md §Semantic Research Nodes)
-  topic:         '#0051c3', // Cobalt blue: core subject anchors, active focus
-  finding:       '#2d7a4c', // Deep botanical green: verified facts, citations
-  question:      '#de5052', // Crimson coral: active inquiries, hypotheses
-  conclusion:    '#521010', // Deep oxblood: consolidated theses, closures
+  topic:         'rgb(var(--topic))', // Cobalt blue: core subject anchors, active focus
+  finding:       'rgb(var(--finding))', // Deep botanical green: verified facts, citations
+  question:      'rgb(var(--question))', // Crimson coral: active inquiries, hypotheses
+  conclusion:    'rgb(var(--conclusion))', // Deep oxblood: consolidated theses, closures
   // Backward-compatibility aliases
-  textPrimary:   '#000000',
-  textSecondary: '#404040',
-  textTertiary:  '#595959',
-  surfaceBase:   '#000000',
-  surfaceRaised: '#ffffff',
-  surfaceStrong: '#0051c3',
+  textPrimary:   'rgb(var(--ink-strong))',
+  textSecondary: 'rgb(var(--ink-read))',
+  textTertiary:  'rgb(var(--ink-3))',
+  surfaceBase:   'rgb(var(--ink-strong))',
+  surfaceRaised: 'rgb(var(--panel))',
+  surfaceStrong: 'rgb(var(--topic))',
 } as const;
 
 /**
@@ -97,4 +97,4 @@ export const typeStyles: { readonly [K in NodeType]: TypeStyle } = {
  * the DESIGN.md active focus accent — applied as a 2 px border when a node
  * is selected.
  */
-export const SELECTION_BORDER_COLOR = PALETTE.topic; // #0051c3
+export const SELECTION_BORDER_COLOR = PALETTE.topic; // rgb(var(--topic))

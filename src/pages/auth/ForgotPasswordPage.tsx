@@ -17,7 +17,7 @@ export function ForgotPasswordPage(): JSX.Element {
     <AuthLayout title="Reset Password" subtitle="Enter your email to receive recovery instructions">
       {submitted ? (
         <div className="flex flex-col gap-4 text-center">
-          <p className="text-xs text-[#434653] font-sans">
+          <p className="text-xs text-ink-2 font-sans">
             Instructions to reset your password have been sent to <strong>{email || 'your email'}</strong>.
           </p>
           <Button
@@ -33,7 +33,7 @@ export function ForgotPasswordPage(): JSX.Element {
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="block text-xs font-mono uppercase text-[#737785] mb-1.5">
+            <label className="block text-xs font-mono uppercase text-muted mb-1.5">
               Email Address
             </label>
             <input
@@ -42,7 +42,7 @@ export function ForgotPasswordPage(): JSX.Element {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
+              className="w-full text-sm bg-panel text-ink placeholder:text-faint border border-rule-2 px-3 py-2 rounded-sm focus:border-ink-strong outline-none font-sans"
             />
           </div>
 
@@ -55,11 +55,11 @@ export function ForgotPasswordPage(): JSX.Element {
             Send Reset Instructions
           </Button>
 
-          <div className="text-center pt-2 border-t border-[#f5f3f3]">
+          <div className="text-center pt-2 border-t border-sunken">
             <button
               type="button"
               onClick={() => navigate('/auth/login')}
-              className="text-xs font-mono text-[#0051c3] hover:underline"
+              className="text-xs font-mono text-topic hover:underline"
             >
               Remembered your password? Sign in
             </button>

@@ -108,8 +108,7 @@ describe('NodeEditor — component', () => {
 
     // Normal state: color must NOT be the warning red.
     const color = (counter as HTMLElement).style.color;
-    expect(color).not.toBe('rgb(222, 80, 82)'); // #de5052
-    expect(color).not.toBe('#de5052');
+    expect(color).not.toBe('var(--color-semantic-question)');
   });
 
   /* ---------------------------------------------------------------------- */
@@ -133,10 +132,10 @@ describe('NodeEditor — component', () => {
 
     expect(counter.textContent).toBe('19900/20000');
 
-    // Warning state: counter color must be the #de5052 warning accent.
-    // jsdom may normalize inline styles from hex to rgb(), so we accept both forms.
+    // Warning state: counter color must be the question (warning) accent,
+    // given as its theme token so it follows light and dark.
     const color = (counter as HTMLElement).style.color;
-    const isWarnColor = color === '#de5052' || color === 'rgb(222, 80, 82)';
+    const isWarnColor = color === 'var(--color-semantic-question)';
     expect(isWarnColor).toBe(true);
   });
 

@@ -53,15 +53,15 @@ function Pocket(): JSX.Element {
       <rect width="80" height="56" fill="#f1ece4" />
       <path d="M 0 56 L 0 18 C 14 10, 22 30, 34 30 C 46 30, 50 8, 64 12 C 72 14, 78 22, 80 20 L 80 56 Z" fill="#c9b8a6" />
       <path d="M 0 56 L 0 28 C 14 22, 22 40, 34 40 C 46 40, 52 22, 64 24 C 72 26, 78 32, 80 30 L 80 56 Z" fill="#a8927c" />
-      <g stroke="#1b1c1c" strokeWidth={1.2}>
+      <g stroke="rgb(var(--ink))" strokeWidth={1.2}>
         <line x1="30" y1="24" x2="38" y2="20" />
         <line x1="38" y1="20" x2="46" y2="24" />
         <line x1="46" y1="24" x2="52" y2="18" />
       </g>
-      <circle cx="30" cy="24" r="3" fill="#de5052" />
-      <circle cx="38" cy="20" r="3" fill="#6b6f7a" />
-      <circle cx="46" cy="24" r="3" fill="#6b6f7a" />
-      <circle cx="52" cy="18" r="3" fill="#de5052" />
+      <circle cx="30" cy="24" r="3" fill="rgb(var(--question))" />
+      <circle cx="38" cy="20" r="3" fill="rgb(var(--ink-3))" />
+      <circle cx="46" cy="24" r="3" fill="rgb(var(--ink-3))" />
+      <circle cx="52" cy="18" r="3" fill="rgb(var(--question))" />
     </>
   );
 }
@@ -108,17 +108,17 @@ function Gel(): JSX.Element {
 /** A ball-and-stick molecule: the PET repeat unit. */
 function Molecule(): JSX.Element {
   const atoms: readonly [number, number, string][] = [
-    [14, 28, '#6b6f7a'], [24, 20, '#6b6f7a'], [34, 28, '#6b6f7a'], [44, 20, '#6b6f7a'], [54, 28, '#6b6f7a'],
-    [64, 20, '#6b6f7a'], [24, 10, '#de5052'], [54, 38, '#de5052'], [34, 38, '#de5052'], [70, 30, '#de5052'],
+    [14, 28, 'rgb(var(--ink-3))'], [24, 20, 'rgb(var(--ink-3))'], [34, 28, 'rgb(var(--ink-3))'], [44, 20, 'rgb(var(--ink-3))'], [54, 28, 'rgb(var(--ink-3))'],
+    [64, 20, 'rgb(var(--ink-3))'], [24, 10, 'rgb(var(--question))'], [54, 38, 'rgb(var(--question))'], [34, 38, 'rgb(var(--question))'], [70, 30, 'rgb(var(--question))'],
   ];
   const bonds: readonly [number, number][] = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [1, 6], [4, 7], [2, 8], [5, 9]];
   return (
     <>
-      <rect width="80" height="56" fill="#fbf9f8" />
+      <rect width="80" height="56" fill="rgb(var(--paper))" />
       {bonds.map(([a, b]) => {
         const [x1, y1] = atoms[a] as [number, number, string];
         const [x2, y2] = atoms[b] as [number, number, string];
-        return <line key={`${a}-${b}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#9a9da8" strokeWidth={2} />;
+        return <line key={`${a}-${b}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgb(var(--faint))" strokeWidth={2} />;
       })}
       {atoms.map(([x, y, c], i) => (
         <circle key={i} cx={x} cy={y} r={4} fill={c} />
@@ -131,14 +131,14 @@ function Molecule(): JSX.Element {
 function RetentionChart(): JSX.Element {
   return (
     <>
-      <rect width="80" height="56" fill="#ffffff" />
+      <rect width="80" height="56" fill="rgb(var(--panel))" />
       {[14, 26, 38].map((y) => (
-        <line key={y} x1="6" y1={y} x2="76" y2={y} stroke="#ebebeb" strokeWidth={0.8} />
+        <line key={y} x1="6" y1={y} x2="76" y2={y} stroke="rgb(var(--rule))" strokeWidth={0.8} />
       ))}
-      <path d="M 6 10 C 12 10, 14 12, 18 30 C 22 38, 40 38, 76 42 L 76 50 L 6 50 Z" fill="rgba(0, 81, 195, 0.12)" />
-      <path d="M 6 10 C 12 10, 14 12, 18 30 C 22 38, 40 38, 76 42" stroke="#0051c3" strokeWidth={1.6} fill="none" />
-      <line x1="17" y1="6" x2="17" y2="50" stroke="#de5052" strokeWidth={1} strokeDasharray="2 2" />
-      <circle cx="17" cy="26" r="2.2" fill="#de5052" />
+      <path d="M 6 10 C 12 10, 14 12, 18 30 C 22 38, 40 38, 76 42 L 76 50 L 6 50 Z" fill="rgb(var(--topic) / 0.12)" />
+      <path d="M 6 10 C 12 10, 14 12, 18 30 C 22 38, 40 38, 76 42" stroke="rgb(var(--topic))" strokeWidth={1.6} fill="none" />
+      <line x1="17" y1="6" x2="17" y2="50" stroke="rgb(var(--question))" strokeWidth={1} strokeDasharray="2 2" />
+      <circle cx="17" cy="26" r="2.2" fill="rgb(var(--question))" />
     </>
   );
 }
@@ -149,11 +149,11 @@ function VideoFrame(): JSX.Element {
     <>
       <rect width="80" height="56" fill="#1f2a44" />
       <circle cx="58" cy="18" r="9" fill="#f2c94c" opacity={0.9} />
-      <path d="M 0 56 L 0 40 L 18 28 L 34 40 L 50 30 L 80 46 L 80 56 Z" fill="#2d7a4c" />
-      <circle cx="40" cy="28" r="9" fill="rgba(255,255,255,0.9)" />
+      <path d="M 0 56 L 0 40 L 18 28 L 34 40 L 50 30 L 80 46 L 80 56 Z" fill="rgb(var(--finding))" />
+      <circle cx="40" cy="28" r="9" fill="rgb(var(--panel) / 0.9)" />
       <path d="M 37 23.5 L 45 28 L 37 32.5 Z" fill="#1f2a44" />
-      <rect x="0" y="52" width="80" height="4" fill="rgba(255,255,255,0.25)" />
-      <rect x="0" y="52" width="22" height="4" fill="#de5052" />
+      <rect x="0" y="52" width="80" height="4" fill="rgb(var(--panel) / 0.25)" />
+      <rect x="0" y="52" width="22" height="4" fill="rgb(var(--question))" />
     </>
   );
 }
@@ -163,15 +163,15 @@ function Storyboard(): JSX.Element {
   const cells = [0, 1, 2, 3, 4, 5];
   return (
     <>
-      <rect width="80" height="56" fill="#fbf9f8" />
+      <rect width="80" height="56" fill="rgb(var(--paper))" />
       {cells.map((i) => {
         const x = 4 + (i % 3) * 25;
         const y = 4 + Math.floor(i / 3) * 25;
         return (
           <g key={i}>
-            <rect x={x} y={y} width="22" height="22" fill="#ffffff" stroke="#1b1c1c" strokeWidth={0.8} />
-            <circle cx={x + 7 + (i % 2) * 6} cy={y + 9} r="3" fill="none" stroke="#434653" strokeWidth={0.8} />
-            <path d={`M ${x + 3} ${y + 19} L ${x + 10} ${y + 13} L ${x + 19} ${y + 19}`} fill="none" stroke="#434653" strokeWidth={0.8} />
+            <rect x={x} y={y} width="22" height="22" fill="rgb(var(--panel))" stroke="rgb(var(--ink))" strokeWidth={0.8} />
+            <circle cx={x + 7 + (i % 2) * 6} cy={y + 9} r="3" fill="none" stroke="rgb(var(--ink-2))" strokeWidth={0.8} />
+            <path d={`M ${x + 3} ${y + 19} L ${x + 10} ${y + 13} L ${x + 19} ${y + 19}`} fill="none" stroke="rgb(var(--ink-2))" strokeWidth={0.8} />
           </g>
         );
       })}

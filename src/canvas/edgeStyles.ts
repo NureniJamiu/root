@@ -16,14 +16,14 @@ export const CONNECTOR_EDGE_TYPE = 'connector' as const;
 
 /** Stroke colour for a connector leaving an idea of each type. */
 export const EDGE_COLOR_BY_TYPE: Readonly<Record<NodeType, string>> = Object.freeze({
-  topic: '#0051c3',
-  finding: '#2d7a4c',
-  question: '#de5052',
-  conclusion: '#521010',
+  topic: 'rgb(var(--topic))',
+  finding: 'rgb(var(--finding))',
+  question: 'rgb(var(--question))',
+  conclusion: 'rgb(var(--conclusion))',
 });
 
 /** Neutral stroke used when the source type is unknown. */
-export const EDGE_STROKE_COLOR = '#737785' as const;
+export const EDGE_STROKE_COLOR = 'rgb(var(--muted))' as const;
 
 /** Stroke width of a resting connector, in CSS pixels. */
 export const EDGE_STROKE_WIDTH = 2 as const;
@@ -42,7 +42,7 @@ export const EDGE_DASH = '5 4' as const;
 
 /** Line drawn while the user drags a new connector out of a card. */
 export const CONNECTION_LINE_STYLE: CSSProperties = Object.freeze({
-  stroke: '#0051c3',
+  stroke: 'rgb(var(--topic))',
   strokeWidth: 2,
   strokeDasharray: '5 4',
 });

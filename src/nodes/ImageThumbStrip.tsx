@@ -36,8 +36,8 @@ export function ImageThumbStrip({
             height: 36,
             objectFit: 'cover',
             borderRadius: 6,
-            border: '1px solid #312e2e',
-            background: '#ffffff',
+            border: '1px solid rgb(var(--ink-2))',
+            background: 'rgb(var(--panel))',
           }}
         />
       ))}

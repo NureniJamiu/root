@@ -272,7 +272,7 @@ export function AppShell(): JSX.Element {
     <ToolbarCallbacksProvider value={toolbarCallbacks}>
       <div
         id="root-app"
-        className="w-screen h-screen flex bg-[#f9f9fb] overflow-hidden select-none"
+        className="w-screen h-screen flex bg-canvas overflow-hidden select-none"
         style={{
           width: '100vw',
           height: '100vh',
@@ -344,17 +344,17 @@ export function AppShell(): JSX.Element {
                   className="absolute inset-0 flex items-center justify-center z-20 p-4"
                   data-testid="projects-load-failed"
                 >
-                  <div className="max-w-[420px] bg-[#ffffff] border border-[#c3c6d6] rounded-[2px] p-6 text-center">
-                    <h2 className="font-serif text-[20px] font-normal text-[#000000] m-0 mb-2">
+                  <div className="max-w-[420px] bg-panel border border-rule-strong rounded-[2px] p-6 text-center">
+                    <h2 className="font-serif text-[20px] font-normal text-ink-strong m-0 mb-2">
                       Your projects couldn&apos;t be loaded
                     </h2>
-                    <p className="font-serif text-[13px] leading-[20px] text-[#404040] m-0 mb-4">
+                    <p className="font-serif text-[13px] leading-[20px] text-ink-read m-0 mb-4">
                       Check your connection, then reload. Nothing you add here would be saved.
                     </p>
                     <button
                       type="button"
                       onClick={() => window.location.reload()}
-                      className="h-8 px-4 bg-[#0051c3] hover:bg-[#003b93] text-white font-mono text-[11px] rounded-[2px] cursor-pointer"
+                      className="h-8 px-4 bg-accent hover:bg-accent-strong text-white font-mono text-[11px] rounded-[2px] cursor-pointer"
                     >
                       Reload
                     </button>

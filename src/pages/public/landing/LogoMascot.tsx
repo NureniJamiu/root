@@ -247,16 +247,16 @@ export function MascotStage({ className = '' }: { readonly className?: string })
     >
       <defs>
         <linearGradient id={`${gid}-g`} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#de5052" />
-          <stop offset="100%" stopColor="#0051c3" />
+          <stop offset="0%" stopColor="rgb(var(--brand-from))" />
+          <stop offset="100%" stopColor="rgb(var(--brand-to))" />
         </linearGradient>
         <linearGradient id={`${gid}-inf`} x1="56" y1="0" x2="140" y2="0" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#de5052" />
-          <stop offset="100%" stopColor="#0051c3" />
+          <stop offset="0%" stopColor="rgb(var(--brand-from))" />
+          <stop offset="100%" stopColor="rgb(var(--brand-to))" />
         </linearGradient>
         <radialGradient id={`${gid}-sh`}>
-          <stop offset="0%" stopColor="#1b1c1c" stopOpacity={0.35} />
-          <stop offset="100%" stopColor="#1b1c1c" stopOpacity={0} />
+          <stop offset="0%" stopColor="rgb(var(--ink))" stopOpacity={0.35} />
+          <stop offset="100%" stopColor="rgb(var(--ink))" stopOpacity={0} />
         </radialGradient>
       </defs>
 
@@ -288,19 +288,19 @@ export function MascotStage({ className = '' }: { readonly className?: string })
           opacity={s.mouth.o}
           transform={reduced ? undefined : `translate(0 ${s.mouth.y}) rotate(${s.mouth.rot} 98 74)`}
         >
-          <path d={MOUTH} stroke="#0051c3" strokeWidth={5.5} strokeLinecap="round" fill="none" />
+          <path d={MOUTH} stroke="rgb(var(--topic))" strokeWidth={5.5} strokeLinecap="round" fill="none" />
         </g>
 
         <g data-m="pupilL" opacity={s.pupilL.o} transform={`translate(0 ${s.pupilL.y})`}>
           <g data-m="lidL">
-            <circle cx={PUPIL_L.x} cy={PUPIL_L.y} r={5} fill="#0f172a" />
-            <circle cx={PUPIL_L.x + 2} cy={PUPIL_L.y - 1} r={1.8} fill="#ffffff" />
+            <circle cx={PUPIL_L.x} cy={PUPIL_L.y} r={5} fill="rgb(var(--ink))" />
+            <circle cx={PUPIL_L.x + 2} cy={PUPIL_L.y - 1} r={1.8} fill="rgb(var(--panel))" />
           </g>
         </g>
         <g data-m="pupilR" opacity={s.pupilR.o} transform={`translate(0 ${s.pupilR.y})`}>
           <g data-m="lidR">
-            <circle cx={PUPIL_R.x} cy={PUPIL_R.y} r={5} fill="#0f172a" />
-            <circle cx={PUPIL_R.x - 2} cy={PUPIL_R.y - 1} r={1.8} fill="#ffffff" />
+            <circle cx={PUPIL_R.x} cy={PUPIL_R.y} r={5} fill="rgb(var(--ink))" />
+            <circle cx={PUPIL_R.x - 2} cy={PUPIL_R.y - 1} r={1.8} fill="rgb(var(--panel))" />
           </g>
         </g>
       </g>
@@ -324,11 +324,11 @@ export function AnimatedLogo({ className = '' }: { readonly className?: string }
     <svg viewBox="0 0 206 96" xmlns="http://www.w3.org/2000/svg" aria-label="Root" fill="none" className={`lp-logo ${className}`}>
       <defs>
         <linearGradient id={`${gid}-g`} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#de5052" />
-          <stop offset="100%" stopColor="#0051c3" />
+          <stop offset="0%" stopColor="rgb(var(--brand-from))" />
+          <stop offset="100%" stopColor="rgb(var(--brand-to))" />
         </linearGradient>
       </defs>
-      <g stroke="#0051c3" strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <g stroke="rgb(var(--topic))" strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
         <line x1="16" y1="10" x2="16" y2="78" />
         <path d="M 16 10 C 56 10 56 50 16 50" />
         <line x1="44" y1="50" x2="70" y2="78" />
@@ -343,19 +343,19 @@ export function AnimatedLogo({ className = '' }: { readonly className?: string }
         fill="none"
       />
       <g className="lp-logo-mouth">
-        <path d={MOUTH} stroke="#0051c3" strokeWidth="5.5" strokeLinecap="round" fill="none" />
+        <path d={MOUTH} stroke="rgb(var(--topic))" strokeWidth="5.5" strokeLinecap="round" fill="none" />
       </g>
       <g className="lp-logo-look">
         <g className="lp-logo-blink">
-          <circle cx="82" cy="43" r="5" fill="#0f172a" />
+          <circle cx="82" cy="43" r="5" fill="rgb(var(--ink))" />
           <circle cx="84" cy="42" r="1.8" fill="white" />
         </g>
         <g className="lp-logo-blink lp-logo-wink">
-          <circle cx="114" cy="43" r="5" fill="#0f172a" />
+          <circle cx="114" cy="43" r="5" fill="rgb(var(--ink))" />
           <circle cx="112" cy="42" r="1.8" fill="white" />
         </g>
       </g>
-      <g stroke="#0051c3" strokeWidth="7.5" strokeLinecap="round" fill="none">
+      <g stroke="rgb(var(--topic))" strokeWidth="7.5" strokeLinecap="round" fill="none">
         <line x1="164" y1="10" x2="164" y2="78" />
         <line x1="146" y1="36" x2="182" y2="36" />
       </g>

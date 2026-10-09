@@ -7,7 +7,7 @@ export interface KbdProps extends HTMLAttributes<HTMLElement> {
 export function Kbd({ children, className = '', style, ...rest }: KbdProps): JSX.Element {
   return (
     <kbd
-      className={`inline-flex items-center justify-center font-mono text-[9px] font-medium leading-[12px] uppercase px-1.5 py-0.5 rounded-[2px] bg-[#ffffff] text-[#1b1c1c] border border-[#c3c6d6] select-none ${className}`}
+      className={`inline-flex items-center justify-center font-mono text-[9px] font-medium leading-[12px] uppercase px-1.5 py-0.5 rounded-[2px] bg-panel text-ink border border-rule-strong select-none ${className}`}
       style={{
         boxShadow: 'none',
         ...style,

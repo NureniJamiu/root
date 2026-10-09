@@ -137,13 +137,13 @@ export function DeletePrompt({
         aria-modal="true"
         aria-labelledby="delete-prompt-title"
         aria-describedby="delete-prompt-body"
-        className="root-modal-panel w-[440px] max-w-full bg-[#ffffff] text-[#1b1c1c] border border-[#d9d9de] rounded-[4px] overflow-hidden"
+        className="root-modal-panel w-[440px] max-w-full bg-panel text-ink border border-rule-2 rounded-[4px] overflow-hidden"
         data-testid="delete-prompt"
       >
         <div className="relative px-6 pt-5 pb-4">
-          <span className="absolute left-0 top-0 h-[3px] w-full bg-[#ba1a1a]" aria-hidden="true" />
+          <span className="absolute left-0 top-0 h-[3px] w-full bg-danger-fill" aria-hidden="true" />
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-full bg-[#fdf2f2] text-[#ba1a1a]" aria-hidden="true">
+            <span className="mt-0.5 w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-full bg-danger-soft text-danger" aria-hidden="true">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 6h18" />
                 <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -152,13 +152,13 @@ export function DeletePrompt({
               </svg>
             </span>
             <div className="flex flex-col gap-1 min-w-0">
-              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[#737785]">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
                 Delete idea
               </span>
-              <h2 id="delete-prompt-title" className="font-serif text-[20px] leading-[26px] font-normal text-[#000000] m-0 truncate">
+              <h2 id="delete-prompt-title" className="font-serif text-[20px] leading-[26px] font-normal text-ink-strong m-0 truncate">
                 {node.title.trim() ? `Delete “${node.title.trim()}”?` : 'Delete this idea?'}
               </h2>
-              <p id="delete-prompt-body" className="font-serif text-[14px] leading-[21px] text-[#404040] m-0">
+              <p id="delete-prompt-body" className="font-serif text-[14px] leading-[21px] text-ink-read m-0">
                 Some ideas hang only from this one. What should happen to them?
               </p>
             </div>
@@ -186,8 +186,8 @@ export function DeletePrompt({
           </ChoiceButton>
         </div>
 
-        <div className="flex flex-row items-center justify-between px-6 py-3.5 border-t border-[#ebebeb] bg-[#fbfbfc]">
-          <span className="font-mono text-[10px] text-[#737785]">Undo brings it back.</span>
+        <div className="flex flex-row items-center justify-between px-6 py-3.5 border-t border-rule bg-panel-2">
+          <span className="font-mono text-[10px] text-muted">Undo brings it back.</span>
           <Button variant="secondary" size="md" onClick={onCancel} data-testid="btn-delete-cancel">
             Cancel
           </Button>
@@ -221,13 +221,13 @@ function ChoiceButton({ testId, onClick, children, title, hint, danger = false }
       data-testid={testId}
       className={`group w-full flex flex-col items-start gap-0.5 px-4 py-3 text-left rounded-[3px] border transition-colors duration-150 cursor-pointer ${
         danger
-          ? 'bg-[#ba1a1a] border-[#ba1a1a] text-[#ffffff] hover:bg-[#93000a] hover:border-[#93000a]'
-          : 'bg-[#ffffff] border-[#e3c4c4] text-[#ba1a1a] hover:bg-[#fdf2f2] hover:border-[#ba1a1a]'
+          ? 'bg-danger-fill border-danger text-on-accent hover:bg-danger-strong hover:border-danger-strong'
+          : 'bg-panel border-danger/30 text-danger hover:bg-danger-soft hover:border-danger'
       }`}
     >
       <span className="font-mono text-[12px] font-medium">{children}</span>
       {hint && (
-        <span className={`font-serif text-[12.5px] ${danger ? 'text-[#ffffff]/80' : 'text-[#595959]'}`}>{hint}</span>
+        <span className={`font-serif text-[12.5px] ${danger ? 'text-on-accent/80' : 'text-ink-3'}`}>{hint}</span>
       )}
     </button>
   );

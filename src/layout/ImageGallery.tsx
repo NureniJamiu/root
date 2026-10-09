@@ -36,7 +36,7 @@ export function ImageMosaic({ images }: { readonly images: readonly ImageEntry[]
         key={image.id}
         type="button"
         onClick={() => setOpenAt(index)}
-        className={`group/tile relative overflow-hidden rounded-[4px] bg-[#f5f3f3] border border-[#ebebeb] cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0051c3] ${className}`}
+        className={`group/tile relative overflow-hidden rounded-[4px] bg-sunken border border-rule cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-topic ${className}`}
         aria-label={isLast ? `Open image ${index + 1} of ${images.length}, ${extra} more` : `Open image ${index + 1} of ${images.length}`}
         data-testid={`inspector-image-${index}`}
       >

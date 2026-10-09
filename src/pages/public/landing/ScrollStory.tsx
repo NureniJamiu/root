@@ -122,8 +122,8 @@ const STORY_CONTENT: PanelContent = {
     { kind: 'board', caption: 'Storyboard v2' },
   ],
   sources: [
-    { title: 'Audience retention, last five uploads', site: 'studio.youtube.com', mark: '▶', color: '#de5052' },
-    { title: 'Team notes: competitor launch videos', site: 'notion.so', mark: 'N', color: '#1b1c1c' },
+    { title: 'Audience retention, last five uploads', site: 'studio.youtube.com', mark: '▶', color: 'rgb(var(--question))' },
+    { title: 'Team notes: competitor launch videos', site: 'notion.so', mark: 'N', color: 'rgb(var(--ink))' },
   ],
   url: 'studio.youtube.com/analytics/retention',
   doc: { name: 'launch-script-v2.pdf', meta: '6 pages · 210 KB · 3 comments' },
@@ -303,9 +303,9 @@ function StepCard({ p, active }: { readonly p: number; readonly active: number }
   return (
     <div className="relative">
       <div className="flex items-center justify-between mb-6">
-        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#737785]">How it works</p>
-        <p className="font-mono text-[11px] tabular-nums text-[#737785]">
-          <span className="text-[#1b1c1c]">0{active + 1}</span> / 0{STEPS.length}
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">How it works</p>
+        <p className="font-mono text-[11px] tabular-nums text-muted">
+          <span className="text-ink">0{active + 1}</span> / 0{STEPS.length}
         </p>
       </div>
 
@@ -317,18 +317,18 @@ function StepCard({ p, active }: { readonly p: number; readonly active: number }
             data-state={i === active ? 'active' : i < active ? 'past' : 'next'}
             aria-hidden={i !== active}
           >
-            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#0051c3] mb-3">{s.kicker}</p>
-            <h3 className="font-serif font-light text-[#1b1c1c] text-[32px] md:text-[40px] leading-[1.06] tracking-[-0.02em] mb-4">
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-topic mb-3">{s.kicker}</p>
+            <h3 className="font-serif font-light text-ink text-[32px] md:text-[40px] leading-[1.06] tracking-[-0.02em] mb-4">
               {s.title}
             </h3>
-            <p className="font-serif text-[16px] md:text-[17px] leading-[1.6] text-[#434653]">{s.body}</p>
+            <p className="font-serif text-[16px] md:text-[17px] leading-[1.6] text-ink-2">{s.body}</p>
           </div>
         ))}
       </div>
 
       <div className="mt-4 flex gap-1.5" aria-hidden="true">
         {STEPS.map((s, i) => (
-          <span key={s.kicker} className="relative h-[3px] flex-1 rounded-[1px] bg-[#e4e2e1] overflow-hidden">
+          <span key={s.kicker} className="relative h-[3px] flex-1 rounded-[1px] bg-sunken-3 overflow-hidden">
             <span
               className="absolute inset-y-0 left-0 w-full origin-left lp-gradient-bar"
               style={{ transform: `scaleX(${i < active ? 1 : i === active ? clamp01(stepProgress(p, i)) : 0})` }}
@@ -363,8 +363,8 @@ function StoryPinned(): JSX.Element {
   const frame = storyFrame(p, layout);
 
   return (
-    <section ref={ref} id="how-it-works" className="relative border-y border-[#ebebeb]" style={{ height: '620vh' }}>
-      <div className="sticky top-0 h-screen overflow-hidden bg-[#f9f9fb]">
+    <section ref={ref} id="how-it-works" className="relative border-y border-rule" style={{ height: '620vh' }}>
+      <div className="sticky top-0 h-screen overflow-hidden bg-canvas">
         {/* Wide: the canvas fills everything below the header. */}
         <div ref={stageRef} className="absolute inset-x-0 top-16 bottom-0 hidden md:block">
           {wide && (
@@ -378,18 +378,18 @@ function StoryPinned(): JSX.Element {
             />
           )}
           {/* Soft edges so the grid melts into the page. */}
-          <div className="absolute inset-y-0 left-0 w-24 pointer-events-none bg-gradient-to-r from-[#f9f9fb] to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-16 pointer-events-none bg-gradient-to-t from-[#f9f9fb] to-transparent" />
+          <div className="absolute inset-y-0 left-0 w-24 pointer-events-none bg-gradient-to-r from-canvas to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-16 pointer-events-none bg-gradient-to-t from-canvas to-transparent" />
 
           <div
-            className="absolute top-1/2 -translate-y-1/2 bg-[#ffffff]/90 backdrop-blur-sm border border-[#1b1c1c] rounded-[4px] p-8"
+            className="absolute top-1/2 -translate-y-1/2 bg-panel/90 backdrop-blur-sm border border-ink rounded-[4px] p-8"
             style={{ left: cardLeftPx, width: CARD_PX }}
           >
             <StepCard p={p} active={active} />
           </div>
 
           <div
-            className="absolute bottom-5 font-mono text-[10px] uppercase tracking-[0.1em] text-[#737785]"
+            className="absolute bottom-5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted"
             style={{ left: cardLeftPx }}
           >
             Canvas · Launch video · <span className="tabular-nums">{Math.round(p * 100)}%</span>
@@ -399,7 +399,7 @@ function StoryPinned(): JSX.Element {
         {/* Phones: step text over a framed canvas. */}
         <div className="md:hidden h-full flex flex-col justify-center gap-6 px-5 pt-16 pb-6">
           <StepCard p={p} active={active} />
-          <div className="relative border border-[#1b1c1c] rounded-[4px] overflow-hidden bg-[#f9f9fb]">
+          <div className="relative border border-ink rounded-[4px] overflow-hidden bg-canvas">
             {!wide && (
               <SceneCanvas
                 frame={frame}
@@ -422,20 +422,20 @@ function StoryStill(): JSX.Element {
     <section id="how-it-works" className="py-24 md:py-32">
       <div className="max-w-6xl mx-auto px-6 md:px-8 grid md:grid-cols-2 gap-12 items-center">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#737785] mb-8">How it works</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted mb-8">How it works</p>
           <ol className="flex flex-col gap-7">
             {STEPS.map((s, i) => (
               <li key={s.kicker}>
-                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#0051c3] mb-2">
+                <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-topic mb-2">
                   0{i + 1} · {s.kicker}
                 </p>
-                <h3 className="font-serif font-light text-[26px] leading-tight text-[#1b1c1c] mb-2">{s.title}</h3>
-                <p className="font-serif text-[16px] leading-[1.6] text-[#434653]">{s.body}</p>
+                <h3 className="font-serif font-light text-[26px] leading-tight text-ink mb-2">{s.title}</h3>
+                <p className="font-serif text-[16px] leading-[1.6] text-ink-2">{s.body}</p>
               </li>
             ))}
           </ol>
         </div>
-        <div className="border border-[#1b1c1c] rounded-[4px] overflow-hidden bg-[#f9f9fb]">
+        <div className="border border-ink rounded-[4px] overflow-hidden bg-canvas">
           <SceneCanvas
             frame={frame}
             width={MOBILE_LAYOUT.w}

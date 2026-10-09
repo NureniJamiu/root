@@ -149,10 +149,10 @@ export function ChildRevealMenu({ nodeId, anchor, onClose }: ChildRevealMenuProp
                 // One pick per opening; a keyboard pick (detail 0) hands focus back to the arrow.
                 onClose(e.detail === 0);
               }}
-              className={`reveal-tree-item flex min-w-0 flex-1 items-baseline gap-1.5 rounded-[4px] bg-white px-2.5 py-1.5 text-left text-[12px] leading-[17px] cursor-pointer focus-visible:outline-none ${shown ? 'is-shown text-[#1b1c1c] font-medium' : 'text-[#8e919b]'
+              className={`reveal-tree-item flex min-w-0 flex-1 items-baseline gap-1.5 rounded-[4px] bg-panel px-2.5 py-1.5 text-left text-[12px] leading-[17px] cursor-pointer focus-visible:outline-none ${shown ? 'is-shown text-ink font-medium' : 'text-faint'
                 }`}
             >
-              <span className="shrink-0 font-mono text-[9px] font-normal text-[#a3a6b0]">{label}</span>
+              <span className="shrink-0 font-mono text-[9px] font-normal text-faint">{label}</span>
               <span className="min-w-0 flex-1 truncate hover:text-black">{title}</span>
             </button>
           </div>

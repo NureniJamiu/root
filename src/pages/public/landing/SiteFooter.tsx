@@ -75,9 +75,9 @@ export function SiteFooter(): JSX.Element {
   const toTop = (): void => window.scrollTo({ top: 0, behavior: 'smooth' });
 
   return (
-    <footer className="w-full bg-[#fbf9f8] text-[#1b1c1c]">
+    <footer className="w-full bg-paper text-ink">
       {/* Blocks */}
-      <div className="grid md:grid-cols-3 border-t border-[#ebebeb]">
+      <div className="grid md:grid-cols-3 border-t border-rule">
         {BLOCKS.map((block, i) => (
           <BlockCell key={block.label} index={i} label={block.label} mark={block.mark}>
             <div className={`grid gap-x-6 gap-y-6 ${block.columns.length > 1 ? 'grid-cols-2' : ''}`}>
@@ -88,7 +88,7 @@ export function SiteFooter(): JSX.Element {
                       <a
                         href={'to' in link ? link.to : `#${link.section}`}
                         onClick={follow(link)}
-                        className="lp-foot-link font-serif text-[17px] md:text-[18px] leading-[1.45] text-[#1b1c1c]"
+                        className="lp-foot-link font-serif text-[17px] md:text-[18px] leading-[1.45] text-ink"
                       >
                         {link.label}
                       </a>
@@ -102,19 +102,19 @@ export function SiteFooter(): JSX.Element {
 
         <BlockCell index={2} label="Root" mark="question">
           <div className="flex flex-col gap-10 h-full justify-end">
-            <p className="font-serif text-[17px] md:text-[18px] leading-[1.45] text-[#737785] max-w-[300px]">
-              <span className="text-[#1b1c1c]">A canvas for ideas that branch.</span> Topics, findings, questions and conclusions,
+            <p className="font-serif text-[17px] md:text-[18px] leading-[1.45] text-muted max-w-[300px]">
+              <span className="text-ink">A canvas for ideas that branch.</span> Topics, findings, questions and conclusions,
               all in full view.
             </p>
             <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.1em]">
-              <span className="inline-flex items-center gap-1.5 h-7 px-2.5 border border-[#ebebeb] rounded-[2px] bg-[#ffffff] text-[#2d7a4c]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#2d7a4c] lp-foot-pulse" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1.5 h-7 px-2.5 border border-rule rounded-[2px] bg-panel text-finding">
+                <span className="w-1.5 h-1.5 rounded-full bg-finding-fill lp-foot-pulse" aria-hidden="true" />
                 Free in beta
               </span>
               <button
                 type="button"
                 onClick={toTop}
-                className="group inline-flex items-center gap-1.5 h-7 px-2.5 border border-[#ebebeb] rounded-[2px] uppercase tracking-[0.1em] text-[#434653] hover:border-[#1b1c1c] hover:text-[#1b1c1c] transition-colors"
+                className="group inline-flex items-center gap-1.5 h-7 px-2.5 border border-rule rounded-[2px] uppercase tracking-[0.1em] text-ink-2 hover:border-ink hover:text-ink transition-colors"
               >
                 Back to top
                 <span className="transition-transform group-hover:-translate-y-0.5" aria-hidden="true">
@@ -127,15 +127,15 @@ export function SiteFooter(): JSX.Element {
       </div>
 
       {/* Wordmark */}
-      <div className="border-t border-[#ebebeb] bg-[#f4f3f2] overflow-hidden">
+      <div className="border-t border-rule bg-subtle overflow-hidden">
         <div className="px-4 md:px-7 pt-8 md:pt-12 pb-6 md:pb-10">
           <Wordmark />
         </div>
       </div>
 
       {/* Legal line */}
-      <div className="border-t border-[#ebebeb] px-5 md:px-7 py-5 grid grid-cols-2 md:grid-cols-4 gap-y-3 gap-x-6 font-mono text-[10px] uppercase tracking-[0.12em] text-[#737785]">
-        <span className="text-[#1b1c1c]">©{new Date().getFullYear()} Root</span>
+      <div className="border-t border-rule px-5 md:px-7 py-5 grid grid-cols-2 md:grid-cols-4 gap-y-3 gap-x-6 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+        <span className="text-ink">©{new Date().getFullYear()} Root</span>
         <span>Visual idea mapping &amp; planning</span>
         <span className="md:text-center">Set in EB Garamond &amp; JetBrains Mono</span>
         <span className="md:text-right">Made for thinking out loud</span>
@@ -156,10 +156,10 @@ function BlockCell({
   readonly children: ReactNode;
 }): JSX.Element {
   return (
-    <div className="flex flex-col px-5 md:px-7 pt-6 pb-8 md:pb-10 md:min-h-[340px] border-b md:border-b-0 md:border-r last:border-r-0 border-[#ebebeb]">
+    <div className="flex flex-col px-5 md:px-7 pt-6 pb-8 md:pb-10 md:min-h-[340px] border-b md:border-b-0 md:border-r last:border-r-0 border-rule">
       <div className="flex items-center justify-between mb-8 md:mb-auto">
-        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#1b1c1c]">
-          <span className="text-[#9a9da8]">0{index + 1} ·</span> {label}
+        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink">
+          <span className="text-faint">0{index + 1} ·</span> {label}
         </span>
         <span className="w-2 h-2 rounded-[1px]" style={{ background: TYPE_COLOR[mark] }} aria-hidden="true" />
       </div>
@@ -236,25 +236,25 @@ function Wordmark(): JSX.Element {
     >
       <defs>
         <linearGradient id={`${gid}-g`} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#de5052" />
-          <stop offset="100%" stopColor="#0051c3" />
+          <stop offset="0%" stopColor="rgb(var(--brand-from))" />
+          <stop offset="100%" stopColor="rgb(var(--brand-to))" />
         </linearGradient>
       </defs>
 
       {/* Connectors: a settled link from the R, an open (dashed) one to the t. */}
       <g className="lp-wordmark-link" style={{ transformOrigin: '84px 44px' }}>
-        <line x1="84" y1="44" x2={FACE_X + 48} y2="44" stroke="#0051c3" strokeWidth="1.4" />
-        <circle cx="84" cy="44" r="2.6" fill="#fbf9f8" stroke="#0051c3" strokeWidth="1.4" />
-        <circle cx={FACE_X + 48} cy="44" r="2.2" fill="#0051c3" />
+        <line x1="84" y1="44" x2={FACE_X + 48} y2="44" stroke="rgb(var(--topic))" strokeWidth="1.4" />
+        <circle cx="84" cy="44" r="2.6" fill="rgb(var(--paper))" stroke="rgb(var(--topic))" strokeWidth="1.4" />
+        <circle cx={FACE_X + 48} cy="44" r="2.2" fill="rgb(var(--topic))" />
       </g>
       <g className="lp-wordmark-link lp-wordmark-link-late" style={{ transformOrigin: `${FACE_X + 148}px 44px` }}>
-        <line x1={FACE_X + 148} y1="44" x2={T_X + 152} y2="44" stroke="#de5052" strokeWidth="1.4" strokeDasharray="5 4" />
-        <circle cx={FACE_X + 148} cy="44" r="2.2" fill="#de5052" />
-        <circle cx={T_X + 152} cy="44" r="2.6" fill="#fbf9f8" stroke="#de5052" strokeWidth="1.4" />
+        <line x1={FACE_X + 148} y1="44" x2={T_X + 152} y2="44" stroke="rgb(var(--question))" strokeWidth="1.4" strokeDasharray="5 4" />
+        <circle cx={FACE_X + 148} cy="44" r="2.2" fill="rgb(var(--question))" />
+        <circle cx={T_X + 152} cy="44" r="2.6" fill="rgb(var(--paper))" stroke="rgb(var(--question))" strokeWidth="1.4" />
       </g>
 
       {/* R */}
-      <g stroke="#0051c3" strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round">
+      <g stroke="rgb(var(--topic))" strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round">
         <line x1="16" y1="10" x2="16" y2="78" />
         <path d="M 16 10 C 56 10 56 50 16 50" />
         <line x1="44" y1="50" x2="70" y2="78" />
@@ -264,22 +264,22 @@ function Wordmark(): JSX.Element {
       <g transform={`translate(${FACE_X} 0)`}>
         <path d={INFINITY} stroke={`url(#${gid}-g)`} strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round" />
         <g className="lp-logo-mouth">
-          <path d={MOUTH} stroke="#0051c3" strokeWidth="5.5" strokeLinecap="round" />
+          <path d={MOUTH} stroke="rgb(var(--topic))" strokeWidth="5.5" strokeLinecap="round" />
         </g>
         <g ref={eyesRef}>
           <g className="lp-logo-blink">
-            <circle cx="82" cy="43" r="5" fill="#0f172a" />
-            <circle cx="84" cy="42" r="1.8" fill="#ffffff" />
+            <circle cx="82" cy="43" r="5" fill="rgb(var(--ink))" />
+            <circle cx="84" cy="42" r="1.8" fill="rgb(var(--panel))" />
           </g>
           <g className="lp-logo-blink lp-logo-wink">
-            <circle cx="114" cy="43" r="5" fill="#0f172a" />
-            <circle cx="112" cy="42" r="1.8" fill="#ffffff" />
+            <circle cx="114" cy="43" r="5" fill="rgb(var(--ink))" />
+            <circle cx="112" cy="42" r="1.8" fill="rgb(var(--panel))" />
           </g>
         </g>
       </g>
 
       {/* t */}
-      <g transform={`translate(${T_X} 0)`} stroke="#0051c3" strokeWidth="7.5" strokeLinecap="round">
+      <g transform={`translate(${T_X} 0)`} stroke="rgb(var(--topic))" strokeWidth="7.5" strokeLinecap="round">
         <line x1="164" y1="10" x2="164" y2="78" />
         <line x1="146" y1="36" x2="182" y2="36" />
       </g>

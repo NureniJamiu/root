@@ -91,7 +91,7 @@ export function deriveReactFlowGraph(
       type: CONNECTOR_EDGE_TYPE,
       selected: options?.selectedEdgeId === edge.id,
       data: {
-        color: from ? EDGE_COLOR_BY_TYPE[from.type] : '#737785',
+        color: from ? EDGE_COLOR_BY_TYPE[from.type] : 'rgb(var(--muted))',
         dashed: to?.type === 'question',
       },
       reconnectable: true,

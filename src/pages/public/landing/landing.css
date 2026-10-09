@@ -5,28 +5,53 @@
  */
 
 .lp-page {
+  /* Hero ink wash, in the logo's cobalt and coral */
+  --lp-wash-a: #e9edf6;
+  --lp-wash-b: #dfe6f4;
+  --lp-wash-c: #e8e3ea;
+  --lp-wash-border: 223 227 238;
+  --lp-wash-line: 255 255 255;
+  --lp-wash-grid: 255 255 255;
+  --lp-blob-periwinkle: 177 197 255;
+  --lp-blob-light: 255 255 255;
+  --lp-grain-opacity: 0.32;
+  --lp-grid-line: rgb(var(--rule));
   --lp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --lp-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
   overflow-x: clip;
 }
 
+/* Dark: the wash turns to charcoal, faintly lit by the same two hues. */
+.dark .lp-page {
+  --lp-wash-a: #1b1c1f;
+  --lp-wash-b: #18191c;
+  --lp-wash-c: #1d1a1c;
+  --lp-wash-border: 46 46 48;
+  --lp-wash-line: 150 160 190;
+  --lp-wash-grid: 70 72 80;
+  --lp-blob-periwinkle: 48 58 92;
+  --lp-blob-light: 60 60 64;
+  --lp-grain-opacity: 0.5;
+  --lp-grid-line: rgb(var(--rule) / 0.55);
+}
+
 /* Drafting grids */
 .lp-grid {
   background-image:
-    linear-gradient(to right, #ebebeb 1px, transparent 1px),
-    linear-gradient(to bottom, #ebebeb 1px, transparent 1px);
+    linear-gradient(to right, var(--lp-grid-line, rgb(var(--rule))) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--lp-grid-line, rgb(var(--rule))) 1px, transparent 1px);
   background-size: 16px 16px;
 }
 
 .lp-grid-soft {
-  background-image: radial-gradient(#dcdde3 1px, transparent 1px);
+  background-image: radial-gradient(rgb(var(--dot)) 1px, transparent 1px);
   background-size: 14px 14px;
 }
 
 .lp-grid-hero {
   background-image:
-    linear-gradient(to right, rgba(27, 28, 28, 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(27, 28, 28, 0.06) 1px, transparent 1px);
+    linear-gradient(to right, rgb(var(--shadow) / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--shadow) / 0.06) 1px, transparent 1px);
   background-size: 32px 32px;
   -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 30%, transparent 80%);
   mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 30%, transparent 80%);
@@ -43,10 +68,10 @@
 
 /* The logo's coral-to-cobalt sweep, used for progress lines. */
 .lp-gradient-bar {
-  background: linear-gradient(90deg, #de5052, #0051c3);
+  background: linear-gradient(90deg, rgb(var(--brand-from)), rgb(var(--brand-to)));
 }
 .lp-gradient-bar-vertical {
-  background: linear-gradient(180deg, #de5052, #0051c3);
+  background: linear-gradient(180deg, rgb(var(--brand-from)), rgb(var(--brand-to)));
 }
 
 .lp-rail-pad {
@@ -132,8 +157,11 @@
 
 /* Hero stage: an ink wash in the logo's coral and cobalt, with paper grain. */
 .lp-wash {
-  background: linear-gradient(160deg, #e9edf6 0%, #dfe6f4 45%, #e8e3ea 100%);
+  background: linear-gradient(160deg, var(--lp-wash-a) 0%, var(--lp-wash-b) 45%, var(--lp-wash-c) 100%);
   isolation: isolate;
+}
+.dark .lp-wash-blob {
+  opacity: 0.5;
 }
 .lp-wash-blob {
   position: absolute;
@@ -156,13 +184,13 @@
 }
 .lp-grain {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.12 0 0 0 0 0.2 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity: 0.32;
+  opacity: var(--lp-grain-opacity);
   mix-blend-mode: multiply;
 }
 .lp-wash-grid {
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.5) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+    linear-gradient(to right, rgb(var(--lp-wash-grid) / 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--lp-wash-grid) / 0.5) 1px, transparent 1px);
   background-size: 40px 40px;
   -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 85%);
   mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 85%);
@@ -212,7 +240,7 @@
   height: 0.95em;
   margin-left: 1px;
   vertical-align: -0.1em;
-  background: #0051c3;
+  background: rgb(var(--topic));
 }
 
 .lp-caption {
@@ -240,18 +268,23 @@
 
 .lp-case {
   transition: box-shadow 400ms var(--lp-ease);
-  box-shadow: 0 10px 24px -18px rgba(17, 17, 18, 0.35);
+  box-shadow: 0 10px 24px -18px rgb(var(--shadow) / 0.35);
 }
 .lp-hanger {
   transform-origin: 0 0;
   will-change: transform;
 }
 .is-near .lp-case {
-  box-shadow: 0 30px 60px -30px rgba(17, 17, 18, 0.45);
+  box-shadow: 0 30px 60px -30px rgb(var(--shadow) / 0.45);
 }
 .lp-dark .lp-case {
   border-color: #2a2a2c;
   box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.7);
+}
+/* Dark theme: the stage is charcoal too, so the cards lift a step above it. */
+.dark .lp-dark .lp-case {
+  background-color: #232323;
+  border-color: #333333;
 }
 .lp-dark .is-near .lp-case {
   box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
@@ -325,8 +358,8 @@
   }
   .lp-stack-card + .lp-stack-card .lp-kind {
     box-shadow:
-      0 -1px 0 rgba(27, 28, 28, 0.03),
-      0 -18px 40px -22px rgba(27, 28, 28, 0.22);
+      0 -1px 0 rgb(var(--shadow) / 0.03),
+      0 -18px 40px -22px rgb(var(--shadow) / 0.22);
   }
 }
 .lp-kind-stage {
@@ -420,7 +453,7 @@ a:hover > .lp-logo .lp-logo-mouth,
 /* -------------------------------------------------------------------------- */
 
 .lp-foot-link {
-  background: linear-gradient(90deg, #de5052, #0051c3) no-repeat 0 100% / 0 1px;
+  background: linear-gradient(90deg, rgb(var(--brand-from)), rgb(var(--brand-to))) no-repeat 0 100% / 0 1px;
   transition: background-size 380ms var(--lp-ease);
 }
 .lp-foot-link:hover,
@@ -431,8 +464,8 @@ a:hover > .lp-logo .lp-logo-mouth,
   animation: lp-foot-pulse 2.4s ease-in-out infinite;
 }
 @keyframes lp-foot-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 122, 76, 0.35); }
-  50% { box-shadow: 0 0 0 4px rgba(45, 122, 76, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--finding) / 0.35); }
+  50% { box-shadow: 0 0 0 4px rgb(var(--finding) / 0); }
 }
 .lp-wordmark .lp-wordmark-link {
   transform: scaleX(0);

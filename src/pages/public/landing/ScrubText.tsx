@@ -39,7 +39,7 @@ export function ScrubText({ text, className = '' }: ScrubTextProps): JSX.Element
           <span
             key={i}
             data-word=""
-            className={accent ? 'italic text-[#0051c3]' : undefined}
+            className={accent ? 'italic text-topic' : undefined}
             style={{ opacity: reduced ? 1 : 0.14, transition: 'opacity 120ms linear' }}
           >
             {clean}

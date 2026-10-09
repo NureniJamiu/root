@@ -126,8 +126,8 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
       data-testid="hover-toolbar"
     >
       <div
-        className="flex flex-row items-center gap-1 rounded-[4px] bg-white p-[3px]"
-        style={{ border: '1px solid #e2e2e2', boxShadow: '0 4px 12px rgba(27, 28, 28, 0.10)' }}
+        className="flex flex-row items-center gap-1 rounded-[4px] bg-panel p-[3px]"
+        style={{ border: '1px solid rgb(var(--rule-2))', boxShadow: '0 4px 12px rgb(var(--shadow) / 0.10)' }}
       >
         <ToolbarButton label="Add connected idea" onClick={handleAddChild} testId="btn-add-child">
           <PlusIcon />
@@ -229,17 +229,17 @@ function ToolbarButton({
         // into a canvas drag.
         e.stopPropagation();
       }}
-      className={`inline-flex items-center justify-center rounded-[2px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#0051c3] cursor-pointer ${
+      className={`inline-flex items-center justify-center rounded-[2px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-topic cursor-pointer ${
         variant === 'destructive'
-          ? 'hover:bg-[#de5052] hover:text-[#ffffff] hover:border-[#de5052]'
-          : 'hover:bg-[#f5f3f3] hover:border-[#000000] hover:text-[#000000]'
+          ? 'hover:bg-question-fill hover:text-on-accent hover:border-question'
+          : 'hover:bg-sunken hover:border-ink-strong hover:text-ink-strong'
       }`}
       style={{
         width: testId === 'btn-reveal-menu' ? 14 : 22,
         height: 22,
-        border: '1px solid #ebebeb',
-        background: pressed ? '#f5f3f3' : '#ffffff',
-        color: pressed ? '#000000' : '#404040',
+        border: '1px solid rgb(var(--rule))',
+        background: pressed ? 'rgb(var(--sunken))' : 'rgb(var(--panel))',
+        color: pressed ? 'rgb(var(--ink-strong))' : 'rgb(var(--ink-read))',
         boxShadow: 'none',
         ...(joined === 'left' ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 } : {}),
         ...(joined === 'right' ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0, marginLeft: -1 } : {}),

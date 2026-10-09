@@ -1,0 +1,131 @@
+/*
+ * Colour tokens for light and dark themes.
+ *
+ * Each token is an RGB triplet so Tailwind's opacity modifiers work
+ * (`bg-panel/80`), and so inline styles and SVG can read it as
+ * `rgb(var(--token))` or `rgb(var(--token) / 0.5)`. The light values are the
+ * DESIGN.md palette; dark values keep the same roles on an ink ground.
+ * `.dark` on <html> (set by theme/theme.ts) switches the whole app.
+ */
+:root {
+  color-scheme: light;
+
+  /* Grounds and surfaces, from the page back to the most sunken well */
+  --paper: 251 249 248;        /* #fbf9f8 page ground */
+  --canvas: 249 249 251;       /* #f9f9fb canvas underlay */
+  --panel: 255 255 255;        /* #ffffff cards, rails, header */
+  --panel-2: 251 251 252;      /* #fbfbfc quiet panel */
+  --subtle: 246 245 244;       /* #f6f5f4 */
+  --sunken: 245 243 243;       /* #f5f3f3 hover, wells */
+  --sunken-2: 240 237 237;     /* #f0eded pressed, active */
+  --sunken-3: 228 226 225;     /* #e4e2e1 */
+
+  /* Ink */
+  --ink-strong: 0 0 0;         /* #000000 titles */
+  --ink: 27 28 28;             /* #1b1c1c */
+  --ink-read: 64 64 64;        /* #404040 body copy */
+  --ink-2: 67 70 83;           /* #434653 */
+  --ink-3: 89 89 89;           /* #595959 */
+  --muted: 115 119 133;        /* #737785 labels */
+  --faint: 154 157 168;        /* #9a9da8 hints */
+
+  /* Hairlines */
+  --rule: 235 235 235;         /* #ebebeb */
+  --rule-2: 226 226 226;       /* #e2e2e2 */
+  --rule-strong: 195 198 214;  /* #c3c6d6 */
+  --dot: 180 185 203;          /* canvas minor dots */
+  --dot-major: 146 153 179;    /* canvas major dots */
+
+  /* Idea types: lines, borders and text */
+  --topic: 0 81 195;           /* #0051c3 */
+  --topic-strong: 0 59 147;    /* #003b93 */
+  --topic-soft: 218 226 255;   /* #dae2ff */
+  --finding: 45 122 76;        /* #2d7a4c */
+  --question: 222 80 82;       /* #de5052 */
+  --conclusion: 82 16 16;      /* #521010 */
+
+  /* Idea types and actions as fills under white text */
+  --accent: 0 81 195;
+  --accent-strong: 0 59 147;
+  --accent-deep: 0 40 104;
+  --finding-fill: 45 122 76;
+  --question-fill: 222 80 82;
+  --conclusion-fill: 82 16 16;
+  --on-accent: 255 255 255;
+
+  /* Danger */
+  --danger: 186 26 26;         /* #ba1a1a text */
+  --danger-fill: 186 26 26;
+  --danger-strong: 147 0 10;   /* #93000a */
+  --danger-soft: 253 242 242;  /* #fdf2f2 */
+
+  /* Inverted chips and bars (ink in light, paper in dark) */
+  --inverse: 0 0 0;
+  --on-inverse: 255 255 255;
+  --inverse-accent: 177 197 255; /* #b1c5ff, a blue that reads on --inverse */
+
+  /* Landing page stages stay dark in both themes */
+  --stage: 17 17 18;           /* #111112 */
+  --shadow: 27 28 28;
+
+  /* Brand sweep: coral to cobalt */
+  --brand-from: 222 80 82;
+  --brand-to: 0 81 195;
+}
+
+.dark {
+  /* Neutral charcoal, never pure black: a #101010 ground with #1b1b1b panels. */
+  color-scheme: dark;
+
+  --paper: 16 16 16;
+  --canvas: 20 20 20;
+  --panel: 27 27 27;
+  --panel-2: 31 31 31;
+  --subtle: 33 33 33;
+  --sunken: 37 37 37;
+  --sunken-2: 44 44 44;
+  --sunken-3: 54 54 54;
+
+  --ink-strong: 245 245 245;
+  --ink: 236 236 236;
+  --ink-read: 207 207 207;
+  --ink-2: 198 198 198;
+  --ink-3: 170 170 170;
+  --muted: 145 145 145;
+  --faint: 112 112 112;
+
+  --rule: 42 42 42;
+  --rule-2: 52 52 52;
+  --rule-strong: 72 72 72;
+  --dot: 46 46 46;
+  --dot-major: 66 66 66;
+
+  --topic: 112 158 255;        /* #709eff */
+  --topic-strong: 156 189 255;
+  --topic-soft: 30 44 74;
+  --finding: 96 190 134;       /* #60be86 */
+  --question: 245 124 122;     /* #f57c7a */
+  --conclusion: 208 146 170;   /* #d092aa, oxblood lifted to a dusty wine */
+
+  --accent: 46 104 214;        /* #2e68d6 */
+  --accent-strong: 36 92 196;
+  --accent-deep: 28 74 166;
+  --finding-fill: 42 120 74;
+  --question-fill: 202 66 70;
+  --conclusion-fill: 128 40 56;
+
+  --danger: 255 132 124;
+  --danger-fill: 196 40 40;
+  --danger-strong: 222 62 62;
+  --danger-soft: 48 28 28;
+
+  --inverse: 236 236 236;
+  --on-inverse: 16 16 16;
+  --inverse-accent: 0 81 195;
+
+  --stage: 24 24 24;
+  --shadow: 0 0 0;
+
+  --brand-from: 232 96 98;
+  --brand-to: 64 124 236;
+}

@@ -33,13 +33,20 @@ export const easeOutBack = (t: number): number => {
   return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
 };
 
-/** Mixes two `#rrggbb` colours. */
-export function mixHex(a: string, b: string, t: number): string {
-  const pa = parseInt(a.slice(1), 16);
-  const pb = parseInt(b.slice(1), 16);
-  const ch = (shift: number): number =>
-    Math.round(lerp((pa >> shift) & 255, (pb >> shift) & 255, clamp01(t)));
-  return `#${((1 << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).slice(1)}`;
+/**
+ * Mixes two CSS colours, `t` of the way from `a` to `b`. Works with theme
+ * tokens (`rgb(var(--topic))`), so the mix follows light and dark.
+ */
+export function mixColor(a: string, b: string, t: number): string {
+  const pct = Math.round(clamp01(t) * 1000) / 10;
+  if (pct <= 0) return a;
+  if (pct >= 100) return b;
+  return `color-mix(in srgb, ${b} ${pct}%, ${a})`;
+}
+
+/** A CSS colour at `opacity` (0..1). */
+export function withAlpha(color: string, opacity: number): string {
+  return `color-mix(in srgb, ${color} ${Math.round(clamp01(opacity) * 1000) / 10}%, transparent)`;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -21,8 +21,8 @@ export function IconButton({
       title={label}
       className={`inline-flex items-center justify-center w-7 h-7 rounded-[2px] transition-colors duration-150 select-none cursor-pointer border ${
         active
-          ? 'bg-[#f0eded] text-[#000000] border-[#000000]'
-          : 'bg-[#ffffff] text-[#404040] hover:text-[#000000] border-[#ebebeb] hover:border-[#000000]'
+          ? 'bg-sunken-2 text-ink-strong border-ink-strong'
+          : 'bg-panel text-ink-read hover:text-ink-strong border-rule hover:border-ink-strong'
       } ${className}`}
       style={{
         boxShadow: 'none',

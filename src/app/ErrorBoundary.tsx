@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<
             justifyContent: 'center',
             height: '100vh',
             gap: 12,                       // space.6
-            color: '#191818',              // color.text.primary
+            color: 'rgb(var(--ink))',              // color.text.primary
           }}
         >
           <p style={{ margin: 0 }}>Something went wrong.</p>
@@ -48,9 +48,9 @@ export class ErrorBoundary extends Component<
             type="button"
             onClick={() => this.setState({ hasError: false, error: null })}
             style={{
-              border: '1px solid #312e2e',   // color.text.tertiary
-              background: '#ffffff',          // color.surface.raised
-              color: '#191818',               // color.text.primary
+              border: '1px solid rgb(var(--ink-2))',   // color.text.tertiary
+              background: 'rgb(var(--panel))',          // color.surface.raised
+              color: 'rgb(var(--ink))',               // color.text.primary
               padding: '4px 12px',
               cursor: 'pointer',
             }}

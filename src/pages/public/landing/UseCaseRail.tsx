@@ -108,7 +108,7 @@ function Sketch({ useCase }: { readonly useCase: UseCase }): JSX.Element {
       })}
       {useCase.dots.map(([x, y, type], i) => (
         <g key={i}>
-          <rect x={x - 14} y={y - 8} width={28} height={16} rx={2} fill="#ffffff" stroke={TYPE_COLOR[type]} strokeWidth={1.2} />
+          <rect x={x - 14} y={y - 8} width={28} height={16} rx={2} fill="rgb(var(--panel))" stroke={TYPE_COLOR[type]} strokeWidth={1.2} />
           <rect x={x - 14} y={y - 8} width={28} height={2.5} fill={TYPE_COLOR[type]} />
         </g>
       ))}
@@ -144,24 +144,24 @@ const w = (k: number): string => `calc(${CARD_W} * ${k})`;
 function CaseCard({ useCase, index }: { readonly useCase: UseCase; readonly index: number }): JSX.Element {
   return (
     <article
-      className="lp-case flex flex-col bg-[#ffffff] border border-[#1b1c1c] rounded-[4px] overflow-hidden"
+      className="lp-case flex flex-col bg-panel border border-ink rounded-[4px] overflow-hidden"
       style={{ width: CARD_W, height: w(CARD_H_RATIO) }}
     >
-      <div className="flex items-center justify-between px-4 h-9 shrink-0 border-b border-[#ebebeb] font-mono text-[9.5px] uppercase tracking-[0.1em] text-[#737785]">
+      <div className="flex items-center justify-between px-4 h-9 shrink-0 border-b border-rule font-mono text-[9.5px] uppercase tracking-[0.1em] text-muted">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: TYPE_COLOR[useCase.type] }} />
           Use case
         </span>
         <span className="tabular-nums">0{index + 1} / 0{CASES.length}</span>
       </div>
-      <div className="px-4 pt-3 pb-1 bg-[#f9f9fb] border-b border-[#ebebeb] lp-grid-soft shrink-0" style={{ height: '34%' }}>
+      <div className="px-4 pt-3 pb-1 bg-canvas border-b border-rule lp-grid-soft shrink-0" style={{ height: '34%' }}>
         <Sketch useCase={useCase} />
       </div>
       <div className="px-5 py-4 flex flex-col gap-2 min-h-0">
-        <h3 className="font-serif font-light text-[clamp(20px,2.9vh,26px)] leading-tight tracking-[-0.01em] text-[#1b1c1c]">
+        <h3 className="font-serif font-light text-[clamp(20px,2.9vh,26px)] leading-tight tracking-[-0.01em] text-ink">
           {useCase.title}
         </h3>
-        <p className="font-serif text-[clamp(13px,1.75vh,15px)] leading-[1.55] text-[#434653] line-clamp-4 [@media(max-height:780px)]:line-clamp-3">{useCase.body}</p>
+        <p className="font-serif text-[clamp(13px,1.75vh,15px)] leading-[1.55] text-ink-2 line-clamp-4 [@media(max-height:780px)]:line-clamp-3">{useCase.body}</p>
       </div>
     </article>
   );
@@ -188,7 +188,7 @@ function Hanger({ useCase, index }: { readonly useCase: UseCase; readonly index:
         aria-hidden="true"
       />
       <span
-        className="absolute w-2 h-2 -ml-1 -mt-1 rounded-full bg-[#ffffff]"
+        className="absolute w-2 h-2 -ml-1 -mt-1 rounded-full bg-panel"
         style={{ top: w(len), border: `1.5px solid ${color}`, zIndex: 3 }}
         aria-hidden="true"
       />
@@ -207,7 +207,7 @@ function Line({ bleed }: { readonly bleed: boolean }): JSX.Element {
   return (
     <div className="absolute inset-x-0 pointer-events-none" style={{ top: LINE_Y, zIndex: 1 }} aria-hidden="true">
       <div
-        className="absolute -top-[0.75px] h-[1.5px] bg-[#e4e2e1]/80"
+        className="absolute -top-[0.75px] h-[1.5px] bg-sunken-3/80"
         style={bleed ? { left: '-100vw', right: '-100vw' } : { left: 0, right: 0 }}
       />
       {CASES.map((c, i) => (
@@ -218,7 +218,7 @@ function Line({ bleed }: { readonly bleed: boolean }): JSX.Element {
             {
               left: w(0.62 + i * STEP),
               background: ON_DARK[c.type],
-              boxShadow: '0 0 0 3px #111112',
+              boxShadow: '0 0 0 3px rgb(var(--stage))',
             } as CSSProperties
           }
         />
@@ -235,15 +235,31 @@ function RailHeading(): JSX.Element {
   return (
     <div className="w-full max-w-6xl mx-auto px-6 md:px-8 mb-6 md:mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#8a8d99] mb-3">What people map</p>
-        <h2 className="font-serif font-light text-[34px] md:text-[clamp(36px,5.8vh,52px)] leading-[1.05] tracking-[-0.02em] text-[#ffffff] max-w-2xl">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint mb-3">What people map</p>
+        <h2 className="font-serif font-light text-[34px] md:text-[clamp(36px,5.8vh,52px)] leading-[1.05] tracking-[-0.02em] text-on-accent max-w-2xl">
           One canvas, <span className="italic text-[#b1c5ff]">whatever you are making.</span>
         </h2>
       </div>
-      <p className="font-mono text-[11px] uppercase tracking-[0.1em] text-[#8a8d99]">Keep scrolling →</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.1em] text-faint">Keep scrolling →</p>
     </div>
   );
 }
+
+/**
+ * A long, eased fade from the stage into the page below, so there is no
+ * seam. Stops are mixes of the two theme colours, so it holds in both themes.
+ */
+const STAGE_FADE = `linear-gradient(to bottom, ${[
+  [0, 0],
+  [14, 4],
+  [30, 14],
+  [50, 34],
+  [68, 62],
+  [84, 86],
+  [100, 100],
+]
+  .map(([at, mix]) => `color-mix(in srgb, rgb(var(--paper)) ${mix}%, rgb(var(--stage))) ${at}%`)
+  .join(', ')})`;
 
 /**
  * The section sits on a dark stage that enters with a rounded top edge over
@@ -252,8 +268,8 @@ function RailHeading(): JSX.Element {
 export function UseCaseRail(): JSX.Element {
   const reduced = usePrefersReducedMotion();
   return (
-    <div className="bg-[#ffffff]">
-      <div className="lp-dark relative bg-[#111112] rounded-t-[32px] md:rounded-t-[56px] overflow-clip">
+    <div className="bg-panel">
+      <div className="lp-dark relative bg-stage rounded-t-[32px] md:rounded-t-[56px] overflow-clip">
         <div className="absolute inset-0 lp-grid-dark pointer-events-none" aria-hidden="true" />
         {reduced ? <RailStill /> : <RailPinned />}
       </div>
@@ -261,7 +277,7 @@ export function UseCaseRail(): JSX.Element {
         className="h-[40vh]"
         style={{
           background:
-            'linear-gradient(to bottom, #111112 0%, #18181a 14%, #2e2e31 30%, #626164 50%, #a9a8a9 68%, #dedddc 84%, #fbf9f8 100%)',
+            STAGE_FADE,
         }}
         aria-hidden="true"
       />
@@ -281,7 +297,7 @@ function Glow(): JSX.Element {
         className="absolute left-1/2 bottom-[-35%] w-[110%] h-[75%] -translate-x-1/2"
         style={{
           background:
-            'radial-gradient(ellipse 45% 55% at 40% 60%, rgba(0, 81, 195, 0.42), transparent 70%), radial-gradient(ellipse 35% 45% at 64% 62%, rgba(222, 80, 82, 0.26), transparent 70%)',
+            'radial-gradient(ellipse 45% 55% at 40% 60%, rgb(var(--topic) / 0.42), transparent 70%), radial-gradient(ellipse 35% 45% at 64% 62%, rgb(var(--question) / 0.26), transparent 70%)',
           filter: 'blur(20px)',
         }}
       />

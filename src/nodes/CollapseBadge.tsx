@@ -26,11 +26,11 @@ export function CollapseBadge({ nodeId }: CollapseBadgeProps): JSX.Element {
         e.stopPropagation();
         canvasActions.setCollapsed(nodeId, false);
       }}
-      className="inline-flex items-center gap-1 font-mono text-[9px] font-medium leading-[12px] px-1.5 py-0.5 rounded-[2px] select-none hover:bg-[#eae8e7] hover:border-[#1b1c1c] transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1 font-mono text-[9px] font-medium leading-[12px] px-1.5 py-0.5 rounded-[2px] select-none hover:bg-sunken-2 hover:border-ink transition-colors cursor-pointer"
       style={{
-        border: '1px solid #c3c6d6',
-        background: '#f5f3f3',
-        color: '#1b1c1c',
+        border: '1px solid rgb(var(--rule-strong))',
+        background: 'rgb(var(--sunken))',
+        color: 'rgb(var(--ink))',
         boxShadow: 'none',
       }}
       title="Click to expand"

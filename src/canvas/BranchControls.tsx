@@ -64,7 +64,7 @@ export function BranchToolbarGroup({ selectedIds }: BranchToolbarGroupProps): JS
 
   return (
     <div className="flex items-center gap-0.5" role="group" aria-label="Show and hide branches">
-      <div className="flex items-center gap-0.5 bg-[#f5f3f3] rounded-[2px] p-0.5" role="group" aria-label="Apply to">
+      <div className="flex items-center gap-0.5 bg-sunken rounded-[2px] p-0.5" role="group" aria-label="Apply to">
         <ScopeButton
           label="All"
           title="Collapse and expand act on every idea"
@@ -187,19 +187,19 @@ export function WalkthroughBar({ onRevealed }: WalkthroughBarProps): JSX.Element
 
   return (
     <div
-      className="root-walkthrough-bar absolute bottom-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-[#000000] text-[#ffffff] rounded-[3px] pl-3 pr-1 py-1"
+      className="root-walkthrough-bar absolute bottom-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-inverse text-on-inverse rounded-[3px] pl-3 pr-1 py-1"
       role="toolbar"
       aria-label="Walkthrough"
       data-testid="walkthrough-bar"
     >
       <span className="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.04em] whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#de5052] animate-pulse" aria-hidden="true" />
-        <span className="uppercase text-[#ffffff]/70">Walkthrough</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-question-fill animate-pulse" aria-hidden="true" />
+        <span className="uppercase text-on-inverse/70">Walkthrough</span>
         <span className="tabular-nums" data-testid="walkthrough-progress">
           {finished ? 'All shown' : `${done} / ${total}`}
         </span>
       </span>
-      <span className="w-px h-4 bg-[#ffffff]/20" aria-hidden="true" />
+      <span className="w-px h-4 bg-on-inverse/20" aria-hidden="true" />
       <BarButton label="Back (←)" onClick={() => walkthroughActions.back()} disabled={revealed.length === 0} testId="btn-walkthrough-back">
         ← Back
       </BarButton>
@@ -253,8 +253,8 @@ function ScopeButton({
       title={title}
       className={`h-6 px-2 inline-flex items-center rounded-[2px] border font-mono text-[10px] whitespace-nowrap transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
         isActive
-          ? 'bg-[#ffffff] text-[#000000] border-[#ebebeb]'
-          : 'border-transparent text-[#737785] enabled:hover:text-[#000000]'
+          ? 'bg-panel text-ink-strong border-rule'
+          : 'border-transparent text-muted enabled:hover:text-ink-strong'
       }`}
       data-testid={testId}
     >
@@ -286,7 +286,7 @@ function BranchButton({
       aria-label={label}
       title={label}
       className={`w-7 h-7 inline-flex items-center justify-center rounded-[2px] transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35 ${
-        isActive ? 'text-[#de5052] bg-[#fdf2f2]' : 'text-[#404040] enabled:hover:text-[#000000] enabled:hover:bg-[#f5f3f3]'
+        isActive ? 'text-question bg-danger-soft' : 'text-ink-read enabled:hover:text-ink-strong enabled:hover:bg-sunken'
       }`}
       data-testid={testId}
     >
@@ -318,8 +318,8 @@ function BarButton({
       title={label}
       className={`h-7 px-2.5 inline-flex items-center rounded-[2px] font-mono text-[10.5px] whitespace-nowrap transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-35 ${
         primary
-          ? 'bg-[#ffffff] text-[#000000] enabled:hover:bg-[#dae2ff]'
-          : 'text-[#ffffff]/85 enabled:hover:bg-[#ffffff]/15 enabled:hover:text-[#ffffff]'
+          ? 'bg-on-inverse text-inverse enabled:hover:bg-accent enabled:hover:text-on-accent'
+          : 'text-on-inverse/85 enabled:hover:bg-on-inverse/15 enabled:hover:text-on-inverse'
       }`}
       data-testid={testId}
     >

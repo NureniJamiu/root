@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter } from '../../routing';
 import { RootLogo } from '../../layout';
+import { ThemeToggle } from '../../ui';
 
 interface AuthLayoutProps {
   readonly title: string;
@@ -12,15 +13,16 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps): JSX.
   const { navigate } = useRouter();
 
   return (
-    <div className="min-h-screen bg-[#fbf9f8] flex flex-col justify-center items-center p-6 text-[#1b1c1c]">
+    <div className="min-h-screen bg-paper flex flex-col justify-center items-center p-6 text-ink">
+      <ThemeToggle className="fixed top-4 right-4" />
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8 cursor-pointer" onClick={() => navigate('/')}>
           <RootLogo className="h-9 w-auto mb-3" />
-          <h1 className="text-xl font-serif font-medium text-[#1b1c1c] tracking-tight">{title}</h1>
-          {subtitle && <p className="text-xs text-[#737785] font-sans mt-1">{subtitle}</p>}
+          <h1 className="text-xl font-serif font-medium text-ink tracking-tight">{title}</h1>
+          {subtitle && <p className="text-xs text-muted font-sans mt-1">{subtitle}</p>}
         </div>
 
-        <div className="bg-[#ffffff] border border-[#ebebeb] rounded-sm p-6">
+        <div className="bg-panel border border-rule rounded-sm p-6">
           {children}
         </div>
 
@@ -28,7 +30,7 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps): JSX.
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="text-xs font-mono text-[#737785] hover:text-[#000000] transition-colors"
+            className="text-xs font-mono text-muted hover:text-ink-strong transition-colors"
           >
             ← Back to Root home
           </button>

@@ -5,3 +5,4 @@ export * from './Card';
 export * from './Kbd';
 export * from './Divider';
 export * from './IconButton';
+export * from './ThemeToggle';

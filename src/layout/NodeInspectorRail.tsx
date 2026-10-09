@@ -25,32 +25,32 @@ const SAVE_LABELS: Record<SaveStatus, string> = {
 function SaveIndicator({ status }: { readonly status: SaveStatus }): JSX.Element {
   return (
     <div
-      className="flex items-center gap-1.5 font-mono text-[9px] text-[#737785]"
+      className="flex items-center gap-1.5 font-mono text-[9px] text-muted"
       role="status"
       data-testid="save-status"
       data-status={status}
     >
       <span
         className={`w-1.5 h-1.5 rounded-full ${
-          status === 'error' ? 'bg-[#ba1a1a]' : status === 'saving' ? 'bg-[#737785]' : 'bg-[#0051c3]'
+          status === 'error' ? 'bg-danger-fill' : status === 'saving' ? 'bg-muted' : 'bg-accent'
         }`}
       />
-      <span className={status === 'error' ? 'text-[#ba1a1a]' : undefined}>{SAVE_LABELS[status]}</span>
+      <span className={status === 'error' ? 'text-danger' : undefined}>{SAVE_LABELS[status]}</span>
     </div>
   );
 }
 
 const TYPE_LABELS: Record<NodeType, { readonly label: string; readonly color: string }> = {
-  topic: { label: 'Topic', color: '#0051c3' },
-  finding: { label: 'Finding', color: '#2d7a4c' },
-  question: { label: 'Question', color: '#de5052' },
-  conclusion: { label: 'Conclusion', color: '#521010' },
+  topic: { label: 'Topic', color: 'rgb(var(--topic))' },
+  finding: { label: 'Finding', color: 'rgb(var(--finding))' },
+  question: { label: 'Question', color: 'rgb(var(--question))' },
+  conclusion: { label: 'Conclusion', color: 'rgb(var(--conclusion))' },
 };
 
 /** Small uppercase heading over a section of the read-only view. */
 function SectionLabel({ children }: { readonly children: string }): JSX.Element {
   return (
-    <h3 className="m-0 font-mono text-[9.5px] font-medium uppercase tracking-[0.08em] text-[#9a9da8]">{children}</h3>
+    <h3 className="m-0 font-mono text-[9.5px] font-medium uppercase tracking-[0.08em] text-faint">{children}</h3>
   );
 }
 
@@ -79,10 +79,10 @@ function ConnectorPanel({
   ) => (
     <div className="flex items-center justify-between gap-2">
       <div className="flex flex-col min-w-0">
-        <span className="text-[#737785] text-[8.5px] uppercase">
+        <span className="text-muted text-[8.5px] uppercase">
           {label} · {pinned ? 'pinned' : 'auto'}
         </span>
-        <span className="font-semibold text-[#1b1c1c] truncate" title={node ? nameOf(node) : undefined}>
+        <span className="font-semibold text-ink truncate" title={node ? nameOf(node) : undefined}>
           {node ? `${labelOf(node)} ${nameOf(node)}` : 'missing'}
         </span>
       </div>
@@ -99,7 +99,7 @@ function ConnectorPanel({
             [key === 'sourceSide' ? 'sourcePinned' : 'targetPinned']: true,
           })
         }
-        className="font-mono text-[9px] bg-white border border-[#ebebeb] rounded-[2px] px-1 py-0.5 text-[#1b1c1c] focus:outline-none focus:border-[#0051c3] cursor-pointer"
+        className="font-mono text-[9px] bg-panel border border-rule rounded-[2px] px-1 py-0.5 text-ink focus:outline-none focus:border-topic cursor-pointer"
         aria-label={`${label} side`}
         data-testid={`connector-${key}`}
       >
@@ -113,11 +113,11 @@ function ConnectorPanel({
   );
   return (
     <div className="flex flex-col gap-3" data-testid="connector-panel">
-      <div className="border border-[#ebebeb] bg-[#fbf9f8] rounded-[2px] p-2.5 flex flex-col gap-2.5 font-mono text-[9.5px]">
+      <div className="border border-rule bg-paper rounded-[2px] p-2.5 flex flex-col gap-2.5 font-mono text-[9.5px]">
         {row('From', from, edge.sourceSide, 'sourceSide', edge.sourcePinned)}
         {row('To', to, edge.targetSide, 'targetSide', edge.targetPinned)}
       </div>
-      <p className="font-serif text-[12px] leading-[18px] text-[#595959] m-0">
+      <p className="font-serif text-[12px] leading-[18px] text-ink-3 m-0">
         With the connector selected, drag either end to attach it to another card or side. A side you pick stays pinned when the card moves; double-click the connector, or use Auto-route, to let it follow the facing sides again.
       </p>
       <Button
@@ -179,13 +179,13 @@ export function NodeInspectorRail({
 
   return (
     <aside
-      className="w-[360px] min-w-[360px] max-w-[360px] h-full bg-[#ffffff] border-l border-[#ebebeb] flex flex-col justify-between shrink-0 select-none z-20 overflow-hidden box-border"
+      className="w-[360px] min-w-[360px] max-w-[360px] h-full bg-panel border-l border-rule flex flex-col justify-between shrink-0 select-none z-20 overflow-hidden box-border"
       style={{ boxShadow: 'none' }}
       data-testid="node-inspector-rail"
     >
       {/* Header: name of the pane, edit and close */}
-      <div className="h-11 px-4 border-b border-[#ebebeb] flex items-center justify-between bg-[#ffffff] shrink-0">
-        <span className="font-mono text-[11px] font-medium tracking-[0.04em] uppercase text-[#1b1c1c] whitespace-nowrap">
+      <div className="h-11 px-4 border-b border-rule flex items-center justify-between bg-panel shrink-0">
+        <span className="font-mono text-[11px] font-medium tracking-[0.04em] uppercase text-ink whitespace-nowrap">
           Node Inspector
         </span>
 
@@ -194,7 +194,7 @@ export function NodeInspectorRail({
             <button
               type="button"
               onClick={() => onOpenEditor(selectedNode.id)}
-              className="h-7 pl-2 pr-2.5 inline-flex items-center gap-1.5 rounded-[4px] border border-[#e2e2e2] bg-white font-mono text-[10px] text-[#1b1c1c] hover:border-[#1b1c1c] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
+              className="h-7 pl-2 pr-2.5 inline-flex items-center gap-1.5 rounded-[4px] border border-rule-2 bg-panel font-mono text-[10px] text-ink hover:border-ink hover:bg-sunken transition-colors cursor-pointer"
               title="Edit this idea"
               aria-label="Edit this idea"
               data-testid="btn-inspector-edit"
@@ -209,7 +209,7 @@ export function NodeInspectorRail({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-[2px] text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
+              className="p-1 rounded-[2px] text-muted hover:text-ink-strong hover:bg-sunken transition-colors cursor-pointer"
               title="Collapse Inspector (Slide right)"
               aria-label="Collapse Inspector"
               data-testid="btn-close-inspector"
@@ -240,7 +240,7 @@ export function NodeInspectorRail({
               </span>
               <h2
                 className={`m-0 font-serif text-[26px] font-medium leading-[1.2] break-words ${
-                  selectedNode.title ? 'text-[#000000]' : 'text-[#9a9da8] italic'
+                  selectedNode.title ? 'text-ink-strong' : 'text-faint italic'
                 }`}
                 data-testid="inspector-title"
               >
@@ -253,13 +253,13 @@ export function NodeInspectorRail({
               <SectionLabel>Notes</SectionLabel>
               {selectedNode.body.trim() ? (
                 <p
-                  className="m-0 font-serif text-[14px] leading-[22px] text-[#2b2c2c] whitespace-pre-wrap break-words"
+                  className="m-0 font-serif text-[14px] leading-[22px] text-ink whitespace-pre-wrap break-words"
                   data-testid="inspector-notes"
                 >
                   {selectedNode.body}
                 </p>
               ) : (
-                <p className="m-0 font-serif text-[13px] italic text-[#9a9da8]" data-testid="inspector-notes">
+                <p className="m-0 font-serif text-[13px] italic text-faint" data-testid="inspector-notes">
                   No notes yet.
                 </p>
               )}
@@ -279,7 +279,7 @@ export function NodeInspectorRail({
         ) : (
           /* Empty Selection State */
           <div className="flex flex-col items-center text-center pt-8 pb-4">
-            <div className="w-12 h-12 rounded-[2px] bg-[#f5f3f3] border border-[#ebebeb] flex items-center justify-center text-[#737785] mb-3">
+            <div className="w-12 h-12 rounded-[2px] bg-sunken border border-rule flex items-center justify-center text-muted mb-3">
               <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <rect x="3" y="3" width="7" height="7" rx="1" />
                 <rect x="14" y="14" width="7" height="7" rx="1" />
@@ -287,10 +287,10 @@ export function NodeInspectorRail({
               </svg>
             </div>
 
-            <h3 className="font-serif text-[18px] font-normal text-[#000000] m-0 mb-1.5">
+            <h3 className="font-serif text-[18px] font-normal text-ink-strong m-0 mb-1.5">
               No Idea Selected
             </h3>
-            <p className="font-serif text-[13px] leading-[20px] text-[#595959] m-0 mb-6 max-w-[280px]">
+            <p className="font-serif text-[13px] leading-[20px] text-ink-3 m-0 mb-6 max-w-[280px]">
               {canvas.nodes.length === 0
                 ? 'Double-click empty canvas, or use Add Idea, to start.'
                 : 'Click any idea card on the canvas to read it here.'}
@@ -300,15 +300,15 @@ export function NodeInspectorRail({
       </div>
 
       {/* Footer: drag position while moving the idea, otherwise the save state */}
-      <div className="border-t border-[#ebebeb] bg-[#ffffff] px-4 py-3 flex flex-col gap-3 shrink-0 select-none">
+      <div className="border-t border-rule bg-panel px-4 py-3 flex flex-col gap-3 shrink-0 select-none">
         {isSelectedDragging && dragInfo ? (
-          <div className="flex items-center justify-between font-mono text-[9px] text-[#595959]">
+          <div className="flex items-center justify-between font-mono text-[9px] text-ink-3">
             <span>
-              POSITION: <strong className="text-[#0051c3]">X: {dragInfo.currentX} Y: {dragInfo.currentY}</strong>
+              POSITION: <strong className="text-topic">X: {dragInfo.currentX} Y: {dragInfo.currentY}</strong>
             </span>
             <span>
               DELTA:{' '}
-              <strong className="text-[#0051c3]">
+              <strong className="text-topic">
                 {dragInfo.dx >= 0 ? `+${dragInfo.dx}` : dragInfo.dx} / {dragInfo.dy >= 0 ? `+${dragInfo.dy}` : dragInfo.dy}
               </strong>
             </span>

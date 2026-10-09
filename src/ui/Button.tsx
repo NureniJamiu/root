@@ -28,27 +28,27 @@ export function Button({
 
   const variantStyles: Record<ButtonVariant, { base: string; inline: React.CSSProperties }> = {
     primary: {
-      base: 'bg-[#000000] text-[#ffffff] hover:bg-[#0051c3] active:bg-[#003b93] border border-[#000000] hover:border-[#0051c3]',
+      base: 'bg-inverse text-on-inverse hover:bg-accent hover:text-on-accent active:bg-accent-strong border border-inverse hover:border-accent',
       inline: {},
     },
     cobalt: {
-      base: 'bg-[#0051c3] text-[#ffffff] hover:bg-[#003b93] active:bg-[#002868] border border-[#0051c3]',
+      base: 'bg-accent text-on-accent hover:bg-accent-strong active:bg-accent-deep border border-accent',
       inline: {},
     },
     secondary: {
-      base: 'bg-[#ffffff] text-[#404040] hover:text-[#000000] border border-[#ebebeb] hover:border-[#000000] active:bg-[#f5f3f3]',
+      base: 'bg-panel text-ink-read hover:text-ink-strong border border-rule hover:border-ink-strong active:bg-sunken',
       inline: {},
     },
     ghost: {
-      base: 'bg-transparent text-[#404040] hover:text-[#000000] hover:bg-[#f5f3f3] border border-transparent',
+      base: 'bg-transparent text-ink-read hover:text-ink-strong hover:bg-sunken border border-transparent',
       inline: {},
     },
     destructive: {
-      base: 'bg-transparent text-[#de5052] border border-[#de5052] hover:bg-[#de5052] hover:text-[#ffffff]',
+      base: 'bg-transparent text-question border border-question hover:bg-question-fill hover:text-on-accent',
       inline: {},
     },
     outline: {
-      base: 'bg-[#ffffff] text-[#1b1c1c] border border-[#c3c6d6] hover:border-[#000000] active:bg-[#f5f3f3]',
+      base: 'bg-panel text-ink border border-rule-strong hover:border-ink-strong active:bg-sunken',
       inline: {},
     },
   };

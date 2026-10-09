@@ -18,9 +18,9 @@ export function AuthGuard({ children }: AuthGuardProps): JSX.Element {
 
   if (isLoading) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#fbf9f8] text-[#1b1c1c] font-sans">
-        <div className="w-6 h-6 border-2 border-[#1357c9] border-t-transparent rounded-full animate-spin mb-3" />
-        <span className="font-mono text-xs tracking-wider text-[#737785] uppercase">
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-paper text-ink font-sans">
+        <div className="w-6 h-6 border-2 border-topic border-t-transparent rounded-full animate-spin mb-3" />
+        <span className="font-mono text-xs tracking-wider text-muted uppercase">
           Verifying session...
         </span>
       </div>
@@ -29,8 +29,8 @@ export function AuthGuard({ children }: AuthGuardProps): JSX.Element {
 
   if (!isAuthenticated) {
     return (
-      <div className="w-screen h-screen flex flex-col items-center justify-center bg-[#fbf9f8] text-[#1b1c1c] font-sans">
-        <span className="font-mono text-xs tracking-wider text-[#737785] uppercase">
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-paper text-ink font-sans">
+        <span className="font-mono text-xs tracking-wider text-muted uppercase">
           Redirecting to sign in...
         </span>
       </div>

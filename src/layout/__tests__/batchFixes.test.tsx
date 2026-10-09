@@ -52,7 +52,7 @@ describe('Batch Fixes Verification', () => {
     const newProjectBtn = screen.getByTestId('btn-new-project');
     expect(newProjectBtn).toBeInTheDocument();
     // Verify blue background styling
-    expect(newProjectBtn.className).toContain('bg-[#0051c3]');
+    expect(newProjectBtn.className).toContain('bg-accent');
 
     fireEvent.click(newProjectBtn);
     expect(handleNewProject).toHaveBeenCalledTimes(1);

@@ -10,7 +10,7 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { useRouter } from '../../../routing';
 
-import { canObserve, clamp01, easeOutCubic, useInView } from './motion';
+import { canObserve, clamp01, easeOutCubic, useInView, withAlpha } from './motion';
 import { Reveal } from './Reveal';
 import { TYPE_COLOR } from './SceneCanvas';
 import type { IdeaType } from './SceneCanvas';
@@ -129,25 +129,25 @@ export function IdeaTypes(): JSX.Element {
   };
 
   return (
-    <section id="idea-types" className="bg-[#ffffff] scroll-mt-16">
+    <section id="idea-types" className="bg-panel scroll-mt-16">
       <div className="max-w-6xl mx-auto px-6 md:px-8 pt-24 md:pt-32 pb-24 md:pb-32 grid lg:grid-cols-[180px_minmax(0,1fr)] gap-x-14">
         <div className="hidden lg:block" />
         <div className="mb-14 md:mb-20 max-w-3xl">
-          <Reveal as="p" variant="fade" className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#737785] mb-6">
+          <Reveal as="p" variant="fade" className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted mb-6">
             Idea types
           </Reveal>
           <Reveal
             as="h2"
             variant="mask"
-            className="font-serif font-light text-[38px] md:text-[56px] leading-[1.04] tracking-[-0.025em] text-[#1b1c1c] mb-8"
+            className="font-serif font-light text-[38px] md:text-[56px] leading-[1.04] tracking-[-0.025em] text-ink mb-8"
           >
-            Four kinds of idea. <span className="block italic text-[#9a9da8]">Each one does its own job.</span>
+            Four kinds of idea. <span className="block italic text-faint">Each one does its own job.</span>
           </Reveal>
           <Reveal delay={160}>
             <button
               type="button"
               onClick={() => navigate('/dashboard')}
-              className="group inline-flex items-center gap-2 h-9 px-4 bg-[#f4f3f2] border border-[#ebebeb] rounded-[2px] font-mono text-[11px] uppercase tracking-[0.1em] text-[#1b1c1c] hover:border-[#1b1c1c] transition-colors"
+              className="group inline-flex items-center gap-2 h-9 px-4 bg-subtle border border-rule rounded-[2px] font-mono text-[11px] uppercase tracking-[0.1em] text-ink hover:border-ink transition-colors"
             >
               Try them on a canvas
               <span className="transition-transform group-hover:translate-x-0.5" aria-hidden="true">
@@ -161,7 +161,7 @@ export function IdeaTypes(): JSX.Element {
         <nav className="hidden lg:block" aria-label="Idea types">
           <div className="sticky top-32">
             <div className="relative pl-5">
-              <span className="absolute left-0 top-1 bottom-1 w-px bg-[#ebebeb]" />
+              <span className="absolute left-0 top-1 bottom-1 w-px bg-rule" />
               <span
                 className="absolute left-0 top-1 w-px lp-gradient-bar-vertical transition-[height] duration-500"
                 style={{ height: `${((active + 1) / KINDS.length) * 100}%` }}
@@ -173,7 +173,7 @@ export function IdeaTypes(): JSX.Element {
                       type="button"
                       onClick={() => jump(i)}
                       className={`relative flex items-center gap-2.5 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors ${
-                        i === active ? 'text-[#1b1c1c]' : 'text-[#9a9da8] hover:text-[#434653]'
+                        i === active ? 'text-ink' : 'text-faint hover:text-ink-2'
                       }`}
                     >
                       <span
@@ -245,13 +245,13 @@ function KindPanel({
       }}
       data-index={index}
       data-in={inView ? 'true' : 'false'}
-      className="lp-kind relative bg-[#f6f5f4] border border-r-0 border-[#ebebeb] rounded-l-[4px] px-6 md:px-10 pt-8 md:pt-10 pb-8 overflow-hidden"
+      className="lp-kind relative bg-subtle border border-r-0 border-rule rounded-l-[4px] px-6 md:px-10 pt-8 md:pt-10 pb-8 overflow-hidden"
     >
       <div className="max-w-[820px]">
         <div className="flex items-center gap-3 mb-8 md:mb-10">
           <KindIcon type={kind.type} />
-          <h3 className="font-serif font-light text-[26px] md:text-[30px] leading-none text-[#1b1c1c]">{kind.name}</h3>
-          <span className="ml-auto font-mono text-[10px] tabular-nums text-[#9a9da8]">
+          <h3 className="font-serif font-light text-[26px] md:text-[30px] leading-none text-ink">{kind.name}</h3>
+          <span className="ml-auto font-mono text-[10px] tabular-nums text-faint">
             0{index + 1} / 0{KINDS.length}
           </span>
         </div>
@@ -261,16 +261,16 @@ function KindPanel({
         </div>
 
         <div className="mt-8 md:mt-10 flex items-end justify-between gap-6">
-          <p className="font-serif text-[16px] md:text-[17px] leading-[1.6] text-[#737785] max-w-[520px]">
-            <span className="text-[#1b1c1c]">{kind.lead}</span> {kind.body}
+          <p className="font-serif text-[16px] md:text-[17px] leading-[1.6] text-muted max-w-[520px]">
+            <span className="text-ink">{kind.lead}</span> {kind.body}
           </p>
           <button
             type="button"
             onClick={onOpen}
             aria-label={`Try ${kind.name.toLowerCase()} cards on a canvas`}
-            className="shrink-0 w-9 h-9 rounded-full border border-[#dcdcdc] bg-[#ffffff] flex items-center justify-center text-[#434653] hover:text-[#ffffff] transition-colors"
+            className="shrink-0 w-9 h-9 rounded-full border border-rule-2 bg-panel flex items-center justify-center text-ink-2 hover:text-on-accent transition-colors"
             onMouseEnter={(e) => (e.currentTarget.style.background = color)}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgb(var(--panel))')}
           >
             <span aria-hidden="true">↗</span>
           </button>
@@ -302,7 +302,7 @@ function KindIcon({ type }: { readonly type: IdeaType }): JSX.Element {
           <rect x="4" y="3" width="13" height="17" rx="1.5" />
           <path d="M 7.5 8 h 6 M 7.5 11.5 h 6" />
           <circle cx="17" cy="17" r="4.5" fill={c} stroke="none" />
-          <path d="M 15 17 l 1.5 1.5 l 2.7 -3" stroke="#ffffff" />
+          <path d="M 15 17 l 1.5 1.5 l 2.7 -3" stroke="rgb(var(--panel))" />
         </g>
       )}
       {type === 'question' && (
@@ -333,9 +333,9 @@ function Window({
   readonly children: ReactNode;
 }): JSX.Element {
   return (
-    <div className="lp-kind-window bg-[#ffffff] border border-[#ebebeb] rounded-[4px] overflow-hidden shadow-[0_18px_40px_-28px_rgba(17,17,18,0.35)]">
-      <div className="flex items-center justify-between h-9 px-3.5 border-b border-[#ebebeb]">
-        <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-[#737785] truncate">{title}</span>
+    <div className="lp-kind-window bg-panel border border-rule rounded-[4px] overflow-hidden shadow-[0_18px_40px_-28px_rgb(var(--ink) / 0.35)]">
+      <div className="flex items-center justify-between h-9 px-3.5 border-b border-rule">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-muted truncate">{title}</span>
         {action}
       </div>
       {children}
@@ -359,7 +359,7 @@ function MiniCard({
   const c = TYPE_COLOR[type];
   return (
     <div
-      className={`bg-[#ffffff] rounded-[2px] overflow-hidden ${className}`}
+      className={`bg-panel rounded-[2px] overflow-hidden ${className}`}
       style={{
         border: `1px ${type === 'question' ? 'dashed' : 'solid'} ${c}`,
         ...style,
@@ -367,20 +367,20 @@ function MiniCard({
     >
       <div style={{ height: 3, background: c }} />
       <div className="px-2.5 py-1.5">
-        <p className={`font-serif text-[12.5px] leading-tight text-[#1b1c1c] truncate ${type === 'conclusion' ? 'italic' : ''}`}>
+        <p className={`font-serif text-[12.5px] leading-tight text-ink truncate ${type === 'conclusion' ? 'italic' : ''}`}>
           {title}
         </p>
-        {meta && <p className="font-mono text-[8.5px] text-[#9a9da8] mt-0.5 truncate">{meta}</p>}
+        {meta && <p className="font-mono text-[8.5px] text-faint mt-0.5 truncate">{meta}</p>}
       </div>
     </div>
   );
 }
 
-function Chip({ children, tone = '#737785' }: { readonly children: ReactNode; readonly tone?: string }): JSX.Element {
+function Chip({ children, tone = 'rgb(var(--muted))' }: { readonly children: ReactNode; readonly tone?: string }): JSX.Element {
   return (
     <span
       className="inline-flex items-center h-5 px-1.5 rounded-[2px] border font-mono text-[8.5px] uppercase tracking-[0.08em]"
-      style={{ color: tone, borderColor: `${tone}55` }}
+      style={{ color: tone, borderColor: withAlpha(tone, 0.33) }}
     >
       {children}
     </span>
@@ -405,7 +405,7 @@ function TopicScene(): JSX.Element {
   ];
   return (
     <Window title="Canvas · Novel draft" action={<Chip>Reveal one by one</Chip>}>
-      <div className="relative h-[220px] lp-grid-soft bg-[#fbfbfc]">
+      <div className="relative h-[220px] lp-grid-soft bg-panel-2">
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 560 220" preserveAspectRatio="none" aria-hidden="true">
           {kids.map((k, i) => (
             <path
@@ -427,8 +427,8 @@ function TopicScene(): JSX.Element {
             <MiniCard type={i === 2 ? 'question' : 'topic'} title={k.title} meta={k.meta} />
             {k.folded && (
               <>
-                <span className="absolute -bottom-1 left-1 right-1 h-1 border-x border-b border-[#0051c3]/40 rounded-b-[2px] bg-[#ffffff]" />
-                <span className="absolute -right-2.5 top-1/2 -translate-y-1/2 h-5 min-w-5 px-1 rounded-full bg-[#0051c3] text-[#ffffff] font-mono text-[9px] flex items-center justify-center">
+                <span className="absolute -bottom-1 left-1 right-1 h-1 border-x border-b border-topic/40 rounded-b-[2px] bg-panel" />
+                <span className="absolute -right-2.5 top-1/2 -translate-y-1/2 h-5 min-w-5 px-1 rounded-full bg-accent text-on-accent font-mono text-[9px] flex items-center justify-center">
                   +6
                 </span>
               </>
@@ -443,12 +443,12 @@ function TopicScene(): JSX.Element {
 /** A study finding with its evidence gathered inside it. */
 function FindingScene(): JSX.Element {
   return (
-    <Window title="Idea · F-04" action={<span className="font-mono text-[9px] text-[#2d7a4c]">● Saved</span>}>
+    <Window title="Idea · F-04" action={<span className="font-mono text-[9px] text-finding">● Saved</span>}>
       <div className="px-4 pt-4 pb-7">
-        <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-[#2d7a4c] mb-1.5">Finding</p>
-        <p className="font-serif text-[18px] leading-tight text-[#1b1c1c] mb-3">Sleep locks in what you learned</p>
+        <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-finding mb-1.5">Finding</p>
+        <p className="font-serif text-[18px] leading-tight text-ink mb-3">Sleep locks in what you learned</p>
         <p
-          className="lp-pop font-serif text-[12.5px] leading-[1.5] text-[#434653] bg-[#fbf9f8] border border-[#ebebeb] rounded-[2px] px-3 py-2 mb-3"
+          className="lp-pop font-serif text-[12.5px] leading-[1.5] text-ink-2 bg-paper border border-rule rounded-[2px] px-3 py-2 mb-3"
           style={step(0)}
         >
           Recall was higher after a night of sleep than after the same hours awake. Revise the night before, not the morning of.
@@ -456,7 +456,7 @@ function FindingScene(): JSX.Element {
         <div className="grid grid-cols-3 gap-2 mb-3">
           {(['chart', 'gel', 'board'] as const).map((k, i) => (
             <div key={k} className="lp-pop" style={step(i + 1)}>
-              <Specimen kind={k} className="w-full h-[52px] rounded-[2px] border border-[#ebebeb]" />
+              <Specimen kind={k} className="w-full h-[52px] rounded-[2px] border border-rule" />
             </div>
           ))}
         </div>
@@ -468,7 +468,7 @@ function FindingScene(): JSX.Element {
             <Chip>lecture-notes-wk6.pdf</Chip>
           </span>
           <span className="lp-pop ml-auto" style={step(6)}>
-            <span className="inline-flex items-center gap-1 h-5 px-2 rounded-[2px] bg-[#2d7a4c] text-[#ffffff] font-mono text-[8.5px] uppercase tracking-[0.08em]">
+            <span className="inline-flex items-center gap-1 h-5 px-2 rounded-[2px] bg-finding-fill text-on-accent font-mono text-[8.5px] uppercase tracking-[0.08em]">
               ✓ Verified
             </span>
           </span>
@@ -494,38 +494,38 @@ function QuestionScene(): JSX.Element {
       title="Questions · Spring launch"
       action={
         <span className="flex gap-1">
-          <Chip tone="#de5052">Open 2</Chip>
+          <Chip tone="rgb(var(--question))">Open 2</Chip>
           <Chip>Answered 5</Chip>
         </span>
       }
     >
       <div className="relative px-4 py-3">
         <svg className="absolute left-[27px] top-6 bottom-6 w-2 h-[calc(100%-48px)]" aria-hidden="true">
-          <line x1="1" y1="0" x2="1" y2="100%" className="lp-march" stroke="#de5052" strokeWidth={1.5} strokeDasharray="4 4" />
+          <line x1="1" y1="0" x2="1" y2="100%" className="lp-march" stroke="rgb(var(--question))" strokeWidth={1.5} strokeDasharray="4 4" />
         </svg>
         {rows.map((r, i) => (
           <div
             key={r.q}
-            className="lp-pop relative flex items-center gap-3 py-2.5 border-b border-[#f1f1f1] last:border-0"
+            className="lp-pop relative flex items-center gap-3 py-2.5 border-b border-rule last:border-0"
             style={step(i)}
           >
             <span
-              className="relative z-[1] w-[14px] h-[14px] shrink-0 rounded-full flex items-center justify-center font-mono text-[8px] text-[#ffffff]"
-              style={r.open ? { background: '#ffffff', border: '1.5px dashed #de5052' } : { background: '#521010' }}
+              className="relative z-[1] w-[14px] h-[14px] shrink-0 rounded-full flex items-center justify-center font-mono text-[8px] text-on-accent"
+              style={r.open ? { background: 'rgb(var(--panel))', border: '1.5px dashed rgb(var(--question))' } : { background: 'rgb(var(--conclusion))' }}
             >
               {!r.open && '✓'}
             </span>
-            <span className={`font-serif text-[14px] ${r.open ? 'text-[#1b1c1c]' : 'text-[#9a9da8] line-through'}`}>{r.q}</span>
-            <span className="ml-auto font-mono text-[9px] text-right" style={{ color: r.open ? '#de5052' : '#521010' }}>
+            <span className={`font-serif text-[14px] ${r.open ? 'text-ink' : 'text-faint line-through'}`}>{r.q}</span>
+            <span className="ml-auto font-mono text-[9px] text-right" style={{ color: r.open ? 'rgb(var(--question))' : 'rgb(var(--conclusion))' }}>
               {r.state}
             </span>
           </div>
         ))}
         <div
-          className="lp-pop mt-2 flex items-center gap-2 h-8 px-2.5 border border-dashed border-[#de5052]/50 rounded-[2px] font-mono text-[9px] text-[#9a9da8]"
+          className="lp-pop mt-2 flex items-center gap-2 h-8 px-2.5 border border-dashed border-question/50 rounded-[2px] font-mono text-[9px] text-faint"
           style={step(3)}
         >
-          <span className="text-[#de5052]">?</span> Ask something new…
+          <span className="text-question">?</span> Ask something new…
         </div>
       </div>
     </Window>
@@ -541,47 +541,47 @@ function ConclusionScene(): JSX.Element {
     { type: 'conclusion', title: 'Lead with annual' },
   ];
   return (
-    <Window title="Walkthrough · Pricing review" action={<Chip tone="#521010">Presenting</Chip>}>
-      <div className="px-4 pt-5 pb-4 lp-grid-soft bg-[#fbfbfc]">
+    <Window title="Walkthrough · Pricing review" action={<Chip tone="rgb(var(--conclusion))">Presenting</Chip>}>
+      <div className="px-4 pt-5 pb-4 lp-grid-soft bg-panel-2">
         <div className="relative grid grid-cols-4 gap-3 items-center">
-          <div className="absolute left-[12%] right-[12%] top-1/2 h-[2px] -translate-y-1/2 bg-[#ebebeb]" />
+          <div className="absolute left-[12%] right-[12%] top-1/2 h-[2px] -translate-y-1/2 bg-rule" />
           <div className="lp-kind-path absolute left-[12%] right-[12%] top-1/2 h-[2px] lp-gradient-bar origin-left" />
           {path.map((p, i) => (
             <div key={p.title} className="lp-pop relative" style={step(i)}>
               <MiniCard
                 type={p.type}
                 title={p.title}
-                className={i === 3 ? 'shadow-[0_10px_24px_-12px_rgba(82,16,16,0.6)] scale-[1.06]' : ''}
+                className={i === 3 ? 'shadow-[0_10px_24px_-12px_rgb(var(--conclusion) / 0.6)] scale-[1.06]' : ''}
               />
             </div>
           ))}
         </div>
         <div
-          className="lp-pop mt-5 bg-[#ffffff] border border-[#521010] rounded-[2px] overflow-hidden shadow-[0_14px_30px_-20px_rgba(82,16,16,0.5)]"
+          className="lp-pop mt-5 bg-panel border border-conclusion rounded-[2px] overflow-hidden shadow-[0_14px_30px_-20px_rgb(var(--conclusion) / 0.5)]"
           style={step(4)}
         >
-          <div className="h-[3px] bg-[#521010]" />
+          <div className="h-[3px] bg-conclusion-fill" />
           <div className="px-4 py-3">
-            <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-[#521010] mb-1">Conclusion · C-01</p>
-            <p className="font-serif italic text-[18px] leading-tight text-[#1b1c1c] mb-2.5">Lead with annual billing</p>
-            <ul className="flex flex-col gap-1 font-serif text-[12.5px] text-[#434653]">
+            <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-conclusion mb-1">Conclusion · C-01</p>
+            <p className="font-serif italic text-[18px] leading-tight text-ink mb-2.5">Lead with annual billing</p>
+            <ul className="flex flex-col gap-1 font-serif text-[12.5px] text-ink-2">
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#2d7a4c]" /> Annual won the pricing test three to one
+                <span className="w-1.5 h-1.5 rounded-full bg-finding-fill" /> Annual won the pricing test three to one
               </li>
               <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#de5052]" /> Free tier stays for students, question closed
+                <span className="w-1.5 h-1.5 rounded-full bg-question-fill" /> Free tier stays for students, question closed
               </li>
             </ul>
           </div>
         </div>
         <div className="lp-pop mt-4 flex items-center gap-3" style={step(5)}>
-          <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-[#9a9da8]">Step 4 / 4</span>
+          <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-faint">Step 4 / 4</span>
           <span className="flex gap-1">
             {[0, 1, 2, 3].map((i) => (
               <span key={i} className="w-5 h-[3px] rounded-[1px]" style={{ background: TYPE_COLOR[path[i]?.type ?? 'topic'] }} />
             ))}
           </span>
-          <span className="ml-auto font-serif italic text-[13px] text-[#521010]">Supported by 2 findings, 1 question closed</span>
+          <span className="ml-auto font-serif italic text-[13px] text-conclusion">Supported by 2 findings, 1 question closed</span>
         </div>
       </div>
     </Window>
