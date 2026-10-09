@@ -142,5 +142,5 @@ test('picking a hidden idea selects it and opens the inspector on it', async ({ 
   const two = cards.filter({ hasText: 'Two' });
   await expect(two).toHaveAttribute('data-selected', 'true');
   await expect(toggle).toHaveAttribute('aria-label', 'Hide inspector');
-  await expect(rail.getByRole('textbox').first()).toHaveValue('Two');
+  await expect(rail.getByTestId('inspector-title')).toHaveText('Two');
 });

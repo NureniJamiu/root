@@ -100,7 +100,9 @@ test('images survive later edits and a reload without being re-uploaded', async 
     if (req.method() === 'PUT' && req.url().includes('/api/projects/')) bodies.push(req.postData() ?? '');
   });
   await page.locator('[data-testid^="node-card-"]').first().click();
-  await page.getByLabel('Notes and details').fill('Edited after the image was saved');
+  await page.getByTestId('btn-inspector-edit').click();
+  await page.getByTestId('node-editor-body').fill('Edited after the image was saved');
+  await page.getByTestId('node-editor-save').click();
   await waitForSaved(page);
   expect(bodies.length).toBeGreaterThan(0);
   expect(bodies.every((b) => !b.includes('iVBORw0KGgo'))).toBe(true);
@@ -122,7 +124,9 @@ test('a failed save is shown as not saved, then recovers on its own', async ({ d
     route.request().method() === 'PUT' ? route.abort() : route.continue(),
   );
   await page.locator('[data-testid^="node-card-"]').first().click();
-  await page.getByLabel('Idea title').fill('Typed during the outage');
+  await page.getByTestId('btn-inspector-edit').click();
+  await page.getByTestId('node-editor-title').fill('Typed during the outage');
+  await page.getByTestId('node-editor-save').click();
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-status', 'error', { timeout: 10_000 });
   await expect(page.getByTestId('toast').first()).toContainText(/Not saved/);
 
@@ -137,7 +141,9 @@ test('closing the page right after an edit does not lose it', async ({ dashboard
   await createRootTitled(page, 'Seed');
   await waitForSaved(page);
   await page.locator('[data-testid^="node-card-"]').first().click();
-  await page.getByLabel('Idea title').fill('Last words');
+  await page.getByTestId('btn-inspector-edit').click();
+  await page.getByTestId('node-editor-title').fill('Last words');
+  await page.getByTestId('node-editor-save').click();
 
   // Navigate away before the debounce could possibly have fired.
   await page.goto('/');
@@ -145,4 +151,32 @@ test('closing the page right after an edit does not lose it', async ({ dashboard
   await expect
     .poll(async () => (await getProject(page, project!.id)).canvas.nodes[0]!.title, { timeout: 5000 })
     .toBe('Last words');
+});
+
+test('adding an image to one idea keeps the images on other ideas, after a reload too', async ({ dashboard: page }) => {
+  const png = (b64: string) => ({ name: 'pic.png', mimeType: 'image/png', buffer: Buffer.from(b64, 'base64') });
+  const pixel = PIXEL.replace('data:image/png;base64,', '');
+  const cards = page.locator('[data-testid^="node-card-"]');
+
+  await addIdea(page);
+  await page.getByTestId('node-editor-title').fill('First');
+  await page.getByTestId('node-editor-file-input').setInputFiles(png(pixel));
+  await page.getByTestId('node-editor-save').click();
+  await waitForSaved(page);
+
+  const first = cards.first();
+  await first.hover();
+  await first.getByTestId('btn-add-child').click();
+  await page.getByTestId('node-editor-title').fill('Second');
+  await page.getByTestId('node-editor-file-input').setInputFiles(png(pixel));
+  await page.getByTestId('node-editor-save').click();
+  await waitForSaved(page);
+
+  await page.reload();
+  await openDashboard(page);
+  const [project] = await listProjects(page);
+  const saved = await getProject(page, project!.id);
+  expect(saved.canvas.nodes.map((n) => n.images.length)).toEqual([1, 1]);
+  expect(saved.canvas.nodes.every((n) => n.images[0]!.dataUrl.startsWith('data:image/png;base64,'))).toBe(true);
+  await expect(page.locator('[data-testid^="node-card-"] img')).toHaveCount(2);
 });

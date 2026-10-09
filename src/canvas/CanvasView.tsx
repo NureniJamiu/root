@@ -62,6 +62,12 @@ import { NODE_HEIGHT, computeTreeLayout, findFreePosition } from './placement';
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.5;
 
+/**
+ * Fitting the view never zooms in past 100%: one or two cards would
+ * otherwise fill the screen at 250% and push new ideas out of sight.
+ */
+const FIT_VIEW_OPTIONS = { duration: 200, padding: 0.25, maxZoom: 1 } as const;
+
 /** Grid used while Shift is held. */
 const SNAP_GRID: [number, number] = [20, 20];
 
@@ -174,7 +180,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, [reactFlow]);
 
   const handleFitView = useCallback(() => {
-    reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+    reactFlow?.fitView?.(FIT_VIEW_OPTIONS);
   }, [reactFlow]);
 
   const handleCenterSelected = useCallback(() => {
@@ -188,7 +194,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
         { duration: 200, zoom: 1 },
       );
     } else {
-      reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+      reactFlow?.fitView?.(FIT_VIEW_OPTIONS);
     }
   }, [reactFlow]);
 
@@ -558,7 +564,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     const current = useCanvasStore.getState().canvas;
     canvasActions.applyCanvas(computeTreeLayout(current, getMeasuredSizes()));
     setTimeout(() => {
-      reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+      reactFlow?.fitView?.(FIT_VIEW_OPTIONS);
     }, 50);
   }, [reactFlow]);
 

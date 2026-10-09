@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import type { NodeType } from '../data';
-import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Kbd } from '../ui/Kbd';
 import { RootLogo } from './Logo';
@@ -32,6 +31,14 @@ const TYPE_LABELS: Record<NodeType, string> = {
   finding: 'Finding',
   question: 'Question',
   conclusion: 'Conclusion',
+};
+
+/** The colour of each type, shown as a dot beside the highlight dropdown. */
+const TYPE_COLORS: Record<NodeType, string> = {
+  topic: '#0051c3',
+  finding: '#2d7a4c',
+  question: '#de5052',
+  conclusion: '#521010',
 };
 
 const GUIDE_ITEMS: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
@@ -179,31 +186,42 @@ export function AppHeader({
       {/* Right: type highlight, help, primary action, inspector toggle */}
       <div className="flex items-center gap-2 shrink-0">
         {onSelectTypeFilter && (
-          <div className="flex items-center gap-1" role="group" aria-label="Highlight ideas by type">
-            <span className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-[#737785] mr-1">Highlight</span>
-            {(Object.keys(TYPE_LABELS) as NodeType[]).map((type) => {
-              const isActive = activeTypeFilter === type;
-              const isDimmed = activeTypeFilter != null && !isActive;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onSelectTypeFilter(isActive ? null : type)}
-                  aria-pressed={isActive}
-                  className="cursor-pointer rounded-[2px]"
-                  data-testid={`filter-${type}`}
-                >
-                  <Badge
-                    variant={type}
-                    className={`transition-opacity ${isActive ? 'ring-1 ring-offset-1 ring-[#000000]' : ''} ${isDimmed ? 'opacity-40 hover:opacity-80' : 'hover:opacity-100'
-                      }`}
-                  >
+          <label className="relative flex items-center gap-2" data-testid="type-filter">
+            <span className="relative inline-flex items-center">
+              <span
+                className="pointer-events-none absolute left-2.5 w-2 h-2 rounded-full"
+                style={{
+                  background: activeTypeFilter ? TYPE_COLORS[activeTypeFilter] : 'transparent',
+                  border: activeTypeFilter ? 'none' : '1px solid #c3c6d6',
+                }}
+                aria-hidden="true"
+              />
+              <select
+                value={activeTypeFilter ?? ''}
+                onChange={(e) => onSelectTypeFilter(e.target.value === '' ? null : (e.target.value as NodeType))}
+                aria-label="Highlight ideas by type"
+                className="h-8 appearance-none rounded-[4px] border border-[#e2e2e2] bg-white pl-6 pr-7 font-mono text-[11px] text-[#1b1c1c] hover:border-[#1b1c1c] focus:outline-none focus-visible:border-[#0051c3] focus-visible:ring-1 focus-visible:ring-[#0051c3] transition-colors cursor-pointer"
+                data-testid="type-filter-select"
+              >
+                <option value="">All</option>
+                {(Object.keys(TYPE_LABELS) as NodeType[]).map((type) => (
+                  <option key={type} value={type}>
                     {TYPE_LABELS[type]}
-                  </Badge>
-                </button>
-              );
-            })}
-          </div>
+                  </option>
+                ))}
+              </select>
+              <svg
+                className="pointer-events-none absolute right-2 w-3 h-3 text-[#737785]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+          </label>
         )}
 
         <div className="h-4 w-px bg-[#ebebeb]" />
@@ -243,7 +261,7 @@ export function AppHeader({
                 {GUIDE_ITEMS.map((item) => (
                   <li key={item.label} className="flex items-center justify-between gap-3">
                     <span className="font-serif text-[13px] text-[#1b1c1c]">{item.label}</span>
-                    <span className="flex items-center gap-1 shrink-0">
+                    <span className="flex items-center gap-1 shrink-0 capitalize">
                       {item.keys.map((k) => (
                         <Kbd key={k}>{k}</Kbd>
                       ))}
@@ -261,9 +279,9 @@ export function AppHeader({
           onClick={onAddNode}
           disabled={addNodeDisabled}
           title={addNodeHint}
-          className="text-[11px] px-3"
+          className="h-9 px-4 text-[9.5px] uppercase"
           icon={
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>

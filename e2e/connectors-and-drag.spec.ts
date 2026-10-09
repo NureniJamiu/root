@@ -309,11 +309,11 @@ test.describe('E2E: canvas connectors', () => {
     expect(await edges(page)).toHaveLength(0);
   });
 
-  test('13. A connector can be removed from the inspector too', async ({ dashboard: page }) => {
+  test('13. A selected connector can be removed from the inspector', async ({ dashboard: page }) => {
     await setup(page, { edge: {} });
-    await card(page, NODE_A_ID).click();
-    await expect(page.getByTestId(`connection-row-${EDGE_ID}`)).toBeVisible();
-    await page.getByTestId(`connection-remove-${EDGE_ID}`).click();
+    const mid = await edgeMidpoint(page, EDGE_ID);
+    await page.mouse.click(mid.x, mid.y);
+    await page.getByTestId('btn-remove-connector').click();
     expect(await edges(page)).toHaveLength(0);
   });
 
@@ -408,8 +408,7 @@ test.describe('E2E: moving cards', () => {
     await card(page, NODE_B_ID).click();
 
     await expect(page.getByTestId('node-inspector-rail')).toBeVisible();
-    await expect(page.locator('input[placeholder="Give this idea a clear, simple title..."]')).toHaveValue('Node Beta');
-    await expect(page.getByTestId('node-inspector-connections')).toBeVisible();
+    await expect(page.getByTestId('inspector-title')).toHaveText('Node Beta');
     expect(await nodePosition(page, NODE_B_ID)).toEqual(posBefore);
   });
 

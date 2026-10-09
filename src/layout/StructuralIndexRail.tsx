@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
-import { formatRelativeTime } from './formatTime';
 import { RootLogo } from './Logo';
 import { PanelLeftIcon } from './panelIcons';
 
@@ -125,20 +124,20 @@ export function StructuralIndexRail({
           const isActive = project.id === currentActiveId;
           const isConfirmingDelete = pendingDeleteId === project.id;
           const title = project.title || `Project ${idx + 1}`;
-          const updated = formatRelativeTime(project.updatedAt);
           return (
             <div
               key={project.id}
               onClick={() => onSelectProject?.(project.id)}
               onMouseLeave={() => isConfirmingDelete && setPendingDeleteId(null)}
-              className={`group relative flex items-center gap-2 pl-3 pr-1.5 py-2 rounded-[2px] text-left transition-colors cursor-pointer ${isActive
-                ? 'bg-[#ffffff] border border-[#ebebeb] text-[#000000]'
-                : 'border border-transparent text-[#404040] hover:bg-[#f0eded] hover:text-[#000000]'
-                }`}
+              // Rows sit flat on the rail: no box, just a soft tint for the
+              // open project and on hover, so the list reads as part of the nav.
+              className={`group relative flex items-center gap-2 pl-3 pr-1.5 py-2 rounded-[4px] text-left transition-colors cursor-pointer ${
+                isActive ? 'bg-[#efedec] text-[#000000]' : 'text-[#595959] hover:bg-[#f3f1f0] hover:text-[#000000]'
+              }`}
               data-testid={`project-item-${project.id}`}
             >
               {isActive && (
-                <span className="absolute left-0 top-2 bottom-2 w-[2px] bg-[#0051c3]" aria-hidden="true" />
+                <span className="absolute left-0 top-2.5 bottom-2.5 w-[2px] rounded-full bg-[#0051c3]" aria-hidden="true" />
               )}
               {/* The row's one real control: Enter/Space on it bubbles up to the row's click handler. */}
               <button
@@ -146,7 +145,7 @@ export function StructuralIndexRail({
                 aria-current={isActive ? 'page' : undefined}
                 className="flex flex-col min-w-0 flex-1 text-left bg-transparent border-0 p-0 cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#0051c3]"
               >
-                <span className="font-serif text-[14px] font-medium leading-[18px] truncate grid py-3">{title}</span>
+                <span className={`font-serif text-[14px] leading-[20px] truncate ${isActive ? 'font-medium' : ''}`}>{title}</span>
               </button>
 
               {onDeleteProject &&
@@ -170,7 +169,7 @@ export function StructuralIndexRail({
                       e.stopPropagation();
                       setPendingDeleteId(project.id);
                     }}
-                    className="shrink-0 w-6 h-6 inline-flex items-center justify-center text-[#737785] hover:text-[#ba1a1a] hover:bg-[#ffffff] rounded-[2px] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer"
+                    className="shrink-0 w-6 h-6 inline-flex items-center justify-center text-[#737785] hover:text-[#ba1a1a] hover:bg-[#e8e5e4] rounded-[2px] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer"
                     title={`Delete ${title}`}
                     aria-label={`Delete ${title}`}
                     data-testid={`btn-delete-project-${project.id}`}

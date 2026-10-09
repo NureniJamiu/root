@@ -137,7 +137,7 @@ describe('Batch Fixes Verification', () => {
     fireEvent.click(screen.getByTestId('btn-toggle-inspector'));
     expect(onToggleInspector).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTestId('filter-question'));
+    fireEvent.change(screen.getByTestId('type-filter-select'), { target: { value: 'question' } });
     expect(onSelectTypeFilter).toHaveBeenCalledWith('question');
 
     fireEvent.click(screen.getByTestId('btn-add-idea'));
