@@ -17,7 +17,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { addRoot, emptyCanvas } from '../../data/mutators';
+import { addNode, emptyCanvas } from '../../data/mutators';
 import { canvasActions, useCanvasStore } from '../../data/store';
 import type { CanvasState } from '../../data/store';
 import { NodeEditor } from '../NodeEditor';
@@ -33,11 +33,11 @@ import { NodeEditor } from '../NodeEditor';
  */
 function stateWithOneNode(): { state: CanvasState; nodeId: string } {
   const base = emptyCanvas();
-  const canvas = addRoot(base, { position: { x: 0, y: 0 } });
+  const canvas = addNode(base, { position: { x: 0, y: 0 } });
   const nodeId = canvas.nodes[0]!.id;
   const state: CanvasState = {
     canvas,
-    selection: { nodeId: null },
+    selection: { nodeId: null, edgeId: null },
     editor: { openNodeId: nodeId },
     deletePrompt: { nodeId: null },
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -81,8 +81,13 @@ describe('NodeEditor — component', () => {
     await user.clear(titleInput);
     await user.type(titleInput, 'My new title');
 
+    // Nothing is written until Save.
+    expect(useCanvasStore.getState().canvas.nodes[0]!.title).toBe('');
+    await user.click(screen.getByTestId('node-editor-save'));
+
     const node = useCanvasStore.getState().canvas.nodes[0]!;
     expect(node.title).toBe('My new title');
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   /* ---------------------------------------------------------------------- */
@@ -149,6 +154,7 @@ describe('NodeEditor — component', () => {
 
     const findingButton = screen.getByTestId('node-editor-type-finding');
     await user.click(findingButton);
+    await user.click(screen.getByTestId('node-editor-save'));
 
     const node = useCanvasStore.getState().canvas.nodes[0]!;
     expect(node.type).toBe('finding');
@@ -178,5 +184,62 @@ describe('NodeEditor — component', () => {
 
     // The onClose callback passed as a prop should also have been called.
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  /* ---------------------------------------------------------------------- */
+  /* Save / Cancel                                                           */
+  /* ---------------------------------------------------------------------- */
+
+  it('Cancel discards the draft and leaves the node as it was', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+
+    await act(async () => {
+      render(<NodeEditor nodeId={nodeId} onClose={onClose} />);
+    });
+
+    await user.type(screen.getByTestId('node-editor-title'), 'Throwaway');
+    await user.click(screen.getByTestId('node-editor-type-question'));
+    await user.click(screen.getByTestId('node-editor-cancel'));
+
+    const node = useCanvasStore.getState().canvas.nodes[0]!;
+    expect(node.title).toBe('');
+    expect(node.type).not.toBe('question');
+    expect(useCanvasStore.getState().editor.openNodeId).toBeNull();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('Enter in the title saves', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+
+    await act(async () => {
+      render(<NodeEditor nodeId={nodeId} onClose={onClose} />);
+    });
+
+    await user.type(screen.getByTestId('node-editor-title'), 'Quick title{Enter}');
+
+    expect(useCanvasStore.getState().canvas.nodes[0]!.title).toBe('Quick title');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('Cancel on a just-added idea removes it again', async () => {
+    canvasActions.loadCanvas(emptyCanvas());
+    act(() => {
+      canvasActions.addNode({ x: 0, y: 0 });
+    });
+    const newId = useCanvasStore.getState().editor.openNodeId!;
+    expect(useCanvasStore.getState().editor.isNew).toBe(true);
+
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<NodeEditor nodeId={newId} onClose={onClose} />);
+    });
+
+    await user.click(screen.getByTestId('node-editor-cancel'));
+
+    expect(useCanvasStore.getState().canvas.nodes).toHaveLength(0);
+    expect(useCanvasStore.getState().editor.openNodeId).toBeNull();
   });
 });

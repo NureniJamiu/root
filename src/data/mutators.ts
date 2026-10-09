@@ -1,43 +1,22 @@
 /**
- * Pure mutators for the Root MVP `Canvas`.
+ * Pure mutators for the Root `Canvas`.
  *
  * Every mutator in this module is a pure function `(Canvas, ...) => Canvas`.
  * The input canvas is never mutated; on success a new `Canvas` object is
- * returned. Whenever nodes change, `canvas.updatedAt` is bumped to `now()`.
+ * returned. Whenever the canvas changes, `canvas.updatedAt` is bumped to
+ * `now()`.
  *
- * Guarding: an invariant-breaking or nonsensical input returns the input
- * canvas unchanged (design.md §Mutator Semantics, §Error Handling — the
- * mutators are the "last line of defense before the store `set` call"). No
- * exceptions are thrown; the store's write path re-validates with
- * `canvasSchema.safeParse` before committing.
- *
- * Requirements covered here:
- *   R2.2  addRoot shape and precondition
- *   R3.1  addChild shape
- *   R3.4  addChild auto-expands a collapsed parent
- *   R3.5  reject operations that would create a cycle (addChild rejects
- *         unknown parentId; new nodes have no children so no other
- *         cycle-creating paths exist for the MVP mutators)
- *   R4.2  updateNode(title) bumps updatedAt
- *   R4.3  updateNode(body) bumps updatedAt
- *   R4.4  addImage appends an image entry (data URL cap 2 MB)
- *   R4.5  removeImage removes an image entry
- *   R4.6  updateNode(type) bumps updatedAt
- *   R5.2  moveNode commits final position and bumps updatedAt
- *   R5.4  moveNode does not touch descendants
- *   R6.1  setCollapsed(id, true)
- *   R6.3  setCollapsed(id, false)
- *   R7.1  deleteNodeOnly on a leaf (or any non-root node)
- *   R7.3  deleteNodeOnly reparents children to the deleted node's parent
- *   R7.4  deleteSubtree removes id and all descendants
- *   R7.5  deleteNodeOnly on the root with children is a no-op
+ * Guarding: an invariant-breaking or nonsensical input (unknown id, a
+ * connector from a node to itself, a duplicate connector, ...) returns the
+ * input canvas unchanged. No exceptions are thrown; the store's write path
+ * re-validates with `canvasSchema.safeParse` before committing.
  */
 
 import { newId } from './ids';
 import { IMAGE_DATA_URL_MAX_BYTES } from './limits';
 import { now } from './time';
-import { hasCycle, subtreeIds } from './tree';
-import type { Canvas, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
+import { computeFacingSides, downstreamIds, isDuplicateEdge, resolveEdgeSides, subtreeIds } from './graph';
+import type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
@@ -54,15 +33,6 @@ import type { Canvas, ImageEntry, Node, NodeType, Position, Side, UUID } from '.
  */
 function byteLength(s: string): number {
   return new TextEncoder().encode(s).length;
-}
-
-/**
- * Return `c` with `updatedAt` refreshed and `nodes` replaced by `nodes`. This
- * is the single point where the canvas timestamp is bumped, so every mutator
- * routes its final assembly through here.
- */
-function withNodes(c: Canvas, nodes: Node[]): Canvas {
-  return { ...c, nodes, updatedAt: now() };
 }
 
 /**
@@ -86,6 +56,28 @@ function replaceNode(
   return next;
 }
 
+/**
+ * Re-resolve the stored sides of automatic (unpinned) connector ends touching
+ * `moved`, so a canvas always stores the sides its connectors are drawn on.
+ * Returns `edges` itself when nothing changes.
+ */
+function refreshAutoSides(nodes: readonly Node[], edges: readonly Edge[], moved: ReadonlySet<UUID>): readonly Edge[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  let changed = false;
+  const next = edges.map((e) => {
+    if (!moved.has(e.source) && !moved.has(e.target)) return e;
+    if (e.sourcePinned && e.targetPinned) return e;
+    const from = byId.get(e.source);
+    const to = byId.get(e.target);
+    if (!from || !to) return e;
+    const sides = resolveEdgeSides(e, from.position, to.position);
+    if (sides.sourceSide === e.sourceSide && sides.targetSide === e.targetSide) return e;
+    changed = true;
+    return { ...e, ...sides };
+  });
+  return changed ? next : edges;
+}
+
 /* -------------------------------------------------------------------------- */
 /* emptyCanvas                                                                */
 /* -------------------------------------------------------------------------- */
@@ -99,89 +91,70 @@ export function emptyCanvas(): Canvas {
     id: newId(),
     title: '',
     nodes: [],
+    edges: [],
     updatedAt: now(),
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* addRoot                                                                    */
+/* addNode / addChild                                                         */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Append a root node to an empty canvas. Precondition: `c.nodes.length === 0`
- * (R2.2). If the canvas is non-empty, returns `c` unchanged.
- */
-export function addRoot(c: Canvas, opts: { position: Position }): Canvas {
-  if (c.nodes.length !== 0) return c;
-  const ts = now();
-  const root: Node = {
+function blankNode(position: Position, ts: string): Node {
+  return {
     id: newId(),
-    parentId: null,
     title: '',
     body: '',
     images: [],
     type: 'topic',
-    position: opts.position,
+    position,
     collapsed: false,
     createdAt: ts,
     updatedAt: ts,
   };
-  return { ...c, nodes: [root], updatedAt: ts };
 }
 
-/* -------------------------------------------------------------------------- */
-/* addChild                                                                   */
-/* -------------------------------------------------------------------------- */
+/**
+ * Append a new, unconnected node at `position`. Works on any canvas, empty or
+ * not: ideas do not have to hang from anything.
+ */
+export function addNode(c: Canvas, opts: { position: Position }): Canvas {
+  const ts = now();
+  return { ...c, nodes: [...c.nodes, blankNode(opts.position, ts)], updatedAt: ts };
+}
 
 /**
- * Append a child node under `parentId` (R3.1). If `parentId` is not present
- * in `c` the operation is a no-op and `c` is returned unchanged (R3.5 —
- * dangling parents are rejected at the mutator boundary).
- *
- * If the parent is collapsed at the time of the call, its `collapsed` flag
- * is cleared in the returned canvas (R3.4). The parent's other fields are
- * preserved.
- *
- * The new node is a `topic` with empty title / body / images, `collapsed:
- * false`, and matching `createdAt` / `updatedAt` timestamps.
+ * Append a new node at `position` and connect `parentId` to it. The connector
+ * follows the facing sides of the two cards unless `sourceSide` / `targetSide`
+ * are given, which pins that end. A collapsed parent is expanded so the new node is visible.
+ * Unknown `parentId` returns `c` unchanged.
  */
 export function addChild(
   c: Canvas,
   parentId: UUID,
-  opts: { position: Position },
+  opts: { position: Position; sourceSide?: Side; targetSide?: Side },
 ): Canvas {
-  const parentIdx = c.nodes.findIndex((n) => n.id === parentId);
-  if (parentIdx === -1) return c;
-  const parent = c.nodes[parentIdx];
-  // parentIdx came from findIndex on the same array, so this is defined; the
-  // guard narrows the `noUncheckedIndexedAccess` union.
+  const parent = c.nodes.find((n) => n.id === parentId);
   if (parent === undefined) return c;
 
   const ts = now();
-
-  // Auto-expand the parent per R3.4. Only rebuild the parent object when
-  // the flag actually needs to change to keep referential-equality churn
-  // minimal.
-  const nextNodes = c.nodes.slice();
-  if (parent.collapsed) {
-    nextNodes[parentIdx] = { ...parent, collapsed: false, updatedAt: ts };
-  }
-
-  const child: Node = {
+  const child = blankNode(opts.position, ts);
+  const facing = computeFacingSides(parent.position, opts.position);
+  const edge: Edge = {
     id: newId(),
-    parentId,
-    title: '',
-    body: '',
-    images: [],
-    type: 'topic',
-    position: opts.position,
-    collapsed: false,
-    createdAt: ts,
-    updatedAt: ts,
+    source: parentId,
+    target: child.id,
+    sourceSide: opts.sourceSide ?? facing.sourceSide,
+    targetSide: opts.targetSide ?? facing.targetSide,
+    // A side that was asked for is the user's choice, so it stays put.
+    sourcePinned: opts.sourceSide !== undefined,
+    targetPinned: opts.targetSide !== undefined,
   };
-  nextNodes.push(child);
-
-  return { ...c, nodes: nextNodes, updatedAt: ts };
+  const nodes = c.nodes.map((n) =>
+    n.id === parentId && n.collapsed ? { ...n, collapsed: false, updatedAt: ts } : n,
+  );
+  nodes.push(child);
+  return { ...c, nodes, edges: [...c.edges, edge], updatedAt: ts };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -276,19 +249,31 @@ export function removeImage(c: Canvas, id: UUID, imageId: UUID): Canvas {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Set the position of the node identified by `id` (R5.2). Descendants are
- * untouched (R5.4 — the canvas is a parentId-only tree with independent
- * positions per node). Unknown `id` returns `c` unchanged.
+ * Set the position of the node identified by `id`. Other cards are untouched;
+ * connectors follow their card, and their automatic ends are re-resolved.
+ * Unknown `id` returns `c` unchanged.
  */
 export function moveNode(c: Canvas, id: UUID, position: Position): Canvas {
+  return moveNodes(c, new Map([[id, position]]));
+}
+
+/**
+ * Set the positions of several nodes at once (a multi-card drag is one edit).
+ * Ids that are unknown are ignored; `c` is returned unchanged when nothing
+ * moves. Automatic connector ends touching a moved card are re-resolved.
+ */
+export function moveNodes(c: Canvas, positions: ReadonlyMap<UUID, Position>): Canvas {
   const ts = now();
-  const nextNodes = replaceNode(c.nodes, id, (n) => ({
-    ...n,
-    position,
-    updatedAt: ts,
-  }));
-  if (nextNodes === null) return c;
-  return { ...c, nodes: nextNodes, updatedAt: ts };
+  let changed = false;
+  const nodes = c.nodes.map((n) => {
+    const next = positions.get(n.id);
+    if (next === undefined || (next.x === n.position.x && next.y === n.position.y)) return n;
+    changed = true;
+    return { ...n, position: next, updatedAt: ts };
+  });
+  if (!changed) return c;
+  const edges = refreshAutoSides(nodes, c.edges, new Set(positions.keys()));
+  return { ...c, nodes, edges: edges as Edge[], updatedAt: ts };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -322,13 +307,59 @@ export function setCollapsed(c: Canvas, id: UUID, collapsed: boolean): Canvas {
  * node in the branch is collapsed.
  */
 export function expandSubtree(c: Canvas, id: UUID): Canvas {
-  const branch = subtreeIds(c, id);
+  if (!c.nodes.some((n) => n.id === id)) return c;
+  const branch = downstreamIds(c, id);
+  branch.add(id);
   if (!c.nodes.some((n) => branch.has(n.id) && n.collapsed)) return c;
   const ts = now();
   const nextNodes = c.nodes.map((n) =>
     branch.has(n.id) && n.collapsed ? { ...n, collapsed: false, updatedAt: ts } : n,
   );
   return { ...c, nodes: nextNodes, updatedAt: ts };
+}
+
+/* -------------------------------------------------------------------------- */
+/* collapseMany / expandMany                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Collapse every node in `ids` that has something connected below it (a
+ * node with no outgoing connector has nothing to hide). Returns `c`
+ * unchanged when nothing changes.
+ */
+export function collapseMany(c: Canvas, ids: Iterable<UUID>): Canvas {
+  const wanted = new Set(ids);
+  const hasChildren = new Set(c.edges.map((e) => e.source));
+  const ts = now();
+  let changed = false;
+  const nextNodes = c.nodes.map((n) => {
+    if (!wanted.has(n.id) || n.collapsed || !hasChildren.has(n.id)) return n;
+    changed = true;
+    return { ...n, collapsed: true, updatedAt: ts };
+  });
+  return changed ? { ...c, nodes: nextNodes, updatedAt: ts } : c;
+}
+
+/**
+ * Expand every node in `ids` together with its whole branch (as
+ * `expandSubtree` does for one node). Returns `c` unchanged when nothing in
+ * those branches is collapsed.
+ */
+export function expandMany(c: Canvas, ids: Iterable<UUID>): Canvas {
+  const branch = new Set<UUID>();
+  for (const id of ids) {
+    if (!c.nodes.some((n) => n.id === id)) continue;
+    branch.add(id);
+    for (const d of downstreamIds(c, id)) branch.add(d);
+  }
+  const ts = now();
+  let changed = false;
+  const nextNodes = c.nodes.map((n) => {
+    if (!branch.has(n.id) || !n.collapsed) return n;
+    changed = true;
+    return { ...n, collapsed: false, updatedAt: ts };
+  });
+  return changed ? { ...c, nodes: nextNodes, updatedAt: ts } : c;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -342,109 +373,130 @@ export function setCanvasTitle(c: Canvas, title: string): Canvas {
 }
 
 /* -------------------------------------------------------------------------- */
-/* deleteNodeOnly                                                             */
+/* deleteNodeOnly / deleteSubtree                                             */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Remove the node identified by `id` and reparent its direct children to
- * that node's own `parentId` (R7.1 / R7.3).
- *
- * R7.5 no-op: when the target is the root (`parentId === null`) *and* has
- * at least one child, reparenting the children to `null` would produce
- * multiple roots and violate `canvasSchema`. In that case `c` is returned
- * unchanged so the store's `safeParse` guard never fires. Deleting the root
- * of an empty tree (i.e. a leaf root) is allowed.
- *
- * Unknown `id` returns `c` unchanged.
- */
-export function deleteNodeOnly(c: Canvas, id: UUID): Canvas {
-  const target = c.nodes.find((n) => n.id === id);
-  if (target === undefined) return c;
-
-  const hasChildren = c.nodes.some((n) => n.parentId === id);
-  if (target.parentId === null && hasChildren) return c; // R7.5
-
-  const ts = now();
-  const nextNodes: Node[] = [];
-  for (const n of c.nodes) {
-    if (n.id === id) continue;
-    if (n.parentId === id) {
-      nextNodes.push({ ...n, parentId: target.parentId, updatedAt: ts });
-    } else {
-      nextNodes.push(n);
-    }
-  }
-  return withNodes(c, nextNodes);
+function removeNodes(c: Canvas, doomed: ReadonlySet<UUID>): Canvas {
+  return {
+    ...c,
+    nodes: c.nodes.filter((n) => !doomed.has(n.id)),
+    edges: c.edges.filter((e) => !doomed.has(e.source) && !doomed.has(e.target)),
+    updatedAt: now(),
+  };
 }
 
-/* -------------------------------------------------------------------------- */
-/* deleteSubtree                                                              */
-/* -------------------------------------------------------------------------- */
+/**
+ * Remove the node identified by `id` and every connector attached to it. The
+ * nodes it was connected to stay where they are. Unknown `id` returns `c`
+ * unchanged.
+ */
+export function deleteNodeOnly(c: Canvas, id: UUID): Canvas {
+  if (!c.nodes.some((n) => n.id === id)) return c;
+  return removeNodes(c, new Set([id]));
+}
 
 /**
- * Remove the node identified by `id` together with every transitive
- * descendant (R7.4). Unknown `id` returns `c` unchanged.
+ * Remove the node identified by `id` together with every node that hangs only
+ * from it (see `subtreeIds`), and all connectors attached to any of them.
+ * Unknown `id` returns `c` unchanged.
  */
 export function deleteSubtree(c: Canvas, id: UUID): Canvas {
   const doomed = subtreeIds(c, id);
   if (doomed.size === 0) return c;
-  const nextNodes = c.nodes.filter((n) => !doomed.has(n.id));
-  return withNodes(c, nextNodes);
+  return removeNodes(c, doomed);
 }
 
 /* -------------------------------------------------------------------------- */
-/* updateConnection & reparentChild                                          */
+/* Connectors                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export interface ConnectionPatch {
-  parentId?: UUID;
-  sourceSide?: Side | undefined;
-  targetSide?: Side | undefined;
+export interface ConnectorEnds {
+  source: UUID;
+  target: UUID;
+  sourceSide: Side;
+  targetSide: Side;
+  /** The user chose this side; it stays when the card moves. Defaults to false on `connect`, to the current value on `updateEdge`. */
   sourcePinned?: boolean | undefined;
   targetPinned?: boolean | undefined;
 }
 
-/**
- * Update connection properties (parent, sides, pinned state) for child node.
- * Guarded against cycles, self-parenting, reparenting the root node,
- * or unknown node IDs.
- */
-export function updateConnection(
-  c: Canvas,
-  childId: UUID,
-  patch: ConnectionPatch,
-): Canvas {
-  const child = c.nodes.find((n) => n.id === childId);
-  if (!child) return c;
+/** Why a set of ends cannot form a connector, or `null` when it can. */
+function rejectEnds(c: Canvas, ends: ConnectorEnds, ignoreId?: UUID): string | null {
+  if (ends.source === ends.target) return 'self';
+  const ids = new Set(c.nodes.map((n) => n.id));
+  if (!ids.has(ends.source) || !ids.has(ends.target)) return 'unknown';
+  if (isDuplicateEdge(c, ends, ignoreId)) return 'duplicate';
+  return null;
+}
 
-  let newParentId = child.parentId;
-  if (patch.parentId !== undefined && patch.parentId !== child.parentId) {
-    if (patch.parentId === childId) return c;
-    const parent = c.nodes.find((n) => n.id === patch.parentId);
-    if (!parent) return c;
-    if (c.nodes[0]?.id === childId) return c;
-    if (hasCycle(c, childId, patch.parentId)) return c;
-    newParentId = patch.parentId;
+/**
+ * Add a connector. Rejected (returns `c`) for a connector from a node to
+ * itself, an unknown node, or a connector that repeats an existing one. Two
+ * cards may share any number of connectors as long as they attach to
+ * different sides.
+ */
+export function connect(c: Canvas, ends: ConnectorEnds): Canvas {
+  if (rejectEnds(c, ends) !== null) return c;
+  const edge: Edge = {
+    id: newId(),
+    source: ends.source,
+    target: ends.target,
+    sourceSide: ends.sourceSide,
+    targetSide: ends.targetSide,
+    sourcePinned: ends.sourcePinned ?? false,
+    targetPinned: ends.targetPinned ?? false,
+  };
+  return { ...c, edges: [...c.edges, edge], updatedAt: now() };
+}
+
+/**
+ * Re-attach an existing connector: move either end to another card or to
+ * another side of the same card. Same guards as `connect`. Pin flags that are
+ * not given are kept. Returns `c` when nothing changes.
+ */
+export function updateEdge(c: Canvas, edgeId: UUID, ends: ConnectorEnds): Canvas {
+  const current = c.edges.find((e) => e.id === edgeId);
+  if (current === undefined) return c;
+  const next: Edge = {
+    id: current.id,
+    source: ends.source,
+    target: ends.target,
+    sourceSide: ends.sourceSide,
+    targetSide: ends.targetSide,
+    sourcePinned: ends.sourcePinned ?? current.sourcePinned,
+    targetPinned: ends.targetPinned ?? current.targetPinned,
+  };
+  if (
+    next.source === current.source &&
+    next.target === current.target &&
+    next.sourceSide === current.sourceSide &&
+    next.targetSide === current.targetSide &&
+    next.sourcePinned === current.sourcePinned &&
+    next.targetPinned === current.targetPinned
+  ) {
+    return c;
   }
-
-  const ts = now();
-  const nextNodes = replaceNode(c.nodes, childId, (n) => ({
-    ...n,
-    parentId: newParentId,
-    ...(patch.sourceSide !== undefined ? { sourceSide: patch.sourceSide } : {}),
-    ...(patch.targetSide !== undefined ? { targetSide: patch.targetSide } : {}),
-    ...(patch.sourcePinned !== undefined ? { sourcePinned: patch.sourcePinned } : {}),
-    ...(patch.targetPinned !== undefined ? { targetPinned: patch.targetPinned } : {}),
-    updatedAt: ts,
-  }));
-  if (nextNodes === null) return c;
-  return { ...c, nodes: nextNodes, updatedAt: ts };
+  if (rejectEnds(c, ends, edgeId) !== null) return c;
+  return { ...c, edges: c.edges.map((e) => (e.id === edgeId ? next : e)), updatedAt: now() };
 }
 
 /**
- * Re-parent a child node under a new parent node.
+ * Hand a connector back to automatic routing: both ends are unpinned and take
+ * the sides that face each other. Returns `c` when it is already automatic or
+ * the facing sides would repeat another connector.
  */
-export function reparentChild(c: Canvas, childId: UUID, newParentId: UUID): Canvas {
-  return updateConnection(c, childId, { parentId: newParentId });
+export function autoRouteEdge(c: Canvas, edgeId: UUID): Canvas {
+  const edge = c.edges.find((e) => e.id === edgeId);
+  if (edge === undefined) return c;
+  const from = c.nodes.find((n) => n.id === edge.source);
+  const to = c.nodes.find((n) => n.id === edge.target);
+  if (!from || !to) return c;
+  const sides = computeFacingSides(from.position, to.position);
+  return updateEdge(c, edgeId, { ...edge, ...sides, sourcePinned: false, targetPinned: false });
 }
 
+/** Remove one connector. Both cards stay. Unknown `edgeId` returns `c` unchanged. */
+export function removeEdge(c: Canvas, edgeId: UUID): Canvas {
+  if (!c.edges.some((e) => e.id === edgeId)) return c;
+  return { ...c, edges: c.edges.filter((e) => e.id !== edgeId), updatedAt: now() };
+}

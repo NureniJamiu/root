@@ -4,13 +4,14 @@ import {
   IMAGE_DATA_URL_MAX_BYTES,
   NODE_TITLE_MAX,
   canvasActions,
-  childrenIndex,
+  computeFacingSides,
+  isDuplicateEdge,
   nodeLabel,
   nodeOrdinals,
   subtreeIds,
   useCanvasStore,
 } from '../data';
-import type { ImageEntry, Node, NodeType, UUID } from '../data';
+import type { Edge, ImageEntry, Node, NodeType, Side, UUID } from '../data';
 import type { DragState } from '../canvas';
 import type { SaveStatus } from '../lib/save-queue';
 import { Button } from '../ui/Button';
@@ -92,6 +93,95 @@ function ImageAttachment({
   );
 }
 
+const SIDE_OPTIONS: readonly Side[] = ['top', 'right', 'bottom', 'left'];
+
+/** Details of the selected connector: its two cards, the sides it attaches to, and a remove button. */
+function ConnectorPanel({
+  edge,
+  byId,
+  labelOf,
+  nameOf,
+}: {
+  readonly edge: Edge;
+  readonly byId: ReadonlyMap<UUID, Node>;
+  readonly labelOf: (node: Node) => string;
+  readonly nameOf: (node: Node) => string;
+}): JSX.Element {
+  const from = byId.get(edge.source);
+  const to = byId.get(edge.target);
+  const row = (
+    label: string,
+    node: Node | undefined,
+    side: Side,
+    key: 'sourceSide' | 'targetSide',
+    pinned: boolean,
+  ) => (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col min-w-0">
+        <span className="text-[#737785] text-[8.5px] uppercase">
+          {label} · {pinned ? 'pinned' : 'auto'}
+        </span>
+        <span className="font-semibold text-[#1b1c1c] truncate" title={node ? nameOf(node) : undefined}>
+          {node ? `${labelOf(node)} ${nameOf(node)}` : 'missing'}
+        </span>
+      </div>
+      <select
+        value={side}
+        onChange={(e) =>
+          canvasActions.updateEdge(edge.id, {
+            source: edge.source,
+            target: edge.target,
+            sourceSide: edge.sourceSide,
+            targetSide: edge.targetSide,
+            [key]: e.target.value as Side,
+            // Choosing a side pins that end.
+            [key === 'sourceSide' ? 'sourcePinned' : 'targetPinned']: true,
+          })
+        }
+        className="font-mono text-[9px] bg-white border border-[#ebebeb] rounded-[2px] px-1 py-0.5 text-[#1b1c1c] focus:outline-none focus:border-[#0051c3] cursor-pointer"
+        aria-label={`${label} side`}
+        data-testid={`connector-${key}`}
+      >
+        {SIDE_OPTIONS.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+  return (
+    <div className="flex flex-col gap-3" data-testid="connector-panel">
+      <div className="border border-[#ebebeb] bg-[#fbf9f8] rounded-[2px] p-2.5 flex flex-col gap-2.5 font-mono text-[9.5px]">
+        {row('From', from, edge.sourceSide, 'sourceSide', edge.sourcePinned)}
+        {row('To', to, edge.targetSide, 'targetSide', edge.targetPinned)}
+      </div>
+      <p className="font-serif text-[12px] leading-[18px] text-[#595959] m-0">
+        With the connector selected, drag either end to attach it to another card or side. A side you pick stays pinned when the card moves; double-click the connector, or use Auto-route, to let it follow the facing sides again.
+      </p>
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={!edge.sourcePinned && !edge.targetPinned}
+        onClick={() => canvasActions.autoRouteEdge(edge.id)}
+        className="font-mono text-[10px] h-8 justify-center"
+        data-testid="btn-auto-route"
+      >
+        Auto-route
+      </Button>
+      <Button
+        size="sm"
+        variant="destructive"
+        onClick={() => canvasActions.removeEdge(edge.id)}
+        className="font-mono text-[10px] h-8 justify-center"
+        data-testid="btn-remove-connector"
+      >
+        Remove connector
+      </Button>
+    </div>
+  );
+}
+
 export function NodeInspectorRail({
   onOpenEditor,
   onAddChild,
@@ -105,34 +195,37 @@ export function NodeInspectorRail({
   const [imageError, setImageError] = useState<string | null>(null);
   const [isDropTarget, setIsDropTarget] = useState(false);
 
+  const selectedEdgeId = useCanvasStore((s) => s.selection.edgeId);
+
   // Indexes built once per canvas change, not once per lookup.
-  const { byId, children, ordinals } = useMemo(
+  const { byId, ordinals } = useMemo(
     () => ({
       byId: new Map(canvas.nodes.map((n) => [n.id, n])),
-      children: childrenIndex(canvas),
       ordinals: nodeOrdinals(canvas),
     }),
     [canvas],
   );
 
   const selectedNode: Node | undefined = selectionId ? byId.get(selectionId) : undefined;
+  const selectedEdge: Edge | undefined =
+    !selectedNode && selectedEdgeId ? canvas.edges.find((e) => e.id === selectedEdgeId) : undefined;
   const labelOf = (node: Node): string => nodeLabel(node, ordinals);
   const nameOf = (node: Node): string => node.title || 'Untitled idea';
 
-  // Breadcrumb of titles from the root down to the selected idea.
   const pathString = useMemo(() => {
-    if (!selectedNode) {
-      return canvas.nodes.length === 0 ? 'None (No ideas yet)' : 'None (Select an idea)';
-    }
-    const path: string[] = [];
-    for (let cur: Node | undefined = selectedNode; cur; cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
-      path.unshift(cur.title || 'Untitled Idea');
-    }
-    return path.join(' > ');
-  }, [selectedNode, byId, canvas.nodes.length]);
+    if (selectedNode) return selectedNode.title || 'Untitled Idea';
+    if (selectedEdge) return 'Connector';
+    return canvas.nodes.length === 0 ? 'None (No ideas yet)' : 'None (Select an idea)';
+  }, [selectedNode, selectedEdge, canvas.nodes.length]);
 
-  const parentNode = selectedNode?.parentId ? byId.get(selectedNode.parentId) : undefined;
-  const childNodes = selectedNode ? (children.get(selectedNode.id) ?? []) : [];
+  // Every connector that touches the selected idea.
+  const connections = useMemo(
+    () =>
+      selectedNode
+        ? canvas.edges.filter((e) => e.source === selectedNode.id || e.target === selectedNode.id)
+        : [],
+    [canvas.edges, selectedNode],
+  );
 
   // Everything under the selected idea, counted by type.
   const branchStats = useMemo(() => {
@@ -151,12 +244,11 @@ export function NodeInspectorRail({
     return { counts, total };
   }, [canvas, byId, selectedNode]);
 
-  // Ideas this one may be re-attached under: anything outside its own branch.
-  const reparentOptions = useMemo(() => {
-    if (!selectedNode) return [];
-    const ownBranch = subtreeIds(canvas, selectedNode.id);
-    return canvas.nodes.filter((n) => !ownBranch.has(n.id));
-  }, [canvas, selectedNode]);
+  // Ideas the selected one could still be connected to.
+  const connectOptions = useMemo(
+    () => (selectedNode ? canvas.nodes.filter((n) => n.id !== selectedNode.id) : []),
+    [canvas.nodes, selectedNode],
+  );
 
   const hiddenCount = branchStats.total;
   const isCollapsed = selectedNode?.collapsed ?? false;
@@ -267,7 +359,7 @@ export function NodeInspectorRail({
 
         {/* Path Ribbon */}
         <div className="px-4 py-2 border-b border-[#ebebeb] bg-[#fbf9f8] font-mono text-[9px] text-[#595959] tracking-wide truncate shrink-0">
-          <span className="text-[#737785] uppercase">PATH: </span>
+          <span className="text-[#737785] uppercase">SELECTED: </span>
           <span>{pathString}</span>
         </div>
       </div>
@@ -473,63 +565,60 @@ export function NodeInspectorRail({
                 <div className="flex flex-col gap-1.5" data-testid="node-inspector-connections">
                   <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.06em]">
                     <span className="text-[#595959]">CONNECTIONS</span>
-                    <span className="text-[#0051c3] font-semibold">
-                      {(selectedNode.parentId !== null ? 1 : 0) + childNodes.length} TOTAL
-                    </span>
+                    <span className="text-[#0051c3] font-semibold">{connections.length} TOTAL</span>
                   </div>
 
-                  <div className="flex flex-col gap-1.5 border border-[#ebebeb] rounded-[2px] p-2.5 bg-[#ffffff] font-mono text-[9.5px]">
-                    {/* Incoming (Parent) */}
-                    {selectedNode.parentId !== null ? (
-                      <div className="flex items-center justify-between py-1 border-b border-[#f0eded]">
-                        <div className="flex items-center gap-1.5 truncate">
-                          <span className="text-[#737785]">IN:</span>
-                          <span className="font-semibold text-[#1b1c1c] truncate" title={parentNode ? nameOf(parentNode) : undefined}>
-                            {parentNode ? `${labelOf(parentNode)} ${nameOf(parentNode)}` : 'none'}
-                          </span>
-                          <span className="text-[#737785]">
-                            ({selectedNode.sourceSide ?? 'auto'} → {selectedNode.targetSide ?? 'auto'})
-                          </span>
-                        </div>
-                        {selectedNode.targetPinned ? (
-                          <span className="text-[8px] px-1 py-0.5 rounded-[2px] bg-[#fff3cd] text-[#856404] border border-[#ffeeba]">
-                            PINNED
-                          </span>
-                        ) : (
-                          <span className="text-[8px] text-[#737785]">AUTO</span>
-                        )}
+                  <div className="flex flex-col gap-1 border border-[#ebebeb] rounded-[2px] p-2.5 bg-[#ffffff] font-mono text-[9.5px]">
+                    {connections.length === 0 ? (
+                      <div className="text-[#737785] italic">
+                        Not connected. Drag from a dot on the card&apos;s edge to another card.
                       </div>
                     ) : (
-                      <div className="py-1 border-b border-[#f0eded] text-[#737785] italic">
-                        Root idea (no parent)
-                      </div>
-                    )}
-
-                    {/* Outgoing (Children) */}
-                    {childNodes.length > 0 ? (
-                      <div className="flex flex-col gap-1 pt-1">
-                        <span className="text-[#737785] text-[8.5px]">OUTGOING BRANCHES:</span>
-                        {childNodes.map((child) => (
-                          <div key={child.id} className="flex items-center justify-between gap-2">
-                            <span className="text-[#1b1c1c] font-medium truncate" title={nameOf(child)}>
-                              {labelOf(child)} {child.title || child.type}
-                            </span>
-                            <span className="text-[#737785] shrink-0">
-                              ({child.sourceSide ?? 'auto'} → {child.targetSide ?? 'auto'})
-                            </span>
+                      connections.map((edge) => {
+                        const outgoing = edge.source === selectedNode.id;
+                        const other = byId.get(outgoing ? edge.target : edge.source);
+                        return (
+                          <div
+                            key={edge.id}
+                            className="flex items-center justify-between gap-2 py-0.5"
+                            data-testid={`connection-row-${edge.id}`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => canvasActions.selectEdge(edge.id)}
+                              className="flex items-center gap-1.5 min-w-0 text-left bg-transparent border-0 p-0 cursor-pointer hover:text-[#0051c3]"
+                              title="Select this connector"
+                            >
+                              <span className="text-[#737785] shrink-0">{outgoing ? 'OUT →' : 'IN ←'}</span>
+                              <span className="font-semibold text-[#1b1c1c] truncate" title={other ? nameOf(other) : undefined}>
+                                {other ? `${labelOf(other)} ${nameOf(other)}` : 'missing'}
+                              </span>
+                              <span className="text-[#737785] shrink-0">
+                                ({outgoing ? edge.sourceSide : edge.targetSide} → {outgoing ? edge.targetSide : edge.sourceSide})
+                                {edge.sourcePinned || edge.targetPinned ? ' · pinned' : ''}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => canvasActions.removeEdge(edge.id)}
+                              className="shrink-0 w-4 h-4 rounded-[2px] text-[#737785] hover:text-white hover:bg-[#ba1a1a] cursor-pointer leading-none"
+                              title="Remove this connection"
+                              aria-label="Remove connection"
+                              data-testid={`connection-remove-${edge.id}`}
+                            >
+                              ✕
+                            </button>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="pt-1 text-[#737785] italic">
-                        No sub-ideas attached
-                      </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
               </div>
             )}
           </>
+        ) : selectedEdge ? (
+          <ConnectorPanel edge={selectedEdge} byId={byId} labelOf={labelOf} nameOf={nameOf} />
         ) : (
           /* Empty Selection State */
           <div className="flex flex-col items-center text-center pt-8 pb-4">
@@ -545,7 +634,7 @@ export function NodeInspectorRail({
               No Idea Selected
             </h3>
             <p className="font-serif text-[13px] leading-[20px] text-[#595959] m-0 mb-6 max-w-[280px]">
-              Click any idea card on the canvas to view or edit its notes, change its type, add images, or connect new thoughts.
+              Click any idea card on the canvas to view or edit its notes, change its type, add images, or connect new thoughts. Double-click empty canvas to add an idea.
             </p>
           </div>
         )}
@@ -560,39 +649,38 @@ export function NodeInspectorRail({
                 IDEA: <strong className="text-[#1b1c1c] font-normal">{labelOf(selectedNode)}</strong>
               </span>
               <span className="truncate">
-                PARENT:{' '}
-                <strong className="text-[#1b1c1c] font-normal">
-                  {parentNode ? labelOf(parentNode) : 'none'}
-                </strong>
+                LINKS: <strong className="text-[#1b1c1c] font-normal">{connections.length}</strong>
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span>CREATED: {formatDate(selectedNode.createdAt) ?? '—'}</span>
               <span>UPDATED: {formatRelativeTime(selectedNode.updatedAt) ?? '—'}</span>
             </div>
-            {selectedNode.parentId !== null && (
-              <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[#ebebeb]">
-                <span className="shrink-0 text-[#595959]">CONNECT UNDER:</span>
-                <select
-                  value={selectedNode.parentId ?? ''}
-                  onChange={(e) => {
-                    const newParent = e.target.value;
-                    if (newParent && newParent !== selectedNode.parentId) {
-                      canvasActions.reparentChild(selectedNode.id, newParent);
-                    }
-                  }}
-                  className="font-mono text-[9px] bg-white border border-[#ebebeb] rounded-[2px] px-1 py-0.5 text-[#1b1c1c] focus:outline-none focus:border-[#0051c3] cursor-pointer max-w-[160px] truncate"
-                  title="Connect under a different parent idea"
-                  data-testid="reconnect-parent-select"
-                >
-                  {reparentOptions.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.parentId === null ? 'ROOT' : labelOf(n)} {nameOf(n).slice(0, 40)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[#ebebeb]">
+              <span className="shrink-0 text-[#595959]">CONNECT TO:</span>
+              <select
+                value=""
+                onChange={(e) => {
+                  const targetId = e.target.value;
+                  const target = byId.get(targetId);
+                  if (!target) return;
+                  const sides = computeFacingSides(selectedNode.position, target.position);
+                  const ends = { source: selectedNode.id, target: targetId, ...sides };
+                  if (isDuplicateEdge(canvas, ends)) return;
+                  canvasActions.connect(ends);
+                }}
+                className="font-mono text-[9px] bg-white border border-[#ebebeb] rounded-[2px] px-1 py-0.5 text-[#1b1c1c] focus:outline-none focus:border-[#0051c3] cursor-pointer max-w-[160px] truncate"
+                title="Connect this idea to another one"
+                data-testid="connect-to-select"
+              >
+                <option value="">Choose an idea…</option>
+                {connectOptions.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {labelOf(n)} {nameOf(n).slice(0, 40)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
 
@@ -605,7 +693,7 @@ export function NodeInspectorRail({
                 <span>DELTA: <strong className="text-[#0051c3]">{dragInfo.dx >= 0 ? `+${dragInfo.dx}` : dragInfo.dx} / {dragInfo.dy >= 0 ? `+${dragInfo.dy}` : dragInfo.dy}</strong></span>
               </div>
               <div className="flex items-center justify-between">
-                <span>SNAPPING: <strong>20px Grid</strong></span>
+                <span>SNAPPING: <strong>Off (hold Shift)</strong></span>
                 <span>STATUS: <strong className="text-[#0051c3]">Dragging</strong></span>
               </div>
             </div>
@@ -626,7 +714,7 @@ export function NodeInspectorRail({
                 onClick={() => onAddChild?.(selectedNode.id)}
                 className="flex-1 font-mono text-[10px] h-8 bg-[#0051c3] hover:bg-[#003b93] justify-center"
               >
-                + Add Sub-Idea
+                + Add Connected Idea
               </Button>
               <Button
                 size="sm"

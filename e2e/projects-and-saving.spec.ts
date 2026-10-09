@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 
-import { expect, openDashboard, test, waitForSaved } from './fixtures';
+import { addIdea, expect, openDashboard, test, waitForSaved } from './fixtures';
 
 /**
  * Project switching and the save pipeline, end to end against the real API
@@ -28,9 +28,9 @@ async function getProject(page: Page, id: string): Promise<ApiProject> {
 }
 
 async function createRootTitled(page: Page, title: string): Promise<void> {
-  await page.getByTestId('btn-create-root').click();
+  await addIdea(page);
   await page.getByTestId('node-editor-title').fill(title);
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
 }
 
 test('switching projects keeps each canvas in its own project', async ({ dashboard: page }) => {
@@ -39,7 +39,7 @@ test('switching projects keeps each canvas in its own project', async ({ dashboa
 
   await page.getByTestId('btn-new-project').click();
   await expect(page.locator('[data-testid^="node-card-"]')).toHaveCount(0);
-  await expect(page.getByTestId('btn-create-root')).toBeVisible();
+  await expect(page.getByTestId('empty-canvas-affordance')).toHaveCount(0);
 
   // Switch back and forth quickly, then check what the server holds.
   const projects = await listProjects(page);

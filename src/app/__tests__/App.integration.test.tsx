@@ -1,7 +1,7 @@
 /**
  * Integration tests for the App shell and its save pipeline.
  *
- * Requirements exercised: 2.1, 4.1, and the AUDIT §1 data-safety invariants:
+ * Requirements exercised: 2.1 (a new project is just an empty canvas), 4.1, and the AUDIT §1 data-safety invariants:
  *   - the loaded canvas is not echoed back to the server;
  *   - nothing is saved before the first load completes;
  *   - switching projects never writes one project's canvas into another;
@@ -19,7 +19,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { addRoot, emptyCanvas, updateNode } from '../../data/mutators';
+import { addNode, emptyCanvas, updateNode } from '../../data/mutators';
 import { canvasActions, useCanvasStore } from '../../data/store';
 import type { CanvasState } from '../../data/store';
 import type { Canvas } from '../../data';
@@ -34,6 +34,7 @@ vi.mock('../../canvas', () => ({
   CanvasView: () => <div data-testid="mock-canvas-view" />,
   computeChildPosition: () => ({ x: 0, y: 0 }),
   computeTreeLayout: (canvas: unknown) => canvas,
+  findFreePosition: (_canvas: unknown, desired: { x: number; y: number }) => desired,
   getMeasuredSizes: () => new Map(),
   NODE_WIDTH: 220,
   NODE_HEIGHT: 120,
@@ -79,7 +80,7 @@ vi.mock('../../lib/projects-api', () => api);
 function cleanState(): CanvasState {
   return {
     canvas: emptyCanvas(),
-    selection: { nodeId: null },
+    selection: { nodeId: null, edgeId: null },
     editor: { openNodeId: null },
     deletePrompt: { nodeId: null },
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -110,7 +111,7 @@ async function renderShell(): Promise<void> {
 }
 
 function rootCanvas(title: string): Canvas {
-  const c = addRoot({ ...emptyCanvas(), title }, { position: { x: 0, y: 0 } });
+  const c = addNode({ ...emptyCanvas(), title }, { position: { x: 0, y: 0 } });
   return updateNode(c, c.nodes[0]!.id, { title: `${title} root` });
 }
 
@@ -144,65 +145,72 @@ describe('App shell — integration', () => {
   });
 
   /* ---------------------------------------------------------------------- */
-  /* R2.1 — empty-canvas affordance                                          */
+  /* Empty canvas                                                            */
   /* ---------------------------------------------------------------------- */
 
-  it('shows btn-create-root when the loaded project has no nodes (R2.1)', async () => {
+  it('a new project shows an empty canvas with no prompt card on it', async () => {
     await renderShell();
-    expect(await screen.findByTestId('btn-create-root')).toBeVisible();
+
+    expect(screen.getByTestId('mock-canvas-view')).toBeInTheDocument();
+    expect(screen.queryByTestId('empty-canvas-affordance')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('btn-create-root')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('btn-load-example')).not.toBeInTheDocument();
+    expect(screen.queryByText(/What are you planning today/i)).not.toBeInTheDocument();
+    expect(useCanvasStore.getState().canvas.nodes).toHaveLength(0);
+    expect(useCanvasStore.getState().editor.openNodeId).toBeNull();
   });
 
-  it('clicking btn-create-root adds a root node to the store (R2.1)', async () => {
+  it('Add Idea on an empty canvas adds one blank, unconnected idea and opens its editor', async () => {
     const user = userEvent.setup();
     await renderShell();
 
     await act(async () => {
-      await user.click(await screen.findByTestId('btn-create-root'));
+      await user.click(screen.getByRole('button', { name: /Add Idea/i }));
     });
 
-    expect(useCanvasStore.getState().canvas.nodes).toHaveLength(1);
+    const { canvas, editor } = useCanvasStore.getState();
+    expect(canvas.nodes).toHaveLength(1);
+    expect(canvas.nodes[0]!.title).toBe('');
+    expect(canvas.edges).toHaveLength(0);
+    expect(editor.openNodeId).toBe(canvas.nodes[0]!.id);
   });
 
-  it('creating a root with a premise uses it as the title and adds nothing else', async () => {
+  it('pressing N adds a blank idea, again on a canvas that already has ideas', async () => {
     const user = userEvent.setup();
     await renderShell();
-
-    await act(async () => {
-      await user.type(await screen.findByLabelText(/Main Topic or Goal/i), 'My premise');
-      await user.click(screen.getByTestId('btn-create-root'));
-    });
-
-    const { nodes } = useCanvasStore.getState().canvas;
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0]!.title).toBe('My premise');
-    expect(nodes[0]!.body).toBe('');
-  });
-
-  it('pressing N on an empty canvas creates a blank root, not a demo tree', async () => {
-    const user = userEvent.setup();
-    await renderShell();
-    await screen.findByTestId('btn-create-root');
 
     await act(async () => {
       await user.keyboard('n');
     });
+    act(() => canvasActions.closeEditor());
+    act(() => canvasActions.select(null));
+    await act(async () => {
+      await user.keyboard('n');
+    });
 
-    const { nodes } = useCanvasStore.getState().canvas;
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0]!.title).toBe('');
+    const { nodes, edges } = useCanvasStore.getState().canvas;
+    expect(nodes).toHaveLength(2);
+    expect(edges).toHaveLength(0);
   });
 
-  it('"Load example" fills the canvas in one step and undo restores the empty canvas', async () => {
+  it('Add Idea with an idea selected connects the new idea to it', async () => {
     const user = userEvent.setup();
     await renderShell();
+    await act(async () => {
+      await user.keyboard('n');
+    });
+    const first = useCanvasStore.getState().canvas.nodes[0]!.id;
+    act(() => canvasActions.closeEditor());
+    act(() => canvasActions.select(first));
 
     await act(async () => {
-      await user.click(await screen.findByTestId('btn-load-example'));
+      await user.click(screen.getByRole('button', { name: /Add Idea/i }));
     });
-    expect(useCanvasStore.getState().canvas.nodes).toHaveLength(4);
 
-    act(() => canvasActions.undo());
-    expect(useCanvasStore.getState().canvas.nodes).toHaveLength(0);
+    const { nodes, edges } = useCanvasStore.getState().canvas;
+    expect(nodes).toHaveLength(2);
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ source: first });
   });
 
   /* ---------------------------------------------------------------------- */

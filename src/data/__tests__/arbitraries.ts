@@ -12,8 +12,7 @@
  *
  * The remaining exports are small helper arbitraries and *canvas-scoped*
  * arbitrary factories that individual property tests use to draw a random
- * node id or a random parent/child edge out of a canvas produced by
- * `arbCanvas`.
+ * node id or a random edge out of a canvas produced by `arbCanvas`.
  *
  * Requirements: 9.1, 9.2, 9.3.
  */
@@ -23,13 +22,16 @@ import fc from 'fast-check';
 import {
   addChild,
   addImage,
-  addRoot,
+  addNode,
+  connect,
   deleteNodeOnly,
   deleteSubtree,
   emptyCanvas,
   moveNode,
+  removeEdge,
   removeImage,
   setCollapsed,
+  updateEdge,
   updateNode,
   type NodePatch,
 } from '../mutators';
@@ -38,6 +40,7 @@ import type {
   ImageEntry,
   NodeType,
   Position,
+  Side,
   UUID,
 } from '../types';
 
@@ -80,6 +83,9 @@ export const arbImageEntry: fc.Arbitrary<ImageEntry> = fc.record({
   addedAt: fc.constant('2024-01-01T00:00:00.000Z'),
 });
 
+/** Uniform over the four card sides. */
+export const arbSide: fc.Arbitrary<Side> = fc.constantFrom<Side>('top', 'right', 'bottom', 'left');
+
 /* -------------------------------------------------------------------------- */
 /* Operation plan                                                             */
 /* -------------------------------------------------------------------------- */
@@ -95,7 +101,7 @@ export const arbImageEntry: fc.Arbitrary<ImageEntry> = fc.record({
  * them explicitly to keep intent readable.
  */
 type Op =
-  | { readonly kind: 'addRoot'; readonly position: Position }
+  | { readonly kind: 'addNode'; readonly position: Position }
   | {
       readonly kind: 'addChild';
       readonly nodeIdx: number;
@@ -127,7 +133,22 @@ type Op =
       readonly value: boolean;
     }
   | { readonly kind: 'deleteNodeOnly'; readonly nodeIdx: number }
-  | { readonly kind: 'deleteSubtree'; readonly nodeIdx: number };
+  | { readonly kind: 'deleteSubtree'; readonly nodeIdx: number }
+  | {
+      readonly kind: 'connect';
+      readonly fromIdx: number;
+      readonly toIdx: number;
+      readonly sourceSide: Side;
+      readonly targetSide: Side;
+    }
+  | {
+      readonly kind: 'updateEdge';
+      readonly edgeIdx: number;
+      readonly toIdx: number;
+      readonly sourceSide: Side;
+      readonly targetSide: Side;
+    }
+  | { readonly kind: 'removeEdge'; readonly edgeIdx: number };
 
 /**
  * A `NodePatch` with each key independently present or absent. Under
@@ -147,9 +168,34 @@ const arbNodePatch: fc.Arbitrary<NodePatch> = fc.record(
 /** Non-negative integer used as an abstract node/image slot index. */
 const arbSlot: fc.Arbitrary<number> = fc.integer({ min: 0, max: 255 });
 
-const arbOpAddRoot: fc.Arbitrary<Op> = arbPosition.map((position) => ({
-  kind: 'addRoot' as const,
+const arbOpAddNode: fc.Arbitrary<Op> = arbPosition.map((position) => ({
+  kind: 'addNode' as const,
   position,
+}));
+
+const arbOpConnect: fc.Arbitrary<Op> = fc
+  .tuple(arbSlot, arbSlot, arbSide, arbSide)
+  .map(([fromIdx, toIdx, sourceSide, targetSide]) => ({
+    kind: 'connect' as const,
+    fromIdx,
+    toIdx,
+    sourceSide,
+    targetSide,
+  }));
+
+const arbOpUpdateEdge: fc.Arbitrary<Op> = fc
+  .tuple(arbSlot, arbSlot, arbSide, arbSide)
+  .map(([edgeIdx, toIdx, sourceSide, targetSide]) => ({
+    kind: 'updateEdge' as const,
+    edgeIdx,
+    toIdx,
+    sourceSide,
+    targetSide,
+  }));
+
+const arbOpRemoveEdge: fc.Arbitrary<Op> = arbSlot.map((edgeIdx) => ({
+  kind: 'removeEdge' as const,
+  edgeIdx,
 }));
 
 const arbOpAddChild: fc.Arbitrary<Op> = fc
@@ -211,15 +257,17 @@ const arbOpDeleteSubtree: fc.Arbitrary<Op> = arbSlot.map((nodeIdx) => ({
 }));
 
 /**
- * The op distribution is weighted so canvases actually grow. `addRoot` is
- * a no-op on every non-empty canvas, so it stays cheap; `addChild` is
- * amplified so a plan of 20–30 ops typically yields a canvas with a
- * handful of interior nodes; deletes are kept below growth so we still
- * regularly reach non-trivial sizes.
+ * The op distribution is weighted so canvases actually grow: `addNode` and
+ * `addChild` create cards, `connect` wires any two of them on any sides,
+ * and the deletes are kept below growth so we still regularly reach
+ * non-trivial sizes.
  */
 const arbOp: fc.Arbitrary<Op> = fc.oneof(
-  { arbitrary: arbOpAddRoot, weight: 2 },
-  { arbitrary: arbOpAddChild, weight: 6 },
+  { arbitrary: arbOpAddNode, weight: 3 },
+  { arbitrary: arbOpAddChild, weight: 4 },
+  { arbitrary: arbOpConnect, weight: 5 },
+  { arbitrary: arbOpUpdateEdge, weight: 1 },
+  { arbitrary: arbOpRemoveEdge, weight: 1 },
   { arbitrary: arbOpUpdateNode, weight: 2 },
   { arbitrary: arbOpAddImage, weight: 2 },
   { arbitrary: arbOpRemoveImage, weight: 1 },
@@ -233,15 +281,40 @@ const arbOp: fc.Arbitrary<Op> = fc.oneof(
  * Apply a single operation to `c`, resolving abstract slot indices into
  * the current node/image list by modulo (so any generated index is always
  * meaningful when the target list is non-empty). Ops that target an
- * empty list return `c` unchanged; `addRoot` on a non-empty canvas is
- * handled by the mutator itself (also a no-op).
+ * empty list return `c` unchanged.
  */
 function applyOp(c: Canvas, op: Op): Canvas {
-  if (op.kind === 'addRoot') {
-    return addRoot(c, { position: op.position });
+  if (op.kind === 'addNode') {
+    return addNode(c, { position: op.position });
   }
 
   if (c.nodes.length === 0) return c;
+
+  if (op.kind === 'connect') {
+    const from = c.nodes[op.fromIdx % c.nodes.length]!;
+    const to = c.nodes[op.toIdx % c.nodes.length]!;
+    return connect(c, {
+      source: from.id,
+      target: to.id,
+      sourceSide: op.sourceSide,
+      targetSide: op.targetSide,
+    });
+  }
+  if (op.kind === 'updateEdge') {
+    if (c.edges.length === 0) return c;
+    const edge = c.edges[op.edgeIdx % c.edges.length]!;
+    const to = c.nodes[op.toIdx % c.nodes.length]!;
+    return updateEdge(c, edge.id, {
+      source: edge.source,
+      target: to.id,
+      sourceSide: op.sourceSide,
+      targetSide: op.targetSide,
+    });
+  }
+  if (op.kind === 'removeEdge') {
+    if (c.edges.length === 0) return c;
+    return removeEdge(c, c.edges[op.edgeIdx % c.edges.length]!.id);
+  }
 
   const nodeIdx = op.nodeIdx % c.nodes.length;
   const target = c.nodes[nodeIdx]!; // safe: nodeIdx is in [0, nodes.length)
@@ -276,9 +349,9 @@ function applyOp(c: Canvas, op: Op): Canvas {
 /**
  * A `Canvas` produced by folding a random sequence of 0–30 mutator
  * operations over `emptyCanvas()`. By construction every generated canvas
- * satisfies the four structural invariants enforced by
- * `canvasSchema.superRefine` — unique ids, ≤ 1 root (= 1 when non-empty),
- * no dangling `parentId`, no cycles — which is exactly Property 15.
+ * satisfies the structural invariants enforced by `canvasSchema` — unique
+ * node and edge ids, no dangling, self or duplicate connectors — which is
+ * exactly Property 15.
  *
  * Individual property tests either consume the canvas directly (e.g.
  * Property 15 itself, Property 16 serialization round-trip) or `chain`
@@ -310,22 +383,12 @@ export function arbNodeId(c: Canvas): fc.Arbitrary<UUID> {
 }
 
 /**
- * Uniform over the direct `(parentId, childId)` edges in `c`. Precondition:
- * `c` contains at least one non-root node. Callers should `chain` this
- * onto `arbCanvas.filter(hasParentChildEdge)` where the filter is trivially
- * `c.nodes.some((n) => n.parentId !== null)`.
+ * Uniform over the connectors in `c`. Precondition: `c` has at least one
+ * connector; `chain` it onto `arbCanvas.filter((c) => c.edges.length > 0)`.
  */
-export function arbParentChildPair(
-  c: Canvas,
-): fc.Arbitrary<readonly [UUID, UUID]> {
-  const pairs: Array<readonly [UUID, UUID]> = [];
-  for (const n of c.nodes) {
-    if (n.parentId !== null) pairs.push([n.parentId, n.id] as const);
+export function arbEdge(c: Canvas): fc.Arbitrary<Canvas['edges'][number]> {
+  if (c.edges.length === 0) {
+    throw new Error('arbEdge requires a canvas with >= 1 connector');
   }
-  if (pairs.length === 0) {
-    throw new Error(
-      'arbParentChildPair requires a canvas with ≥ 1 parent-child edge',
-    );
-  }
-  return fc.constantFrom(...pairs);
+  return fc.constantFrom(...c.edges);
 }

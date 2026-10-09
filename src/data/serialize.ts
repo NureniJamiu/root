@@ -17,7 +17,7 @@
  */
 
 import { canvasSchema } from './schema';
-import type { Canvas, ImageEntry, Node, Position } from './types';
+import type { Canvas, Edge, ImageEntry, Node, Position } from './types';
 
 /* -------------------------------------------------------------------------- */
 /* Stable field ordering                                                      */
@@ -43,13 +43,11 @@ function orderedImage(img: ImageEntry): ImageEntry {
 
 /**
  * Rebuild a `Node` with a fixed key order:
- * id, parentId, title, body, images, type, position, collapsed,
- * createdAt, updatedAt.
+ * id, title, body, images, type, position, collapsed, createdAt, updatedAt.
  */
 function orderedNode(n: Node): Node {
   return {
     id: n.id,
-    parentId: n.parentId,
     title: n.title,
     body: n.body,
     images: n.images.map(orderedImage),
@@ -58,16 +56,28 @@ function orderedNode(n: Node): Node {
     collapsed: n.collapsed,
     createdAt: n.createdAt,
     updatedAt: n.updatedAt,
-    ...(n.sourceSide !== undefined ? { sourceSide: n.sourceSide } : {}),
-    ...(n.targetSide !== undefined ? { targetSide: n.targetSide } : {}),
-    ...(n.sourcePinned !== undefined ? { sourcePinned: n.sourcePinned } : {}),
-    ...(n.targetPinned !== undefined ? { targetPinned: n.targetPinned } : {}),
+  };
+}
+
+/**
+ * Rebuild an `Edge` with a fixed key order:
+ * id, source, target, sourceSide, targetSide, sourcePinned, targetPinned.
+ */
+function orderedEdge(e: Edge): Edge {
+  return {
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    sourceSide: e.sourceSide,
+    targetSide: e.targetSide,
+    sourcePinned: e.sourcePinned,
+    targetPinned: e.targetPinned,
   };
 }
 
 /**
  * Rebuild a `Canvas` with a fixed key order:
- * id, title, nodes, updatedAt.
+ * id, title, nodes, edges, updatedAt.
  *
  * Node array order is preserved as-is; only the *field* order within each
  * object is normalized. Callers that need a canonical node ordering should
@@ -78,6 +88,7 @@ function orderedCanvas(c: Canvas): Canvas {
     id: c.id,
     title: c.title,
     nodes: c.nodes.map(orderedNode),
+    edges: c.edges.map(orderedEdge),
     updatedAt: c.updatedAt,
   };
 }
@@ -113,9 +124,10 @@ export type ParseCanvasResult =
  * branch with the original `raw` string echoed so callers can persist it to
  * the `.raw` recovery slot (R8.5):
  *   1. JSON parse failure (malformed payload).
- *   2. Schema validation failure (shape mismatch, or any of the four
- *      structural invariants enforced by `canvasSchema.superRefine`:
- *      unique ids, single root, no dangling parentId, no cycles).
+ *   2. Schema validation failure (shape mismatch, or a structural invariant
+ *      enforced by `canvasSchema`: unique ids, no dangling or duplicate
+ *      connectors).
+ * Canvases saved in the older `parentId` format are migrated, not rejected.
  */
 export function parseCanvas(raw: string): ParseCanvasResult {
   let json: unknown;

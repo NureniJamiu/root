@@ -1,8 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { emptyCanvas, addRoot, addChild, updateNode } from '../../data/mutators';
+import { emptyCanvas, addNode } from '../../data/mutators';
 import { useCanvasStore } from '../../data/store';
-import { deriveReactFlowGraph } from '../useReactFlowGraph';
 import { NodeInspectorRail } from '../../layout/NodeInspectorRail';
 import { NodeCard } from '../../nodes';
 import type { NodeCardData } from '../../nodes';
@@ -27,64 +26,20 @@ vi.mock('reactflow', () => {
   };
 });
 
-describe('Connectors and Dragging Specifications', () => {
+describe('Card handles, dragging badge and inspector telemetry', () => {
   beforeEach(() => {
     useCanvasStore.setState({
       canvas: emptyCanvas(),
-      selection: { nodeId: null },
+      selection: { nodeId: null, edgeId: null },
       editor: { openNodeId: null },
       deletePrompt: { nodeId: null },
       viewport: { x: 0, y: 0, zoom: 1 },
     });
   });
 
-  describe('deriveReactFlowGraph connector styles', () => {
-    it('applies dashed blue style for dragging target node, solid blue for selected, dashed gray for question, and solid gray for standard', () => {
-      let canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
-      const rootId = canvas.nodes[0]!.id;
-
-      // Child 1: Question node
-      canvas = addChild(canvas, rootId, { position: { x: 300, y: 0 } });
-      const qId = canvas.nodes[1]!.id;
-      canvas = updateNode(canvas, qId, { type: 'question' });
-
-      // Child 2: Finding node
-      canvas = addChild(canvas, rootId, { position: { x: 300, y: 100 } });
-      const fId = canvas.nodes[2]!.id;
-      canvas = updateNode(canvas, fId, { type: 'finding' });
-
-      // Child 3: Conclusion node
-      canvas = addChild(canvas, rootId, { position: { x: 300, y: 200 } });
-      const cId = canvas.nodes[3]!.id;
-      canvas = updateNode(canvas, cId, { type: 'conclusion' });
-
-      // Case 1: Question node unselected
-      const graphNormal = deriveReactFlowGraph(canvas);
-      const qEdge = graphNormal.edges.find((e) => e.target === qId);
-      expect(qEdge?.style?.stroke).toBe('#737785');
-      expect(qEdge?.style?.strokeDasharray).toBe('4 4');
-
-      const cEdge = graphNormal.edges.find((e) => e.target === cId);
-      expect(cEdge?.style?.stroke).toBe('#737785');
-      expect(cEdge?.style?.strokeDasharray).toBeUndefined();
-
-      // Case 2: Selected finding node
-      const graphSelected = deriveReactFlowGraph(canvas, { selectedNodeId: fId });
-      const fEdge = graphSelected.edges.find((e) => e.target === fId);
-      expect(fEdge?.style?.stroke).toBe('#0051c3');
-      expect(fEdge?.style?.strokeDasharray).toBeUndefined();
-
-      // Case 3: Dragging finding node
-      const graphDragging = deriveReactFlowGraph(canvas, { draggingNodeId: fId });
-      const fDraggingEdge = graphDragging.edges.find((e) => e.target === fId);
-      expect(fDraggingEdge?.style?.stroke).toBe('#0051c3');
-      expect(fDraggingEdge?.style?.strokeDasharray).toBe('5 4');
-    });
-  });
-
   describe('NodeCard Handle orientation and Dragging states', () => {
-    it('mounts incoming handle on Left and outgoing handle on Right for horizontal tree', () => {
-      const canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+    it('mounts a source and a target handle on every side so connectors can attach anywhere', () => {
+      const canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
       const rootId = canvas.nodes[0]!.id;
       useCanvasStore.setState({ canvas });
 
@@ -104,12 +59,14 @@ describe('Connectors and Dragging Specifications', () => {
         />
       );
 
-      expect(screen.getByTestId('handle-target-left')).toBeInTheDocument();
-      expect(screen.getByTestId('handle-source-right')).toBeInTheDocument();
+      for (const side of ['top', 'right', 'bottom', 'left']) {
+        expect(screen.getByTestId(`handle-target-${side}`)).toBeInTheDocument();
+        expect(screen.getByTestId(`handle-source-${side}`)).toBeInTheDocument();
+      }
     });
 
     it('renders the delta badge (and no status pill) when data.isDragging is true', () => {
-      const canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+      const canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
       const rootId = canvas.nodes[0]!.id;
       useCanvasStore.setState({ canvas });
 
@@ -135,7 +92,7 @@ describe('Connectors and Dragging Specifications', () => {
       );
 
       expect(screen.getByText(/dx:\s*\+85px,\s*dy:\s*-40px/)).toBeInTheDocument();
-      expect(screen.getByText('snaps to 20px')).toBeInTheDocument();
+      expect(screen.getByText('Shift snaps')).toBeInTheDocument();
       // The border carries the state; there are no SELECTED / DRAGGING pills.
       expect(screen.queryByText('DRAGGING ACTIVE')).not.toBeInTheDocument();
       expect(screen.queryByText('SELECTED')).not.toBeInTheDocument();
@@ -144,11 +101,11 @@ describe('Connectors and Dragging Specifications', () => {
 
   describe('NodeInspectorRail classification switching and live drag telemetry', () => {
     it('allows one-click classification type switching', () => {
-      const canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+      const canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
       const rootId = canvas.nodes[0]!.id;
       useCanvasStore.setState({
         canvas,
-        selection: { nodeId: rootId },
+        selection: { nodeId: rootId, edgeId: null },
       });
 
       render(<NodeInspectorRail />);
@@ -166,12 +123,12 @@ describe('Connectors and Dragging Specifications', () => {
       expect(useCanvasStore.getState().canvas.nodes[0]!.type).toBe('question');
     });
 
-    it('displays live coordinates, delta, and 20px snapping telemetry when dragging', () => {
-      const canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+    it('displays live coordinates, delta and snapping telemetry when dragging', () => {
+      const canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
       const rootId = canvas.nodes[0]!.id;
       useCanvasStore.setState({
         canvas,
-        selection: { nodeId: rootId },
+        selection: { nodeId: rootId, edgeId: null },
       });
 
       const dragInfo = {
@@ -188,7 +145,7 @@ describe('Connectors and Dragging Specifications', () => {
 
       expect(screen.getByText('X: 535 Y: 170')).toBeInTheDocument();
       expect(screen.getByText('+85 / -40')).toBeInTheDocument();
-      expect(screen.getByText('20px Grid')).toBeInTheDocument();
+      expect(screen.getByText('Off (hold Shift)')).toBeInTheDocument();
       expect(screen.getByText(/Moving idea/)).toBeInTheDocument();
     });
   });

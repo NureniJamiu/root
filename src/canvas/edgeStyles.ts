@@ -1,72 +1,48 @@
 /**
- * Edge styling constants for the Canvas Layer.
+ * Connector styling constants for the Canvas Layer.
  *
- * The Canvas Layer never stores edges in the domain model (R9.3 — the tree
- * shape is `parentId`-only) so every edge is derived per render in
- * `useReactFlowGraph`. This module centralises the visual attributes those
- * derived edges take on.
- *
- * Token source: DESIGN.md §Style Foundations
- *   color.text.tertiary = #312e2e — used as the connector stroke color.
- *
- * Keeping the values here (rather than sprinkled through the derivation
- * hook) lets tests import the exact numbers and lets any future theme
- * work touch a single file.
+ * Connectors are derived per render in `useReactFlowGraph` and drawn by
+ * `ConnectorEdge`. A connector takes the colour of the idea type it leaves,
+ * so a glance at the canvas shows what feeds what. Question connectors are
+ * dashed to read as open inquiries.
  */
 
 import type { CSSProperties } from 'react';
 
-/**
- * React Flow edge type name registered by default (bezier curve). We do
- * not register any custom edge types for the MVP.
- */
-export const DEFAULT_EDGE_TYPE = 'default' as const;
+import type { NodeType } from '../data';
 
-/**
- * Stroke color for default connectors.
- */
+/** Edge type name registered with React Flow for every connector. */
+export const CONNECTOR_EDGE_TYPE = 'connector' as const;
+
+/** Stroke colour for a connector leaving an idea of each type. */
+export const EDGE_COLOR_BY_TYPE: Readonly<Record<NodeType, string>> = Object.freeze({
+  topic: '#0051c3',
+  finding: '#2d7a4c',
+  question: '#de5052',
+  conclusion: '#521010',
+});
+
+/** Neutral stroke used when the source type is unknown. */
 export const EDGE_STROKE_COLOR = '#737785' as const;
 
-/**
- * Stroke width for default connectors in CSS pixels.
- */
-export const EDGE_STROKE_WIDTH = 1.5 as const;
+/** Stroke width of a resting connector, in CSS pixels. */
+export const EDGE_STROKE_WIDTH = 2 as const;
 
-/**
- * Active cobalt blue accent for selected and dragging connectors.
- */
-export const SELECTED_EDGE_COLOR = '#0051c3' as const;
+/** Stroke width of a hovered or selected connector. */
+export const EDGE_STROKE_WIDTH_ACTIVE = 3 as const;
 
-/**
- * Default connector style (neutral hairline bezier).
- */
-export const DEFAULT_EDGE_STYLE: CSSProperties = Object.freeze({
-  stroke: EDGE_STROKE_COLOR,
-  strokeWidth: EDGE_STROKE_WIDTH,
-});
+/** Radius of the dot drawn where a connector meets a card. */
+export const EDGE_DOT_RADIUS = 4 as const;
 
-/**
- * Selected connector style (solid vibrant cobalt blue).
- */
-export const SELECTED_EDGE_STYLE: CSSProperties = Object.freeze({
-  stroke: SELECTED_EDGE_COLOR,
-  strokeWidth: 2,
-});
+/** Width of the invisible band around a connector that still counts as a click on it. */
+export const EDGE_INTERACTION_WIDTH = 24 as const;
 
-/**
- * Dragging connector style (dashed vibrant cobalt blue).
- */
-export const DRAGGING_EDGE_STYLE: CSSProperties = Object.freeze({
-  stroke: SELECTED_EDGE_COLOR,
+/** Dash pattern for connectors that point at an open question. */
+export const EDGE_DASH = '5 4' as const;
+
+/** Line drawn while the user drags a new connector out of a card. */
+export const CONNECTION_LINE_STYLE: CSSProperties = Object.freeze({
+  stroke: '#0051c3',
   strokeWidth: 2,
   strokeDasharray: '5 4',
-});
-
-/**
- * Question connector style (subtle dashed gray for inquiries/hypotheses).
- */
-export const QUESTION_EDGE_STYLE: CSSProperties = Object.freeze({
-  stroke: EDGE_STROKE_COLOR,
-  strokeWidth: 1.5,
-  strokeDasharray: '4 4',
 });

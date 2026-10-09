@@ -2,41 +2,33 @@
  * `useReactFlowGraph` — the derivation hook that turns the Zustand-backed
  * `Canvas` into the `{ nodes, edges }` pair `<ReactFlow>` renders.
  *
- * Contract (design.md §Canvas Layer — Public Surface):
- *
- *   - Subscribes to `useCanvasStore` on the `canvas` slice only. Any change
- *     that does not touch `canvas` (selection, editor, viewport) does not
- *     re-trigger the derivation.
- *   - The visible-node set is computed via `visibleNodeIds(canvas)` so a
- *     collapsed subtree is *not* handed to React Flow at all — cheaper than
- *     rendering-and-hiding, and it matches Requirement 6.4 (collapsed
- *     children and their connectors are absent from the DOM).
+ *   - Subscribes to the `canvas` slice and to the selection. Changes that do
+ *     not touch those (editor, viewport) do not re-run the derivation, and
+ *     neither does dragging a card: live drag positions are overlaid by
+ *     `CanvasView`, and connectors follow their cards inside React Flow.
+ *   - The visible-node set is computed via `visibleNodeIds(canvas)`, so the
+ *     ideas hidden by a collapsed card, and every connector that touches one,
+ *     are not handed to React Flow at all — except those a walkthrough has
+ *     revealed (see `walkthrough.ts`).
  *   - RF `nodes` map 1:1 to visible domain nodes: `id`, `type: 'research'`,
- *     `position`, `data: { nodeId }`. The card itself reads its full `Node`
- *     back from the store via a memoized selector on `nodeId` (see
- *     `nodes/NodeCard.tsx`); duplicating the whole node into `data` would
- *     make React Flow re-diff every prop on every edit.
- *   - RF `edges` are derived from `parentId` restricted to visible pairs
- *     (Property 2). Every edge uses the shared style from
- *     `./edgeStyles` — 1 px stroke, `#404040`, bezier.
- *
- * Edge id format is `e:{parentId}->{childId}`. It is stable per pair and
- * unique within a canvas, which is all React Flow requires.
+ *     `position`, `data: { nodeId }`. The card reads its full `Node` back from
+ *     the store on its own subscription.
+ *   - RF `edges` map 1:1 to the canvas's visible connectors. The edge id is
+ *     the connector's own id, and its handles name the sides it is attached
+ *     to (`source-right`, `target-top`, ...). Pinned ends use their stored
+ *     side; automatic ends use the side that faces the other card.
  */
 
 import { useMemo } from 'react';
-import type { Edge, Node as RFNode } from 'reactflow';
+import type { Edge as RFEdge, Node as RFNode } from 'reactflow';
 
-import { useCanvasStore, visibleNodeIds } from '../data';
+import { resolveEdgeSides, useCanvasStore } from '../data';
 import type { Canvas, Position, UUID } from '../data';
 
-import {
-  DEFAULT_EDGE_STYLE,
-  DEFAULT_EDGE_TYPE,
-  DRAGGING_EDGE_STYLE,
-  QUESTION_EDGE_STYLE,
-  SELECTED_EDGE_STYLE,
-} from './edgeStyles';
+import { CONNECTOR_EDGE_TYPE, EDGE_COLOR_BY_TYPE, EDGE_INTERACTION_WIDTH } from './edgeStyles';
+import type { ConnectorEdgeData } from './ConnectorEdge';
+import { sourceHandleId, targetHandleId } from './reconnect';
+import { shownNodeIds, useWalkthroughStore } from './walkthrough';
 
 /**
  * The `data` payload React Flow attaches to every `'research'` node. Kept
@@ -47,146 +39,107 @@ export interface ResearchNodeData {
   readonly nodeId: UUID;
 }
 
-import { resolveConnectionSides } from './reconnect';
-
-/**
- * Options controlling connector styles in the derived graph.
- */
 export interface DeriveGraphOptions {
-  readonly selectedNodeId?: UUID | null;
-  readonly draggingNodeId?: UUID | null;
-  readonly nodePositions?: Map<UUID, Position> | undefined;
+  readonly selectedEdgeId?: UUID | null;
+  /** Hidden ideas a walkthrough has revealed; shown as if expanded. */
+  readonly revealed?: readonly UUID[];
 }
 
-/**
- * The React Flow shape returned to `<ReactFlow>`. Exported so tests
- * (Property 2 / Task 9.4) can call the derivation function directly.
- */
 export interface ReactFlowGraph {
   readonly nodes: RFNode<ResearchNodeData>[];
-  readonly edges: Edge[];
+  readonly edges: RFEdge<ConnectorEdgeData>[];
 }
-
-/* -------------------------------------------------------------------------- */
-/* Pure derivation                                                            */
-/* -------------------------------------------------------------------------- */
 
 /**
  * Pure derivation of `{ nodes, edges }` from a canvas. Split from the hook
- * so property tests can call it without mounting React or the store.
+ * so tests can call it without mounting React or the store.
  */
 export function deriveReactFlowGraph(
   canvas: Canvas,
   options?: DeriveGraphOptions,
 ): ReactFlowGraph {
-  const visible = visibleNodeIds(canvas);
-  const rfNodes: RFNode<ResearchNodeData>[] = [];
-  const rfEdges: Edge[] = [];
+  const visible = shownNodeIds(canvas, options?.revealed ?? []);
+  const byId = new Map(canvas.nodes.map((n) => [n.id, n]));
 
+  const nodes: RFNode<ResearchNodeData>[] = [];
   for (const node of canvas.nodes) {
     if (!visible.has(node.id)) continue;
-
-    const livePos = options?.nodePositions?.get(node.id) ?? node.position;
-
-    rfNodes.push({
+    nodes.push({
       id: node.id,
       type: 'research',
-      position: { x: livePos.x, y: livePos.y },
+      position: { x: node.position.x, y: node.position.y },
       data: { nodeId: node.id },
     });
-
-    // Derive the connector to the parent. Restrict to visible pairs so a
-    // parent hidden behind a collapsed grandparent never produces a
-    // dangling edge (Property 2, Requirement 1.5 / 6.4).
-    if (node.parentId !== null && visible.has(node.parentId)) {
-      const parent = canvas.nodes.find((n) => n.id === node.parentId);
-      let sourceHandle = 'source-right';
-      let targetHandle = 'target-left';
-      let sourceSide = node.sourceSide ?? 'right';
-      let targetSide = node.targetSide ?? 'left';
-
-      if (parent) {
-        const parentPos = options?.nodePositions?.get(parent.id) ?? parent.position;
-        const childPos = options?.nodePositions?.get(node.id) ?? node.position;
-
-        const resolved = resolveConnectionSides(parentPos, childPos, node);
-        sourceSide = resolved.sourceSide;
-        targetSide = resolved.targetSide;
-        sourceHandle = `source-${sourceSide}`;
-        targetHandle = `target-${targetSide}`;
-      }
-
-      const isDragging = options?.draggingNodeId === node.id;
-      const isSelected = options?.selectedNodeId === node.id;
-      const isQuestion = node.type === 'question';
-
-      let style = DEFAULT_EDGE_STYLE;
-      if (isDragging) {
-        style = DRAGGING_EDGE_STYLE;
-      } else if (isSelected) {
-        style = SELECTED_EDGE_STYLE;
-      } else if (isQuestion) {
-        style = QUESTION_EDGE_STYLE;
-      }
-
-      rfEdges.push({
-        id: `e:${node.parentId}->${node.id}`,
-        source: node.parentId,
-        target: node.id,
-        sourceHandle,
-        targetHandle,
-        type: DEFAULT_EDGE_TYPE,
-        style,
-        data: {
-          sourceSide,
-          targetSide,
-          sourcePinned: node.sourcePinned ?? false,
-          targetPinned: node.targetPinned ?? false,
-        },
-        reconnectable: true,
-        updatable: true,
-        interactionWidth: 30,
-      });
-    }
   }
 
-  return { nodes: rfNodes, edges: rfEdges };
+  const edges: RFEdge<ConnectorEdgeData>[] = [];
+  for (const edge of canvas.edges) {
+    if (!visible.has(edge.source) || !visible.has(edge.target)) continue;
+    const from = byId.get(edge.source);
+    const to = byId.get(edge.target);
+    const sides = from && to ? resolveEdgeSides(edge, from.position, to.position) : edge;
+    edges.push({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: sourceHandleId(sides.sourceSide),
+      targetHandle: targetHandleId(sides.targetSide),
+      type: CONNECTOR_EDGE_TYPE,
+      selected: options?.selectedEdgeId === edge.id,
+      data: {
+        color: from ? EDGE_COLOR_BY_TYPE[from.type] : '#737785',
+        dashed: to?.type === 'question',
+      },
+      reconnectable: true,
+      interactionWidth: EDGE_INTERACTION_WIDTH,
+    });
+  }
+
+  return { nodes, edges };
 }
 
-/* -------------------------------------------------------------------------- */
-/* Hook                                                                       */
-/* -------------------------------------------------------------------------- */
-
 /**
- * Selector that returns just the `canvas` slice. Declared at module scope
- * so its identity is stable across renders — Zustand uses reference
- * equality on the selector output to decide whether to re-run subscribers.
+ * Re-resolve the handles of connectors that touch a card being dragged, using
+ * the live positions, so automatic ends re-route while the card moves.
+ * Connectors that do not touch a dragged card keep their object.
  */
+export function relayoutEdges(
+  edges: readonly RFEdge<ConnectorEdgeData>[],
+  canvas: Canvas,
+  live: ReadonlyMap<UUID, Position>,
+): RFEdge<ConnectorEdgeData>[] {
+  const byId = new Map(canvas.nodes.map((n) => [n.id, n]));
+  const stored = new Map(canvas.edges.map((e) => [e.id, e]));
+  return edges.map((rf) => {
+    if (!live.has(rf.source) && !live.has(rf.target)) return rf;
+    const edge = stored.get(rf.id);
+    const from = byId.get(rf.source);
+    const to = byId.get(rf.target);
+    if (!edge || !from || !to) return rf;
+    const sides = resolveEdgeSides(edge, live.get(rf.source) ?? from.position, live.get(rf.target) ?? to.position);
+    const sourceHandle = sourceHandleId(sides.sourceSide);
+    const targetHandle = targetHandleId(sides.targetSide);
+    return sourceHandle === rf.sourceHandle && targetHandle === rf.targetHandle
+      ? rf
+      : { ...rf, sourceHandle, targetHandle };
+  });
+}
+
 function selectCanvas(s: { canvas: Canvas }): Canvas {
   return s.canvas;
 }
 
-function selectSelectedNodeId(s: { selection: { nodeId: UUID | null } }): UUID | null {
-  return s.selection.nodeId;
+function selectSelectedEdgeId(s: { selection: { edgeId: UUID | null } }): UUID | null {
+  return s.selection.edgeId;
 }
 
-/**
- * React hook returning the RF-ready `{ nodes, edges }`. Memoized on canvas,
- * selection, and dragging states.
- */
-export function useReactFlowGraph(options?: DeriveGraphOptions): ReactFlowGraph {
+/** React hook returning the RF-ready `{ nodes, edges }`, memoized on canvas and edge selection. */
+export function useReactFlowGraph(): ReactFlowGraph {
   const canvas = useCanvasStore(selectCanvas);
-  const selectedNodeId = useCanvasStore(selectSelectedNodeId);
-  const draggingNodeId = options?.draggingNodeId ?? null;
-  const nodePositions = options?.nodePositions;
-
+  const selectedEdgeId = useCanvasStore(selectSelectedEdgeId);
+  const revealed = useWalkthroughStore((s) => s.revealed);
   return useMemo(
-    () =>
-      deriveReactFlowGraph(canvas, {
-        selectedNodeId: options?.selectedNodeId !== undefined ? options.selectedNodeId : selectedNodeId,
-        draggingNodeId,
-        nodePositions,
-      }),
-    [canvas, selectedNodeId, options?.selectedNodeId, draggingNodeId, nodePositions],
+    () => deriveReactFlowGraph(canvas, { selectedEdgeId, revealed }),
+    [canvas, selectedEdgeId, revealed],
   );
 }

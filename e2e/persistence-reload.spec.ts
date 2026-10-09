@@ -1,4 +1,4 @@
-import { expect, openDashboard, test, waitForSaved } from './fixtures';
+import { addIdea, expect, openDashboard, test, waitForSaved } from './fixtures';
 
 /**
  * Persistence reload E2E test
@@ -13,10 +13,9 @@ import { expect, openDashboard, test, waitForSaved } from './fixtures';
 test('Persistence reload — state is preserved exactly after reload', async ({ dashboard: page }) => {
   // ── Step 1: the fixture signed in a new user and opened their empty project ──
 
-  // ── Step 2: Create the root node via the empty-canvas affordance ─────────
-  const createRootBtn = page.getByTestId('btn-create-root');
-  await expect(createRootBtn).toBeVisible();
-  await createRootBtn.click();
+  // ── Step 2: Add the first idea to the empty canvas ─────────
+  await expect(page.locator('[data-testid^="node-card-"]')).toHaveCount(0);
+  await addIdea(page);
 
   // ── Step 3: NodeEditor should auto-open (R2.4) ───────────────────────────
   const nodeEditor = page.getByTestId('node-editor');
@@ -28,7 +27,7 @@ test('Persistence reload — state is preserved exactly after reload', async ({ 
   await titleInput.fill('Persisted Root');
 
   // ── Step 5: Close the editor ─────────────────────────────────────────────
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
   await expect(nodeEditor).not.toBeVisible();
 
   // ── Step 6: Add a child node ─────────────────────────────────────────────
@@ -44,7 +43,7 @@ test('Persistence reload — state is preserved exactly after reload', async ({ 
   await page.fill('[data-testid="node-editor-title"]', 'Persisted Child');
 
   // ── Step 8: Close the child editor ───────────────────────────────────────
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
   await expect(nodeEditor).not.toBeVisible();
 
   // ── Step 9: Wait until the save has reached the server (R8.1) ─────────────
@@ -65,9 +64,9 @@ test('Persistence reload — state is preserved exactly after reload', async ({ 
 });
 
 test('Persistence — a second account starts with an empty canvas', async ({ dashboard: page, browser, baseURL }) => {
-  await page.getByTestId('btn-create-root').click();
+  await addIdea(page);
   await page.getByTestId('node-editor-title').fill('Private to the first user');
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
   await waitForSaved(page);
 
   // A different user in a different browser context: nothing is shared with them.
@@ -79,7 +78,7 @@ test('Persistence — a second account starts with an empty canvas', async ({ da
   });
   await openDashboard(otherPage);
 
-  await expect(otherPage.getByTestId('btn-create-root')).toBeVisible();
+  await expect(otherPage.getByTestId('empty-canvas-affordance')).toHaveCount(0);
   await expect(otherPage.locator('[data-testid^="node-card-"]')).toHaveCount(0);
   await other.close();
 });

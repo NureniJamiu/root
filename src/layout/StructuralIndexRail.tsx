@@ -54,12 +54,12 @@ export function StructuralIndexRail({
     projects && projects.length > 0
       ? projects
       : [
-          {
-            id: 'default',
-            title: 'Idea Canvas',
-            nodeCount,
-          },
-        ];
+        {
+          id: 'default',
+          title: 'Idea Canvas',
+          nodeCount,
+        },
+      ];
 
   const currentActiveId = activeProjectId ?? projectList[0]?.id ?? 'default';
 
@@ -106,7 +106,7 @@ export function StructuralIndexRail({
           size="sm"
           variant="cobalt"
           onClick={onNewProject}
-          className="w-full h-8 bg-[#0051c3] text-[11px]"
+          className="w-full h-10 bg-[#0051c3] text-[11px] uppercase"
           icon={
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -131,11 +131,10 @@ export function StructuralIndexRail({
               key={project.id}
               onClick={() => onSelectProject?.(project.id)}
               onMouseLeave={() => isConfirmingDelete && setPendingDeleteId(null)}
-              className={`group relative flex items-center gap-2 pl-3 pr-1.5 py-2 rounded-[2px] text-left transition-colors cursor-pointer ${
-                isActive
-                  ? 'bg-[#ffffff] border border-[#ebebeb] text-[#000000]'
-                  : 'border border-transparent text-[#404040] hover:bg-[#f0eded] hover:text-[#000000]'
-              }`}
+              className={`group relative flex items-center gap-2 pl-3 pr-1.5 py-2 rounded-[2px] text-left transition-colors cursor-pointer ${isActive
+                ? 'bg-[#ffffff] border border-[#ebebeb] text-[#000000]'
+                : 'border border-transparent text-[#404040] hover:bg-[#f0eded] hover:text-[#000000]'
+                }`}
               data-testid={`project-item-${project.id}`}
             >
               {isActive && (
@@ -199,7 +198,7 @@ export function StructuralIndexRail({
             <button
               type="button"
               onClick={onSignOut}
-              className="h-8 px-2 flex items-center gap-2 rounded-[2px] font-mono text-[11px] text-[#595959] hover:text-[#ba1a1a] hover:bg-[#fdf2f2] transition-colors cursor-pointer"
+              className="h-8 px-2 flex items-center gap-2 rounded-[2px] font-mono text-[11px] text-[#ba1a1a] bg-[#fdf2f2] hover:bg-[#f9dede] transition-colors cursor-pointer"
               data-testid="btn-sign-out"
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

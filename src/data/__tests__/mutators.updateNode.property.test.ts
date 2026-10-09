@@ -12,7 +12,7 @@
  *
  *   (b) Unpatched fields on the target node are unchanged — for every
  *       patchable key absent from `patch`, and for every non-patchable
- *       field (`id`, `parentId`, `images`, `position`, `collapsed`,
+ *       field (`id`, `images`, `position`, `collapsed`,
  *       `createdAt`), the field is byte-identical to the pre-image.
  *
  *   (c) Other nodes are unchanged — every node in `c'` whose id is not
@@ -118,8 +118,7 @@ describe('Feature: root-mvp, Property 6: updateNode preserves the patch', () => 
           //     `updateNode` never touches structural identity, position,
           //     images, collapse state, or the createdAt timestamp.
           expect(after.id).toBe(before.id);
-          expect(after.parentId).toBe(before.parentId);
-          expect(after.images).toEqual(before.images);
+            expect(after.images).toEqual(before.images);
           expect(after.position).toEqual(before.position);
           expect(after.collapsed).toBe(before.collapsed);
           expect(after.createdAt).toBe(before.createdAt);

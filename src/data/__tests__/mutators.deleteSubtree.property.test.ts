@@ -1,99 +1,62 @@
 /**
- * Property test — Property 13: deleteSubtree semantics (task 4.10).
+ * Property test — deleteSubtree semantics.
  *
- * `Feature: root-mvp, Property 13: deleteSubtree semantics`
- *
- * For any structurally valid non-empty `Canvas` `c` and any node id `id`
- * present in `c`, the canvas `c' = deleteSubtree(c, id)` satisfies:
- *
- *   (a) `idsOf(c') === idsOf(c) \ subtreeIds(c, id)` — every node in the
- *       subtree rooted at `id` (inclusive of `id` itself) is removed, and
- *       nothing else is removed or added.
- *   (b) Every node that survives is byte-identical to its pre-image in
- *       `c` (deep-equal). `deleteSubtree` never rewrites a surviving
- *       node's fields — no `updatedAt` bumps, no reparenting, no
- *       position changes.
- *   (c) `canvasSchema.safeParse(c')` succeeds. Because the subtree
- *       rooted at `id` is downward-closed, dropping it cannot leave any
- *       dangling `parentId` and cannot introduce a second root. When
- *       `id` is the root of the canvas, the entire node list is
- *       removed, yielding an empty (still-valid) canvas.
- *
- * Validates: Requirements 7.4.
+ * For any canvas `c` and node `id` in `c`, `c' = deleteSubtree(c, id)` removes
+ * exactly `subtreeIds(c, id)` (the node plus every idea that hangs only from
+ * it) and every connector touching one of them; everything else is unchanged
+ * and the result still satisfies `canvasSchema`.
  */
 
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
+import { subtreeIds } from '../graph';
 import { deleteSubtree } from '../mutators';
 import { canvasSchema } from '../schema';
-import { subtreeIds } from '../tree';
-import type { Canvas } from '../types';
 
 import { arbCanvas, arbNodeId } from './arbitraries';
 
-/**
- * `arbCanvas` may produce an empty canvas. Property 13 targets an id that
- * exists in the canvas, so we filter down to non-empty canvases and then
- * chain a random in-canvas id.
- */
-const arbInput: fc.Arbitrary<{ canvas: Canvas; id: string }> = arbCanvas
+const arbInput = arbCanvas
   .filter((c) => c.nodes.length > 0)
-  .chain((canvas) =>
-    fc.record({
-      canvas: fc.constant(canvas),
-      id: arbNodeId(canvas),
-    }),
-  );
+  .chain((canvas) => fc.record({ canvas: fc.constant(canvas), id: arbNodeId(canvas) }));
 
-describe('Feature: root-mvp, Property 13: deleteSubtree semantics', () => {
-  test('deleteSubtree removes exactly the subtree rooted at id, leaves other nodes unchanged, and preserves structural invariants', () => {
+describe('deleteSubtree semantics', () => {
+  test('removes exactly the subtree and the connectors that touch it', () => {
     fc.assert(
       fc.property(arbInput, ({ canvas, id }) => {
-        const before = canvas;
-        const after = deleteSubtree(before, id);
-
-        // Precompute the target subtree from `before`. `subtreeIds` is
-        // inclusive of `id` and returns a non-empty set whenever `id` is
-        // present in the canvas (which the input arbitrary guarantees).
-        const doomed = subtreeIds(before, id);
-        expect(doomed.size).toBeGreaterThanOrEqual(1);
+        const doomed = subtreeIds(canvas, id);
         expect(doomed.has(id)).toBe(true);
 
-        const beforeIds = new Set(before.nodes.map((n) => n.id));
-        const afterIds = new Set(after.nodes.map((n) => n.id));
-
-        // (a) remaining ids equal idsOf(before) \ subtreeIds(before, id).
-        //     Compute the expected survivor set from `before` and check
-        //     both directions of equality via size + membership.
-        const expectedSurvivors = new Set<string>();
-        for (const nid of beforeIds) {
-          if (!doomed.has(nid)) expectedSurvivors.add(nid);
-        }
-        expect(afterIds.size).toBe(expectedSurvivors.size);
-        for (const nid of expectedSurvivors) expect(afterIds.has(nid)).toBe(true);
-        // No id in `after` was ever in the doomed set.
-        for (const nid of afterIds) expect(doomed.has(nid)).toBe(false);
-
-        // (b) each surviving node is deep-equal to its pre-image in
-        //     `before`. `deleteSubtree` filters the node list rather
-        //     than rebuilding it, so timestamps, parentId, position,
-        //     images, etc. must all be preserved.
-        const beforeById = new Map(before.nodes.map((n) => [n.id, n]));
-        for (const n of after.nodes) {
-          const prior = beforeById.get(n.id);
-          expect(prior).toBeDefined();
-          expect(n).toEqual(prior);
-        }
-
-        // (c) structural invariants — the result round-trips through the
-        //     canvas schema. Deleting the root removes every node
-        //     (subtreeIds at the root spans the full canvas), which
-        //     yields an empty canvas that is still valid.
-        const parsed = canvasSchema.safeParse(after);
-        expect(parsed.success).toBe(true);
+        const after = deleteSubtree(canvas, id);
+        expect(after.nodes).toEqual(canvas.nodes.filter((n) => !doomed.has(n.id)));
+        expect(after.edges).toEqual(
+          canvas.edges.filter((e) => !doomed.has(e.source) && !doomed.has(e.target)),
+        );
+        expect(canvasSchema.safeParse(after).success).toBe(true);
       }),
       { numRuns: 100 },
     );
+  });
+
+  test('ideas that something else also points at are kept', () => {
+    // a -> shared <- b, a -> only. Deleting `a` removes `only` but keeps `shared`.
+    const ids = { a: crypto.randomUUID(), b: crypto.randomUUID(), shared: crypto.randomUUID(), only: crypto.randomUUID() };
+    const ts = new Date().toISOString();
+    const node = (id: string) => ({
+      id, title: '', body: '', images: [], type: 'topic' as const,
+      position: { x: 0, y: 0 }, collapsed: false, createdAt: ts, updatedAt: ts,
+    });
+    const edge = (source: string, target: string) => ({
+      id: crypto.randomUUID(), source, target, sourceSide: 'right' as const, targetSide: 'left' as const, sourcePinned: false, targetPinned: false,
+    });
+    const c = {
+      id: crypto.randomUUID(), title: '', updatedAt: ts,
+      nodes: [node(ids.a), node(ids.b), node(ids.shared), node(ids.only)],
+      edges: [edge(ids.a, ids.shared), edge(ids.b, ids.shared), edge(ids.a, ids.only)],
+    };
+    const after = deleteSubtree(c, ids.a);
+    expect(after.nodes.map((n) => n.id).sort()).toEqual([ids.b, ids.shared].sort());
+    expect(after.edges).toHaveLength(1);
+    expect(after.edges[0]).toMatchObject({ source: ids.b, target: ids.shared });
   });
 });

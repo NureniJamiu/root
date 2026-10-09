@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { addIdea, expect, test } from './fixtures';
 
 /**
  * MVP walkthrough E2E test
@@ -6,7 +6,7 @@ import { expect, test } from './fixtures';
  * Runs as a freshly registered user on /dashboard (see ./fixtures).
  *
  * Covers:
- *  - Creating the root node via the empty-canvas affordance
+ *  - Adding the first idea to an empty canvas (there is no prompt card)
  *  - NodeEditor auto-opening on root creation (R2.4)
  *  - Editing the node title and verifying it appears in the card
  *  - Adding a child node and verifying two node cards appear on canvas
@@ -14,10 +14,9 @@ import { expect, test } from './fixtures';
 test('MVP walkthrough — build a two-node tree', async ({ dashboard: page }) => {
   // ── Step 1: the fixture signed in a new user and opened their empty project ──
 
-  // ── Step 2: Click "Create root node" button ──────────────────────────────
-  const createRootBtn = page.getByTestId('btn-create-root');
-  await expect(createRootBtn).toBeVisible();
-  await createRootBtn.click();
+  // ── Step 2: Add the first idea from the header ──────────────────────────────
+  await expect(page.locator('[data-testid^="node-card-"]')).toHaveCount(0);
+  await addIdea(page);
 
   // ── Step 3: Assert a node card appeared on the canvas ───────────────────
   const firstNodeCard = page.locator('[data-testid^="node-card-"]').first();
@@ -33,7 +32,7 @@ test('MVP walkthrough — build a two-node tree', async ({ dashboard: page }) =>
   await titleInput.fill('Root Research');
 
   // ── Step 6: Close the editor ─────────────────────────────────────────────
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
   await expect(nodeEditor).not.toBeVisible();
 
   // ── Step 7: Assert the node card's title shows "Root Research" ───────────

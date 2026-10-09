@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { addChild, addRoot, emptyCanvas } from '../mutators';
+import { addChild, addNode, emptyCanvas } from '../mutators';
 import { canvasActions, useCanvasStore } from '../store';
-import { formatNodeLabel, nodeLabel, nodeOrdinal, nodeOrdinals } from '../tree';
+import { formatNodeLabel, nodeLabel, nodeOrdinal, nodeOrdinals } from '../graph';
 import type { Canvas } from '../types';
 
 function reset(canvas: Canvas = emptyCanvas()): void {
@@ -18,7 +18,7 @@ describe('canvasActions — history', () => {
   });
 
   it('undo restores the canvas before the last edit and redo re-applies it', () => {
-    canvasActions.addRoot({ x: 0, y: 0 });
+    canvasActions.addNode({ x: 0, y: 0 });
     const rootId = canvas().nodes[0]!.id;
     canvasActions.moveNode(rootId, { x: 40, y: 40 });
 
@@ -34,16 +34,16 @@ describe('canvasActions — history', () => {
   });
 
   it('a new edit clears the redo stack', () => {
-    canvasActions.addRoot({ x: 0, y: 0 });
+    canvasActions.addNode({ x: 0, y: 0 });
     canvasActions.undo();
-    canvasActions.addRoot({ x: 5, y: 5 });
+    canvasActions.addNode({ x: 5, y: 5 });
     canvasActions.redo();
     expect(canvas().nodes).toHaveLength(1);
     expect(canvas().nodes[0]!.position).toEqual({ x: 5, y: 5 });
   });
 
   it('coalesces a burst of typing into one undo step', () => {
-    canvasActions.addRoot({ x: 0, y: 0 });
+    canvasActions.addNode({ x: 0, y: 0 });
     const id = canvas().nodes[0]!.id;
     for (const title of ['H', 'He', 'Hel', 'Hell', 'Hello']) canvasActions.updateNode(id, { title });
     expect(canvas().nodes[0]!.title).toBe('Hello');
@@ -54,7 +54,7 @@ describe('canvasActions — history', () => {
   });
 
   it('undo clears selection and open dialogs that point at a node that no longer exists', () => {
-    canvasActions.addRoot({ x: 0, y: 0 });
+    canvasActions.addNode({ x: 0, y: 0 });
     const rootId = canvas().nodes[0]!.id;
     canvasActions.select(rootId);
     canvasActions.openEditor(rootId);
@@ -66,8 +66,8 @@ describe('canvasActions — history', () => {
   });
 
   it('loadCanvas resets history so undo cannot cross into the previous project', () => {
-    canvasActions.addRoot({ x: 0, y: 0 });
-    const other = addRoot(emptyCanvas(), { position: { x: 1, y: 1 } });
+    canvasActions.addNode({ x: 0, y: 0 });
+    const other = addNode(emptyCanvas(), { position: { x: 1, y: 1 } });
 
     canvasActions.loadCanvas(other);
     canvasActions.undo();
@@ -103,18 +103,18 @@ describe('canvasActions — title, layout and branch expansion', () => {
     expect(canvas()).toBe(before);
   });
 
-  it('applyCanvas validates: an invalid canvas is not committed', () => {
-    let c = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+  it('applyCanvas validates: an invalid canvas is not committed (a connector from a card to itself)', () => {
+    let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     c = addChild(c, c.nodes[0]!.id, { position: { x: 1, y: 1 } });
     reset(c);
     const before = canvas();
-    const broken = { ...before, nodes: before.nodes.map((n) => ({ ...n, parentId: null })) };
+    const broken = { ...before, edges: before.edges.map((e) => ({ ...e, target: e.source })) };
     canvasActions.applyCanvas(broken);
     expect(canvas()).toBe(before);
   });
 
   it('expandSubtree reveals every collapsed descendant, not just one level', () => {
-    let c = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+    let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     const rootId = c.nodes[0]!.id;
     c = addChild(c, rootId, { position: { x: 1, y: 1 } });
     const childId = c.nodes[1]!.id;
@@ -128,7 +128,7 @@ describe('canvasActions — title, layout and branch expansion', () => {
   });
 
   it('setCollapsed(false) still reveals one level only', () => {
-    let c = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+    let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     const rootId = c.nodes[0]!.id;
     c = addChild(c, rootId, { position: { x: 1, y: 1 } });
     const childId = c.nodes[1]!.id;
@@ -143,20 +143,19 @@ describe('canvasActions — title, layout and branch expansion', () => {
 
 describe('node labels', () => {
   it('gives every idea a unique label, however many there are', () => {
-    let c = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+    let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     const rootId = c.nodes[0]!.id;
     for (let i = 0; i < 300; i++) c = addChild(c, rootId, { position: { x: i, y: i } });
 
     const ordinals = nodeOrdinals(c);
     const labels = c.nodes.map((n) => nodeLabel(n, ordinals));
 
-    // Exactly one ROOT; the other 300 labels are all different.
-    expect(labels.filter((l) => l === 'ROOT')).toHaveLength(1);
-    expect(new Set(labels.filter((l) => l !== 'ROOT')).size).toBe(300);
+    // 301 ideas, 301 different labels.
+    expect(new Set(labels).size).toBe(301);
   });
 
   it('nodeOrdinal agrees with nodeOrdinals for every node', () => {
-    let c = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+    let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     for (let i = 0; i < 20; i++) c = addChild(c, c.nodes[0]!.id, { position: { x: i, y: i } });
     const all = nodeOrdinals(c);
     for (const n of c.nodes) {
