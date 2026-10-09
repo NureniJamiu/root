@@ -34,6 +34,7 @@
  */
 
 import { newId } from './ids';
+import { IMAGE_DATA_URL_MAX_BYTES } from './limits';
 import { now } from './time';
 import { hasCycle, subtreeIds } from './tree';
 import type { Canvas, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
@@ -41,9 +42,6 @@ import type { Canvas, ImageEntry, Node, NodeType, Position, Side, UUID } from '.
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
 /* -------------------------------------------------------------------------- */
-
-/** Per-image data-URL byte cap: 2 MB (design.md §Error Handling, R4.4). */
-const IMAGE_DATA_URL_MAX_BYTES = 2 * 1024 * 1024;
 
 /* -------------------------------------------------------------------------- */
 /* Internal helpers                                                           */
@@ -311,6 +309,36 @@ export function setCollapsed(c: Canvas, id: UUID, collapsed: boolean): Canvas {
   }));
   if (nextNodes === null) return c;
   return { ...c, nodes: nextNodes, updatedAt: ts };
+}
+
+/* -------------------------------------------------------------------------- */
+/* expandSubtree                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Clear `collapsed` on the node identified by `id` and on every descendant,
+ * so the whole branch becomes visible (unlike `setCollapsed`, which only
+ * reveals one level). Returns `c` unchanged when the id is unknown or no
+ * node in the branch is collapsed.
+ */
+export function expandSubtree(c: Canvas, id: UUID): Canvas {
+  const branch = subtreeIds(c, id);
+  if (!c.nodes.some((n) => branch.has(n.id) && n.collapsed)) return c;
+  const ts = now();
+  const nextNodes = c.nodes.map((n) =>
+    branch.has(n.id) && n.collapsed ? { ...n, collapsed: false, updatedAt: ts } : n,
+  );
+  return { ...c, nodes: nextNodes, updatedAt: ts };
+}
+
+/* -------------------------------------------------------------------------- */
+/* setCanvasTitle                                                             */
+/* -------------------------------------------------------------------------- */
+
+/** Rename the canvas. Returns `c` unchanged when the title is identical. */
+export function setCanvasTitle(c: Canvas, title: string): Canvas {
+  if (c.title === title) return c;
+  return { ...c, title, updatedAt: now() };
 }
 
 /* -------------------------------------------------------------------------- */

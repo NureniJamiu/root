@@ -11,7 +11,7 @@
  * Visual hierarchy mirrors DESIGN.md and attached visual guide:
  * - Top colored taxonomy accent bar (3px)
  * - High-contrast editorial container with 1px border (2px cobalt when selected/dragging)
- * - Classification badge with SELECTED or DRAGGING ACTIVE state
+ * - Classification badge
  * - Scholarly Serif typography for titles and evidentiary notes
  * - Microscopy plate image preview with title/caption overlay
  * - Branch / child stats and collapsed subtree indicators
@@ -21,17 +21,12 @@ import { memo } from 'react';
 import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
-import { useCanvasStore } from '../data';
+import { formatNodeLabel, nodeOrdinal, useCanvasStore } from '../data';
 import type { Node, UUID } from '../data';
 
 import { CollapseBadge } from './CollapseBadge';
 import { HoverToolbar } from './HoverToolbar';
 import { SELECTION_BORDER_COLOR, typeStyles } from './typeStyles';
-
-/**
- * Number of body characters shown in the card preview.
- */
-const BODY_PREVIEW_LIMIT = 160;
 
 /**
  * The data payload React Flow attaches to a `'research'` node.
@@ -54,7 +49,12 @@ function selectNode(nodeId: UUID) {
 function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
   const { data, selected } = props;
   const node = useCanvasStore(selectNode(data.nodeId));
-  const canvas = useCanvasStore((s) => s.canvas);
+  // Primitive selectors: the card re-renders only when its own numbers change,
+  // not on every edit to any other idea.
+  const childCount = useCanvasStore(
+    (s) => s.canvas.nodes.reduce((n, c) => (c.parentId === data.nodeId ? n + 1 : n), 0),
+  );
+  const ordinal = useCanvasStore((s) => nodeOrdinal(s.canvas, data.nodeId));
 
   // Transiently deleted node guard
   if (node === undefined) return null;
@@ -66,27 +66,18 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
   const borderColor = isSelectedOrDragging ? SELECTION_BORDER_COLOR : style.border;
   const isConclusion = node.type === 'conclusion';
 
-  // Compute children / branch statistics
-  const directChildren = canvas.nodes.filter((n) => n.parentId === node.id);
-  const childCount = directChildren.length;
-  const hasCollapsedChildren = directChildren.some((c) => c.collapsed);
+  // Short label, unique within the canvas
+  const shortId = formatNodeLabel(node, ordinal);
 
-  // Short ID label
-  const isRoot = node.parentId === null;
-  const shortId = isRoot
-    ? 'ROOT-01'
-    : `N-${node.id.slice(0, 2).toUpperCase()}`;
-
-  // Top accent bar color
-  const topAccentColor = isSelectedOrDragging
-    ? '#0051c3'
-    : node.type === 'topic'
-    ? '#0051c3'
-    : node.type === 'finding'
-    ? '#2d7a4c'
-    : node.type === 'question'
-    ? '#de5052'
-    : '#521010';
+  // Top accent bar color: always the idea's type, so selection is carried by the border alone
+  const topAccentColor =
+    node.type === 'topic'
+      ? '#0051c3'
+      : node.type === 'finding'
+      ? '#2d7a4c'
+      : node.type === 'question'
+      ? '#de5052'
+      : '#521010';
 
   return (
     <div
@@ -110,7 +101,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
       {/* Real-time dragging coordinate delta badge */}
       {isDragging && (
         <div
-          className="absolute -top-7 right-0 z-30 font-mono text-[9px] px-2 py-0.5 rounded-[2px] flex items-center gap-2 pointer-events-none whitespace-nowrap shadow-sm"
+          className="absolute -top-7 right-0 z-30 font-mono text-[9px] px-2 py-0.5 rounded-[2px] flex items-center gap-2 pointer-events-none whitespace-nowrap"
           style={{
             background: '#002566',
             color: '#ffffff',
@@ -121,7 +112,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
             dx: {data.dx && data.dx >= 0 ? `+${data.dx}` : data.dx ?? 0}px, dy:{' '}
             {data.dy && data.dy >= 0 ? `+${data.dy}` : data.dy ?? 0}px
           </span>
-          <span className="text-[#a0c4ff]">Grid [Grid 20px]</span>
+          <span className="text-[#a0c4ff]">snaps to 20px</span>
         </div>
       )}
 
@@ -134,7 +125,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         isConnectableStart={true}
         isConnectableEnd={true}
         className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         } z-30`}
         style={{ top: '50%', transform: 'translateY(-50%)' }}
         data-testid="handle-target-left"
@@ -147,7 +138,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         isConnectableStart={true}
         isConnectableEnd={true}
         className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         } z-30`}
         style={{ top: '50%', transform: 'translateY(-50%)' }}
         data-testid="handle-target-right"
@@ -160,7 +151,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         isConnectableStart={true}
         isConnectableEnd={true}
         className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         } z-30`}
         style={{ left: '50%', transform: 'translateX(-50%)' }}
         data-testid="handle-target-top"
@@ -173,7 +164,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         isConnectableStart={true}
         isConnectableEnd={true}
         className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         } z-30`}
         style={{ left: '50%', transform: 'translateX(-50%)' }}
         data-testid="handle-target-bottom"
@@ -192,12 +183,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
 
       {/* Inner Card Body with nodrag so typing and clicking do not drag the node */}
       <div className="p-3 flex flex-col gap-2 nodrag">
-        <Header
-          node={node}
-          selected={selected}
-          isDragging={isDragging}
-          isConclusion={isConclusion}
-        />
+        <Header node={node} isConclusion={isConclusion} />
 
         <BodyPreview body={node.body} isConclusion={isConclusion} />
 
@@ -222,13 +208,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
             <CollapseBadge nodeId={node.id} />
           ) : (
             <span>
-              {isRoot
-                ? hasCollapsedChildren
-                  ? `${childCount} ${childCount === 1 ? 'Branch' : 'Branches'} (1 Collapsed)`
-                  : `${childCount} ${childCount === 1 ? 'Branch' : 'Branches'}`
-                : childCount > 0
-                ? `${childCount} ${childCount === 1 ? 'sub-idea' : 'sub-ideas'}`
-                : ''}
+              {childCount > 0 ? `${childCount} ${childCount === 1 ? 'sub-idea' : 'sub-ideas'}` : ''}
             </span>
           )}
         </div>
@@ -243,7 +223,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         isConnectableStart={true}
         isConnectableEnd={true}
         className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         } z-20`}
         style={{ top: '50%', transform: 'translateY(-50%)' }}
         data-testid="handle-source-right"
@@ -256,7 +236,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         isConnectableStart={true}
         isConnectableEnd={true}
         className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         } z-20`}
         style={{ top: '50%', transform: 'translateY(-50%)' }}
         data-testid="handle-source-left"
@@ -269,7 +249,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         isConnectableStart={true}
         isConnectableEnd={true}
         className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         } z-20`}
         style={{ left: '50%', transform: 'translateX(-50%)' }}
         data-testid="handle-source-top"
@@ -282,7 +262,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         isConnectableStart={true}
         isConnectableEnd={true}
         className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         } z-20`}
         style={{ left: '50%', transform: 'translateX(-50%)' }}
         data-testid="handle-source-bottom"
@@ -300,27 +280,16 @@ NodeCard.displayName = 'NodeCard';
 
 interface HeaderProps {
   readonly node: Node;
-  readonly selected?: boolean;
-  readonly isDragging?: boolean;
   readonly isConclusion: boolean;
 }
 
-function Header({ node, selected, isDragging, isConclusion }: HeaderProps): JSX.Element {
+function Header({ node, isConclusion }: HeaderProps): JSX.Element {
   return (
     <div className="flex flex-col gap-1.5">
       {/* Upper metadata row: Type Pill, Status Pill & Actions */}
       <div className="flex flex-row items-center justify-between gap-1">
         <div className="flex items-center gap-1.5">
           <TypeBadge type={node.type} />
-          {isDragging ? (
-            <span className="font-mono text-[8.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-[2px] bg-[#0051c3] text-white">
-              DRAGGING ACTIVE
-            </span>
-          ) : selected ? (
-            <span className="font-mono text-[8.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-[2px] bg-[#0051c3] text-white">
-              SELECTED
-            </span>
-          ) : null}
         </div>
         <HoverToolbar node={node} />
       </div>
@@ -420,10 +389,6 @@ interface BodyPreviewProps {
 
 function BodyPreview({ body, isConclusion }: BodyPreviewProps): JSX.Element | null {
   if (body.length === 0) return null;
-  const truncated =
-    body.length > BODY_PREVIEW_LIMIT
-      ? `${body.slice(0, BODY_PREVIEW_LIMIT)}…`
-      : body;
   return (
     <p
       className={`mt-0.5 whitespace-pre-wrap leading-[20px] font-serif ${isConclusion ? 'italic' : ''}`}
@@ -431,9 +396,15 @@ function BodyPreview({ body, isConclusion }: BodyPreviewProps): JSX.Element | nu
       style={{
         fontSize: '13px',
         color: '#404040',
+        // Clamp to three lines at a word boundary instead of cutting mid-word.
+        display: '-webkit-box',
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        overflowWrap: 'anywhere',
       }}
     >
-      {truncated}
+      {body}
     </p>
   );
 }

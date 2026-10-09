@@ -108,7 +108,7 @@ describe('Connectors and Dragging Specifications', () => {
       expect(screen.getByTestId('handle-source-right')).toBeInTheDocument();
     });
 
-    it('renders DRAGGING ACTIVE badge and delta tooltip when data.isDragging is true', () => {
+    it('renders the delta badge (and no status pill) when data.isDragging is true', () => {
       const canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
       const rootId = canvas.nodes[0]!.id;
       useCanvasStore.setState({ canvas });
@@ -134,9 +134,11 @@ describe('Connectors and Dragging Specifications', () => {
         />
       );
 
-      expect(screen.getByText('DRAGGING ACTIVE')).toBeInTheDocument();
       expect(screen.getByText(/dx:\s*\+85px,\s*dy:\s*-40px/)).toBeInTheDocument();
-      expect(screen.getByText('Grid [Grid 20px]')).toBeInTheDocument();
+      expect(screen.getByText('snaps to 20px')).toBeInTheDocument();
+      // The border carries the state; there are no SELECTED / DRAGGING pills.
+      expect(screen.queryByText('DRAGGING ACTIVE')).not.toBeInTheDocument();
+      expect(screen.queryByText('SELECTED')).not.toBeInTheDocument();
     });
   });
 
@@ -187,7 +189,7 @@ describe('Connectors and Dragging Specifications', () => {
       expect(screen.getByText('X: 535 Y: 170')).toBeInTheDocument();
       expect(screen.getByText('+85 / -40')).toBeInTheDocument();
       expect(screen.getByText('20px Grid')).toBeInTheDocument();
-      expect(screen.getByText('Repositioning Active...')).toBeInTheDocument();
+      expect(screen.getByText(/Moving idea/)).toBeInTheDocument();
     });
   });
 });

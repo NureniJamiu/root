@@ -14,8 +14,9 @@ const API_BASE = '/api/projects';
 
 /**
  * Fetch list of all projects for the authenticated user (metadata summary).
+ * Resolves to `null` when the server could not be reached.
  */
-export async function fetchProjects(): Promise<ProjectItem[]> {
+export async function fetchProjects(): Promise<ProjectItem[] | null> {
   try {
     const res = await fetch(API_BASE, {
       method: 'GET',
@@ -28,8 +29,8 @@ export async function fetchProjects(): Promise<ProjectItem[]> {
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   } catch (err) {
-    console.warn('Database fetchProjects failed, operating in local mode:', err);
-    return [];
+    console.warn('Database fetchProjects failed:', err);
+    return null;
   }
 }
 
@@ -64,7 +65,6 @@ export async function createProjectApi(payload: {
   id?: string;
   title: string;
   canvas: Canvas;
-  nodeCount?: number;
 }): Promise<ProjectItem | null> {
   try {
     const res = await fetch(API_BASE, {
@@ -89,28 +89,48 @@ export async function createProjectApi(payload: {
   }
 }
 
+export interface SaveResult {
+  readonly ok: boolean;
+  /** HTTP status, or 0 when the request never completed. */
+  readonly status: number;
+  /** Machine-readable reason from the server (e.g. `missing-image`). */
+  readonly code?: string;
+  readonly message?: string;
+}
+
 /**
- * Update project metadata or canvas in the database.
+ * Update project title or canvas in the database. Never throws; the result
+ * says whether the server accepted the write and, if not, why.
+ *
+ * `keepalive` lets the request outlive the page (used while it unloads).
  */
 export async function updateProjectApi(
   id: string,
   payload: {
     title?: string;
     canvas?: Canvas;
-    nodeCount?: number;
   },
-): Promise<boolean> {
+  options: { keepalive?: boolean } = {},
+): Promise<SaveResult> {
   try {
     const res = await fetch(`${API_BASE}/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify(payload),
+      ...(options.keepalive ? { keepalive: true } : {}),
     });
-    return res.ok;
+    if (res.ok) return { ok: true, status: res.status };
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    return {
+      ok: false,
+      status: res.status,
+      ...(body.code ? { code: body.code } : {}),
+      message: body.error ?? `Save failed (${res.status})`,
+    };
   } catch (err) {
     console.warn(`Database updateProject(${id}) failed:`, err);
-    return false;
+    return { ok: false, status: 0, message: 'Could not reach the server' };
   }
 }
 
@@ -124,7 +144,8 @@ export async function deleteProjectApi(id: string): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     });
-    return res.ok;
+    // A project that is already gone counts as deleted.
+    return res.ok || res.status === 404;
   } catch (err) {
     console.warn(`Database deleteProject(${id}) failed:`, err);
     return false;

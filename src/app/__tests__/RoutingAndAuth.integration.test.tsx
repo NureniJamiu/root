@@ -7,6 +7,8 @@ import { App } from '../App';
 vi.mock('../../canvas', () => ({
   CanvasView: () => <div data-testid="mock-canvas-view" />,
   computeChildPosition: () => ({ x: 0, y: 0 }),
+  computeTreeLayout: (canvas: unknown) => canvas,
+  getMeasuredSizes: () => new Map(),
   NODE_WIDTH: 220,
   NODE_HEIGHT: 120,
   SIBLING_GAP: 40,

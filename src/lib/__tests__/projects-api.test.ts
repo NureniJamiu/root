@@ -86,7 +86,6 @@ describe('Projects API Client & Database Boundary', () => {
       id: canvas.id,
       title: 'New Research Project',
       canvas,
-      nodeCount: 0,
     });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -108,7 +107,6 @@ describe('Projects API Client & Database Boundary', () => {
     const success = await updateProjectApi('proj-1', {
       title: 'Updated Title',
       canvas,
-      nodeCount: 2,
     });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -117,7 +115,7 @@ describe('Projects API Client & Database Boundary', () => {
         method: 'PUT',
       }),
     );
-    expect(success).toBe(true);
+    expect(success.ok).toBe(true);
   });
 
   it('deleteProjectApi calls DELETE /api/projects/:id', async () => {

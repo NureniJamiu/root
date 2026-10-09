@@ -2,9 +2,11 @@
  * `CanvasView` — the React Flow adapter for the Root MVP.
  *
  * Real-time dragging architecture:
- * - Local `rfNodes` state synchronized with store `nodes`.
- * - `onNodesChange` wired to `applyNodeChanges` to update position on every frame as cursor moves.
- * - `onNodeDragStart`, `onNodeDrag`, `onNodeDragStop` manage live drag telemetry.
+ * - React Flow is fully controlled: nodes are derived from the store on every
+ *   render (selection and measured sizes included); there is no local mirror.
+ * - `onNodeDragStart`, `onNodeDrag`, `onNodeDragStop` keep the live drag
+ *   position in `dragState`, which overlays the dragged node's position.
+ * - `onNodesChange` records measured card sizes and forwards selection.
  * - Grid snapping with `snapToGrid={true}` and `snapGrid={[20, 20]}`.
  * - Live connector recalculation during drag.
  */
@@ -15,7 +17,6 @@ import ReactFlow, {
   Background,
   ConnectionMode,
   ReactFlowProvider,
-  applyNodeChanges,
   useReactFlow,
   type Connection,
   type Edge,
@@ -32,6 +33,8 @@ import { canvasActions, hasCycle, useCanvasStore } from '../data';
 import type { NodeType, UUID } from '../data';
 import { FitViewIcon, NodeCard, ZoomInIcon, ZoomOutIcon } from '../nodes';
 
+import { getMeasuredSizes, setMeasuredSize } from './measuredSizes';
+import type { NodeSize } from './measuredSizes';
 import { useReactFlowGraph } from './useReactFlowGraph';
 import { determineReconnect, determineReparent, resolveConnectionSides } from './reconnect';
 import { computeTreeLayout } from './placement';
@@ -69,12 +72,7 @@ export interface CanvasViewProbeProps {
 }
 
 export interface CanvasViewControls {
-  readonly zoomIn: () => void;
-  readonly zoomOut: () => void;
   readonly fitView: () => void;
-  readonly centerRoot: () => void;
-  readonly autoLayout?: () => void;
-  readonly zoomPercent: number;
 }
 
 export interface CanvasViewProps {
@@ -119,34 +117,10 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     nodePositions,
   });
 
-  const [rfNodes, setRfNodes] = useState(derivedNodes);
-
-  // Sync rfNodes with derivedNodes, augmenting with live dragging data
-  useEffect(() => {
-    setRfNodes((prev) => {
-      return derivedNodes.map((dn) => {
-        const isDragging = dragState?.nodeId === dn.id;
-        const currentPos = isDragging
-          ? { x: dragState.currentX, y: dragState.currentY }
-          : dn.position;
-
-        // If dragging, preserve the node's position from local state if available
-        const localNode = prev.find((p) => p.id === dn.id);
-        const resolvedPos = isDragging && localNode ? localNode.position : currentPos;
-
-        return {
-          ...dn,
-          position: resolvedPos,
-          data: {
-            ...dn.data,
-            isDragging,
-            dx: isDragging ? dragState.dx : undefined,
-            dy: isDragging ? dragState.dy : undefined,
-          },
-        };
-      });
-    });
-  }, [derivedNodes, dragState]);
+  // Card sizes measured by React Flow. React Flow keeps width/height on the
+  // node objects it is given, so they are merged back in below.
+  const [sizes, setSizes] = useState<ReadonlyMap<UUID, NodeSize>>(() => new Map());
+  const selectedNodeId = useCanvasStore((s) => s.selection.nodeId);
 
   const reactFlow = useReactFlow();
   const canvas = useCanvasStore((s) => s.canvas);
@@ -178,10 +152,33 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     }
   }, [canvas.nodes, reactFlow]);
 
-  // Handle node position changes emitted by React Flow in real-time
+  // React Flow reports measured sizes and selection through `onNodesChange`;
+  // positions come from the drag handlers below.
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
-    setRfNodes((nds) => applyNodeChanges(changes, nds));
-  }, []);
+    const measured: Array<[UUID, NodeSize]> = [];
+    let selectedId: UUID | null = null;
+    for (const change of changes) {
+      if (change.type === 'dimensions' && change.dimensions) {
+        if (setMeasuredSize(change.id, change.dimensions)) {
+          measured.push([change.id, change.dimensions]);
+        }
+      } else if (change.type === 'select' && change.selected) {
+        selectedId = change.id;
+      }
+    }
+    if (measured.length > 0) {
+      setSizes((prev) => {
+        const next = new Map(prev);
+        for (const [id, size] of measured) next.set(id, size);
+        return next;
+      });
+    }
+    // Keyboard selection (Tab, then Enter/Space) arrives here, not via click.
+    if (selectedId !== null && selectedId !== useCanvasStore.getState().selection.nodeId) {
+      canvasActions.select(selectedId);
+      onNodeSelect?.(selectedId);
+    }
+  }, [onNodeSelect]);
 
   // Real-time drag handlers
   const handleNodeDragStart = useCallback<NodeDragHandler>(
@@ -284,22 +281,18 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, [onPaneClick]);
 
   const handleConnect = useCallback((connection: Connection) => {
-    console.log('[handleConnect]', connection);
     if (!connection.source || !connection.target || connection.source === connection.target) return;
     const { canvas } = useCanvasStore.getState();
     const resolution = determineReparent(canvas, connection);
-    console.log('[handleConnect resolution]', resolution);
     if (resolution && !hasCycle(canvas, resolution.childId, resolution.parentId)) {
       canvasActions.updateConnection(resolution.childId, resolution);
     }
   }, []);
 
   const handleReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
-    console.log('[handleReconnect]', oldEdge, newConnection);
     if (!newConnection.source || !newConnection.target) return;
     const { canvas } = useCanvasStore.getState();
     const resolution = determineReconnect(canvas, oldEdge, newConnection);
-    console.log('[handleReconnect resolution]', resolution);
     if (resolution && !hasCycle(canvas, resolution.childId, resolution.parentId)) {
       canvasActions.updateConnection(resolution.childId, resolution);
     }
@@ -318,8 +311,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
 
   const handleAutoLayout = useCallback(() => {
     const current = useCanvasStore.getState().canvas;
-    const layouted = computeTreeLayout(current);
-    useCanvasStore.setState({ canvas: layouted });
+    canvasActions.applyCanvas(computeTreeLayout(current, getMeasuredSizes()));
     setTimeout(() => {
       reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
     }, 50);
@@ -327,19 +319,36 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
 
   const zoomPercent = Math.round(storeViewport.zoom * 100);
 
-  // Dim ideas that don't match the highlighted type.
+  // What React Flow renders: derived nodes plus selection, measured sizes,
+  // live drag data and the type-highlight dimming.
   const displayNodes = useMemo(() => {
-    if (!highlightType) return rfNodes;
-    const typeById = new Map(canvas.nodes.map((n) => [n.id, n.type]));
-    return rfNodes.map((n) => ({
-      ...n,
-      style: {
-        ...n.style,
-        opacity: typeById.get(n.id) === highlightType ? 1 : 0.25,
-        transition: 'opacity 150ms ease-out',
-      },
-    }));
-  }, [rfNodes, canvas.nodes, highlightType]);
+    const typeById = highlightType
+      ? new Map(canvas.nodes.map((n) => [n.id, n.type]))
+      : null;
+    return derivedNodes.map((dn) => {
+      const size = sizes.get(dn.id);
+      const isDragging = dragState?.nodeId === dn.id;
+      return {
+        ...dn,
+        selected: dn.id === selectedNodeId,
+        ...(size ? { width: size.width, height: size.height } : {}),
+        data: {
+          ...dn.data,
+          isDragging,
+          dx: isDragging ? dragState.dx : undefined,
+          dy: isDragging ? dragState.dy : undefined,
+        },
+        ...(typeById
+          ? {
+              style: {
+                opacity: typeById.get(dn.id) === highlightType ? 1 : 0.25,
+                transition: 'opacity 150ms ease-out',
+              },
+            }
+          : {}),
+      };
+    });
+  }, [derivedNodes, sizes, selectedNodeId, dragState, canvas.nodes, highlightType]);
 
   // Delete / Backspace opens the delete prompt for the selected idea.
   useEffect(() => {
@@ -357,15 +366,8 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, []);
 
   useEffect(() => {
-    onControlsReady?.({
-      zoomIn: handleZoomIn,
-      zoomOut: handleZoomOut,
-      fitView: handleFitView,
-      centerRoot: handleCenterRoot,
-      autoLayout: handleAutoLayout,
-      zoomPercent,
-    });
-  }, [handleZoomIn, handleZoomOut, handleFitView, handleCenterRoot, handleAutoLayout, zoomPercent, onControlsReady]);
+    onControlsReady?.({ fitView: handleFitView });
+  }, [handleFitView, onControlsReady]);
 
   useEffect(() => {
     if (onRFPropsMounted === undefined) return;

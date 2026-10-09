@@ -1,8 +1,9 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 /**
  * MVP walkthrough E2E test
  * Requirements: 2.1, 2.4, 3.1, 4.2
+ * Runs as a freshly registered user on /dashboard (see ./fixtures).
  *
  * Covers:
  *  - Creating the root node via the empty-canvas affordance
@@ -10,14 +11,8 @@ import { test, expect } from '@playwright/test';
  *  - Editing the node title and verifying it appears in the card
  *  - Adding a child node and verifying two node cards appear on canvas
  */
-test('MVP walkthrough — build a two-node tree', async ({ page }) => {
-  // Clear any persisted state so we always start from an empty canvas.
-  await page.addInitScript(() => {
-    localStorage.clear();
-  });
-
-  // ── Step 1: Navigate to the app ──────────────────────────────────────────
-  await page.goto('/');
+test('MVP walkthrough — build a two-node tree', async ({ dashboard: page }) => {
+  // ── Step 1: the fixture signed in a new user and opened their empty project ──
 
   // ── Step 2: Click "Create root node" button ──────────────────────────────
   const createRootBtn = page.getByTestId('btn-create-root');

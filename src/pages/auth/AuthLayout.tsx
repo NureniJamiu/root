@@ -20,7 +20,7 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps): JSX.
           {subtitle && <p className="text-xs text-[#737785] font-sans mt-1">{subtitle}</p>}
         </div>
 
-        <div className="bg-[#ffffff] border border-[#ebebeb] rounded-sm p-6 shadow-sm">
+        <div className="bg-[#ffffff] border border-[#ebebeb] rounded-sm p-6">
           {children}
         </div>
 

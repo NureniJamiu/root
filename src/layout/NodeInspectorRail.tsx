@@ -1,16 +1,95 @@
-import { useMemo, useRef } from 'react';
-import type { ChangeEvent } from 'react';
-import { useCanvasStore, canvasActions, descendantCount, hasCycle } from '../data';
-import type { Node, NodeType, UUID } from '../data';
+import { useMemo, useRef, useState } from 'react';
+import type { ChangeEvent, DragEvent } from 'react';
+import {
+  IMAGE_DATA_URL_MAX_BYTES,
+  NODE_TITLE_MAX,
+  canvasActions,
+  childrenIndex,
+  nodeLabel,
+  nodeOrdinals,
+  subtreeIds,
+  useCanvasStore,
+} from '../data';
+import type { ImageEntry, Node, NodeType, UUID } from '../data';
 import type { DragState } from '../canvas';
+import type { SaveStatus } from '../lib/save-queue';
 import { Button } from '../ui/Button';
+import { formatDataUrlSize, formatDate, formatRelativeTime } from './formatTime';
 
 export interface NodeInspectorRailProps {
   readonly onOpenEditor?: (nodeId: UUID) => void;
   readonly onAddChild?: (parentId: UUID) => void;
-  readonly isOpen?: boolean;
   readonly onClose?: () => void;
   readonly dragInfo?: DragState | null;
+  /** State of the project's save pipeline; drives the "Saved" indicator. */
+  readonly saveStatus?: SaveStatus;
+}
+
+const SAVE_LABELS: Record<SaveStatus, string> = {
+  saved: 'Saved',
+  saving: 'Saving…',
+  error: 'Not saved — retrying',
+};
+
+function SaveIndicator({ status }: { readonly status: SaveStatus }): JSX.Element {
+  return (
+    <div
+      className="flex items-center gap-1.5 font-mono text-[9px] text-[#737785]"
+      role="status"
+      data-testid="save-status"
+      data-status={status}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${
+          status === 'error' ? 'bg-[#ba1a1a]' : status === 'saving' ? 'bg-[#737785]' : 'bg-[#0051c3]'
+        }`}
+      />
+      <span className={status === 'error' ? 'text-[#ba1a1a]' : undefined}>{SAVE_LABELS[status]}</span>
+    </div>
+  );
+}
+
+/** One attached image with its real dimensions and size. */
+function ImageAttachment({
+  nodeId,
+  image,
+  index,
+}: {
+  readonly nodeId: UUID;
+  readonly image: ImageEntry;
+  readonly index: number;
+}): JSX.Element {
+  const [dimensions, setDimensions] = useState<string | null>(null);
+  return (
+    <div className="relative border border-[#ebebeb] rounded-[2px] overflow-hidden bg-[#000000]">
+      <div className="relative h-[130px] w-full flex items-center justify-center">
+        <img
+          src={image.dataUrl}
+          alt={`Attached visual ${index + 1}`}
+          className="w-full h-full object-cover"
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            if (img.naturalWidth > 0) setDimensions(`${img.naturalWidth}×${img.naturalHeight}`);
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => canvasActions.removeImage(nodeId, image.id)}
+          className="absolute top-2 right-2 w-5 h-5 bg-black/70 hover:bg-[#ba1a1a] text-white rounded-[2px] flex items-center justify-center font-mono text-[10px] cursor-pointer"
+          title="Remove image"
+          aria-label={`Remove image ${index + 1}`}
+        >
+          ✕
+        </button>
+      </div>
+      <div className="bg-[#f5f3f3] px-2.5 py-1.5 border-t border-[#ebebeb] flex flex-col font-mono">
+        <span className="text-[9px] text-[#737785]">
+          {dimensions ? `${dimensions} • ` : ''}
+          {formatDataUrlSize(image.dataUrl)}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function NodeInspectorRail({
@@ -18,50 +97,69 @@ export function NodeInspectorRail({
   onAddChild,
   onClose,
   dragInfo,
+  saveStatus = 'saved',
 }: NodeInspectorRailProps): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const selectionId = useCanvasStore((s) => s.selection.nodeId);
-  const selectedNode = canvas.nodes.find((n) => n.id === selectionId);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [isDropTarget, setIsDropTarget] = useState(false);
 
-  // Compute node path breadcrumb
-  const computePath = (node: Node | undefined): string => {
-    if (!node) {
+  // Indexes built once per canvas change, not once per lookup.
+  const { byId, children, ordinals } = useMemo(
+    () => ({
+      byId: new Map(canvas.nodes.map((n) => [n.id, n])),
+      children: childrenIndex(canvas),
+      ordinals: nodeOrdinals(canvas),
+    }),
+    [canvas],
+  );
+
+  const selectedNode: Node | undefined = selectionId ? byId.get(selectionId) : undefined;
+  const labelOf = (node: Node): string => nodeLabel(node, ordinals);
+  const nameOf = (node: Node): string => node.title || 'Untitled idea';
+
+  // Breadcrumb of titles from the root down to the selected idea.
+  const pathString = useMemo(() => {
+    if (!selectedNode) {
       return canvas.nodes.length === 0 ? 'None (No ideas yet)' : 'None (Select an idea)';
     }
-    const path: string[] = [node.title || 'Untitled Idea'];
-    let curr = node;
-    while (curr.parentId) {
-      const parent = canvas.nodes.find((n) => n.id === curr.parentId);
-      if (!parent) break;
-      path.unshift(parent.title || 'Untitled Idea');
-      curr = parent;
+    const path: string[] = [];
+    for (let cur: Node | undefined = selectedNode; cur; cur = cur.parentId ? byId.get(cur.parentId) : undefined) {
+      path.unshift(cur.title || 'Untitled Idea');
     }
     return path.join(' > ');
-  };
+  }, [selectedNode, byId, canvas.nodes.length]);
 
-  const pathString = computePath(selectedNode);
+  const parentNode = selectedNode?.parentId ? byId.get(selectedNode.parentId) : undefined;
+  const childNodes = selectedNode ? (children.get(selectedNode.id) ?? []) : [];
 
-  // Short ID for display (e.g. N-04 or ROOT-01)
-  const shortId = useMemo(() => {
-    if (!selectedNode) return 'N-00';
-    if (selectedNode.parentId === null) return 'ROOT-01';
-    return `N-${selectedNode.id.slice(0, 2).toUpperCase()}`;
-  }, [selectedNode]);
+  // Everything under the selected idea, counted by type.
+  const branchStats = useMemo(() => {
+    const counts: Record<NodeType, number> = { topic: 0, finding: 0, question: 0, conclusion: 0 };
+    let total = 0;
+    if (selectedNode) {
+      for (const id of subtreeIds(canvas, selectedNode.id)) {
+        if (id === selectedNode.id) continue;
+        const node = byId.get(id);
+        if (node) {
+          counts[node.type] += 1;
+          total += 1;
+        }
+      }
+    }
+    return { counts, total };
+  }, [canvas, byId, selectedNode]);
 
-  const parentShortId = useMemo(() => {
-    if (!selectedNode || !selectedNode.parentId) return 'none';
-    const parent = canvas.nodes.find((n) => n.id === selectedNode.parentId);
-    if (!parent) return 'none';
-    return parent.parentId === null ? 'node_root_01' : `node_${parent.id.slice(0, 6)}`;
-  }, [canvas.nodes, selectedNode]);
+  // Ideas this one may be re-attached under: anything outside its own branch.
+  const reparentOptions = useMemo(() => {
+    if (!selectedNode) return [];
+    const ownBranch = subtreeIds(canvas, selectedNode.id);
+    return canvas.nodes.filter((n) => !ownBranch.has(n.id));
+  }, [canvas, selectedNode]);
 
-  const nodeIdFormatted = selectedNode ? `node_${selectedNode.id.slice(0, 6)}` : 'none';
-
-  // Subtree metrics
-  const isCollapsed = selectedNode?.collapsed;
-  const hiddenCount = selectedNode ? descendantCount(canvas, selectedNode.id) : 0;
-  const isInspectingCollapsedSubtree = selectedNode && (isCollapsed || hiddenCount > 0);
+  const hiddenCount = branchStats.total;
+  const isCollapsed = selectedNode?.collapsed ?? false;
 
   // Check if current selected node is being dragged
   const isSelectedDragging = dragInfo && selectedNode && dragInfo.nodeId === selectedNode.id;
@@ -72,22 +170,40 @@ export function NodeInspectorRail({
     canvasActions.updateNode(selectedNode.id, { type });
   };
 
-  // Handle image upload
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Read a picked or dropped image file onto the selected idea.
+  const attachImage = (file: File | undefined) => {
     if (!file || !selectedNode) return;
+    if (!file.type.startsWith('image/')) {
+      setImageError('That file is not an image.');
+      return;
+    }
+    const nodeId = selectedNode.id;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        canvasActions.addImage(selectedNode.id, {
-          id: crypto.randomUUID(),
-          dataUrl: reader.result,
-          addedAt: new Date().toISOString(),
-        });
+      if (typeof reader.result !== 'string') return;
+      if (reader.result.length > IMAGE_DATA_URL_MAX_BYTES) {
+        setImageError('That image is larger than 2 MB. Choose a smaller one.');
+        return;
       }
+      setImageError(null);
+      canvasActions.addImage(nodeId, {
+        id: crypto.randomUUID(),
+        dataUrl: reader.result,
+        addedAt: new Date().toISOString(),
+      });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    attachImage(e.target.files?.[0]);
     e.target.value = '';
+  };
+
+  const handleDrop = (e: DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setIsDropTarget(false);
+    attachImage(e.dataTransfer.files[0]);
   };
 
   return (
@@ -121,7 +237,7 @@ export function NodeInspectorRail({
           <div className="flex items-center gap-2 shrink-0">
             {selectedNode && (
               <span className="font-mono text-[10px] text-[#1b1c1c] border border-[#ebebeb] bg-[#ffffff] px-1.5 py-0.5 rounded-[2px]">
-                {shortId}
+                {labelOf(selectedNode)}
               </span>
             )}
             {onClose && (
@@ -161,7 +277,7 @@ export function NodeInspectorRail({
         {selectedNode ? (
           <>
             {/* View A: Collapsed Branch View */}
-            {isInspectingCollapsedSubtree && isCollapsed ? (
+            {isCollapsed ? (
               <div className="flex flex-col gap-3.5">
                 {/* Collapsed Branch Summary Header */}
                 <div className="border border-[#f5c2c7] bg-[#fdf2f2] rounded-[2px] p-2.5 flex flex-col gap-1 text-[#521010]">
@@ -181,56 +297,32 @@ export function NodeInspectorRail({
                   </span>
                 </div>
 
-                {/* Hidden Points Metric Cards */}
+                {/* Hidden ideas, counted by type */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between font-mono text-[9px] text-[#595959] tracking-wider uppercase">
                     <span>SUB-IDEAS UNDER THIS BRANCH</span>
-                    <span className="text-[#ba1a1a] font-semibold">{hiddenCount} Hidden Points</span>
+                    <span className="text-[#ba1a1a] font-semibold">
+                      {hiddenCount} Hidden {hiddenCount === 1 ? 'Idea' : 'Ideas'}
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="border border-[#ebebeb] bg-[#fbf9f8] p-2 rounded-[2px] flex flex-col items-center justify-center text-center">
-                      <span className="font-mono text-[18px] font-bold text-[#0051c3]">3</span>
-                      <span className="font-serif text-[11px] text-[#404040]">Key Points</span>
-                    </div>
-                    <div className="border border-[#ebebeb] bg-[#fbf9f8] p-2 rounded-[2px] flex flex-col items-center justify-center text-center">
-                      <span className="font-mono text-[18px] font-bold text-[#de5052]">2</span>
-                      <span className="font-serif text-[11px] text-[#404040]">Open Questions</span>
-                    </div>
-                    <div className="border border-[#ebebeb] bg-[#fbf9f8] p-2 rounded-[2px] flex flex-col items-center justify-center text-center">
-                      <span className="font-mono text-[18px] font-bold text-[#521010]">2</span>
-                      <span className="font-serif text-[11px] text-[#404040]">Takeaways</span>
-                    </div>
-                    <div className="border border-[#ebebeb] bg-[#fbf9f8] p-2 rounded-[2px] flex flex-col items-center justify-center text-center">
-                      <span className="font-mono text-[18px] font-bold text-[#595959]">4</span>
-                      <span className="font-serif text-[11px] text-[#404040]">References</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* References & Links */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between font-mono text-[9px] text-[#595959] tracking-wider uppercase">
-                    <span>SAVED REFERENCES & LINKS</span>
-                    <span className="text-[#0051c3]">4 Links</span>
-                  </div>
-
-                  <div className="flex flex-col divide-y divide-[#ebebeb] border border-[#ebebeb] rounded-[2px] bg-[#ffffff]">
-                    {[
-                      { ref: 'youtube.com/watch?v=creative-habits', label: 'Video Guide' },
-                      { ref: 'notion.so/creative-brief-outline', label: 'Script Notes' },
-                      { ref: 'medium.com/storytelling-for-video', label: 'Article' },
-                      { ref: 'drive.google.com/asset-package-v1', label: 'Assets' },
-                    ].map((item) => (
-                      <div key={item.ref} className="px-2.5 py-1.5 flex items-center justify-between font-mono text-[9.5px]">
-                        <div className="flex items-center gap-1.5 text-[#1b1c1c] truncate">
-                          <svg className="w-3 h-3 text-[#737785] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                            <polyline points="14 2 14 8 20 8" />
-                          </svg>
-                          <span className="truncate hover:underline cursor-pointer">{item.ref}</span>
-                        </div>
-                        <span className="text-[#737785] shrink-0">{item.label}</span>
+                  <div className="grid grid-cols-2 gap-2" data-testid="branch-stats">
+                    {(
+                      [
+                        ['topic', 'Topics', '#0051c3'],
+                        ['finding', 'Findings', '#2d7a4c'],
+                        ['question', 'Open Questions', '#de5052'],
+                        ['conclusion', 'Conclusions', '#521010'],
+                      ] as const
+                    ).map(([type, label, color]) => (
+                      <div
+                        key={type}
+                        className="border border-[#ebebeb] bg-[#fbf9f8] p-2 rounded-[2px] flex flex-col items-center justify-center text-center"
+                      >
+                        <span className="font-mono text-[18px] font-bold" style={{ color }}>
+                          {branchStats.counts[type]}
+                        </span>
+                        <span className="font-serif text-[11px] text-[#404040]">{label}</span>
                       </div>
                     ))}
                   </div>
@@ -240,7 +332,7 @@ export function NodeInspectorRail({
                 <div className="flex flex-col gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => canvasActions.setCollapsed(selectedNode.id, false)}
+                    onClick={() => canvasActions.expandSubtree(selectedNode.id)}
                     className="w-full h-8 bg-[#0051c3] hover:bg-[#003b93] text-white font-mono text-[10px] font-medium rounded-[2px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <span>⇅</span>
@@ -252,14 +344,14 @@ export function NodeInspectorRail({
                     className="w-full h-7 bg-white hover:bg-[#f5f3f3] border border-[#ebebeb] text-[#404040] font-mono text-[10px] rounded-[2px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                   >
                     <span>⤢</span>
-                    <span>Focus on This Branch Only</span>
+                    <span>Open in editor</span>
                   </button>
                 </div>
               </div>
             ) : null}
 
             {/* View B: Standard Node Inspector Form */}
-            {(!isInspectingCollapsedSubtree || !isCollapsed) && (
+            {!isCollapsed && (
               <div className="flex flex-col gap-4">
                 {/* 1. Classification Type */}
                 <div className="flex flex-col gap-1.5">
@@ -277,7 +369,7 @@ export function NodeInspectorRail({
                           onClick={() => handleTypeChange(type)}
                           className={`h-7 text-[10px] font-mono rounded-[1px] transition-all cursor-pointer flex items-center justify-center font-medium ${
                             isActive
-                              ? 'bg-[#003b93] text-[#ffffff] shadow-sm'
+                              ? 'bg-[#003b93] text-[#ffffff]'
                               : 'text-[#404040] hover:text-[#000000] hover:bg-[#ffffff]'
                           }`}
                         >
@@ -292,16 +384,18 @@ export function NodeInspectorRail({
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between font-mono text-[9px] text-[#595959] tracking-[0.06em] uppercase">
                     <span>TITLE</span>
-                    <span className="text-[#737785]">{selectedNode.title.length}/128</span>
+                    <span className="text-[#737785]">{selectedNode.title.length}/{NODE_TITLE_MAX}</span>
                   </div>
                   <input
                     type="text"
                     value={selectedNode.title}
                     onChange={(e) =>
                       canvasActions.updateNode(selectedNode.id, {
-                        title: e.target.value.slice(0, 128),
+                        title: e.target.value.slice(0, NODE_TITLE_MAX),
                       })
                     }
+                    maxLength={NODE_TITLE_MAX}
+                    aria-label="Idea title"
                     placeholder="Give this idea a clear, simple title..."
                     className="w-full px-3 py-2 font-serif text-[15px] font-medium leading-tight text-[#000000] border border-[#ebebeb] bg-[#ffffff] rounded-[2px] focus:outline-none focus:border-[#000000] transition-colors box-border"
                   />
@@ -319,6 +413,7 @@ export function NodeInspectorRail({
                     onChange={(e) =>
                       canvasActions.updateNode(selectedNode.id, { body: e.target.value })
                     }
+                    aria-label="Notes and details"
                     placeholder="Add script notes, key points, talking points, or thoughts..."
                     className="w-full p-3 font-serif text-[13px] leading-[20px] text-[#404040] border border-[#ebebeb] bg-[#ffffff] rounded-[2px] focus:outline-none focus:border-[#000000] resize-y transition-colors box-border"
                   />
@@ -328,39 +423,14 @@ export function NodeInspectorRail({
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between font-mono text-[9px] tracking-[0.06em] uppercase">
                     <span className="text-[#595959]">ATTACHED IMAGES & MEDIA</span>
-                    <span className="text-[#0051c3] font-semibold">{selectedNode.images.length} FILE</span>
+                    <span className="text-[#0051c3] font-semibold">
+                      {selectedNode.images.length} {selectedNode.images.length === 1 ? 'FILE' : 'FILES'}
+                    </span>
                   </div>
 
-                  {selectedNode.images.length > 0 ? (
-                    <div className="relative border border-[#ebebeb] rounded-[2px] overflow-hidden bg-[#000000]">
-                      <div className="relative h-[130px] w-full flex items-center justify-center">
-                        <img
-                          src={selectedNode.images[0]?.dataUrl}
-                          alt="Attached Visual"
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const img = selectedNode.images[0];
-                            if (img) canvasActions.removeImage(selectedNode.id, img.id);
-                          }}
-                          className="absolute top-2 right-2 w-5 h-5 bg-black/70 hover:bg-red-700 text-white rounded-[2px] flex items-center justify-center font-mono text-[10px] cursor-pointer"
-                          title="Remove Image"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <div className="bg-[#f5f3f3] px-2.5 py-1.5 border-t border-[#ebebeb] flex flex-col font-mono">
-                        <span className="text-[10px] font-semibold text-[#1b1c1c]">
-                          Thumbnail / Visual Concept
-                        </span>
-                        <span className="text-[9px] text-[#737785]">
-                          1920x1080 • Visual Asset • 1.2 MB
-                        </span>
-                      </div>
-                    </div>
-                  ) : null}
+                  {selectedNode.images.map((image, index) => (
+                    <ImageAttachment key={image.id} nodeId={selectedNode.id} image={image} index={index} />
+                  ))}
 
                   {/* Attach Button Area */}
                   <input
@@ -369,19 +439,34 @@ export function NodeInspectorRail({
                     onChange={handleFileUpload}
                     accept="image/*"
                     className="hidden"
+                    aria-label="Choose an image to attach"
                   />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-3 px-3 border border-dashed border-[#c3c6d6] hover:border-[#000000] bg-[#fbf9f8] hover:bg-[#ffffff] rounded-[2px] flex items-center justify-center gap-2 font-mono text-[9.5px] text-[#404040] hover:text-[#000000] transition-colors cursor-pointer box-border"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDropTarget(true);
+                    }}
+                    onDragLeave={() => setIsDropTarget(false)}
+                    onDrop={handleDrop}
+                    className={`w-full py-3 px-3 border border-dashed hover:border-[#000000] hover:bg-[#ffffff] rounded-[2px] flex items-center justify-center gap-2 font-mono text-[9.5px] text-[#404040] hover:text-[#000000] transition-colors cursor-pointer box-border ${
+                      isDropTarget ? 'border-[#0051c3] bg-[#eef3fd]' : 'border-[#c3c6d6] bg-[#fbf9f8]'
+                    }`}
+                    data-testid="btn-add-image"
                   >
                     <svg className="w-4 h-4 text-[#737785]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
                       <circle cx="8.5" cy="8.5" r="1.5" />
                       <path d="m21 15-5-5L5 21" />
                     </svg>
-                    <span>+ Add Image (Upload, Paste, or Drop)</span>
+                    <span>+ Add image (click or drop a file)</span>
                   </button>
+                  {imageError && (
+                    <p role="alert" className="m-0 font-mono text-[9.5px] text-[#ba1a1a]" data-testid="image-error">
+                      {imageError}
+                    </p>
+                  )}
                 </div>
 
                 {/* 5. Connections */}
@@ -389,7 +474,7 @@ export function NodeInspectorRail({
                   <div className="flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.06em]">
                     <span className="text-[#595959]">CONNECTIONS</span>
                     <span className="text-[#0051c3] font-semibold">
-                      {(selectedNode.parentId !== null ? 1 : 0) + canvas.nodes.filter((n) => n.parentId === selectedNode.id).length} TOTAL
+                      {(selectedNode.parentId !== null ? 1 : 0) + childNodes.length} TOTAL
                     </span>
                   </div>
 
@@ -399,7 +484,9 @@ export function NodeInspectorRail({
                       <div className="flex items-center justify-between py-1 border-b border-[#f0eded]">
                         <div className="flex items-center gap-1.5 truncate">
                           <span className="text-[#737785]">IN:</span>
-                          <span className="font-semibold text-[#1b1c1c]">{parentShortId}</span>
+                          <span className="font-semibold text-[#1b1c1c] truncate" title={parentNode ? nameOf(parentNode) : undefined}>
+                            {parentNode ? `${labelOf(parentNode)} ${nameOf(parentNode)}` : 'none'}
+                          </span>
                           <span className="text-[#737785]">
                             ({selectedNode.sourceSide ?? 'auto'} → {selectedNode.targetSide ?? 'auto'})
                           </span>
@@ -419,44 +506,25 @@ export function NodeInspectorRail({
                     )}
 
                     {/* Outgoing (Children) */}
-                    {canvas.nodes.filter((n) => n.parentId === selectedNode.id).length > 0 ? (
+                    {childNodes.length > 0 ? (
                       <div className="flex flex-col gap-1 pt-1">
                         <span className="text-[#737785] text-[8.5px]">OUTGOING BRANCHES:</span>
-                        {canvas.nodes
-                          .filter((n) => n.parentId === selectedNode.id)
-                          .map((child) => (
-                            <div key={child.id} className="flex items-center justify-between">
-                              <span className="text-[#1b1c1c] font-medium">
-                                N-{child.id.slice(0, 2).toUpperCase()}: {child.title ? child.title.slice(0, 16) : child.type}
-                              </span>
-                              <span className="text-[#737785]">
-                                ({child.sourceSide ?? 'auto'} → {child.targetSide ?? 'auto'})
-                              </span>
-                            </div>
-                          ))}
+                        {childNodes.map((child) => (
+                          <div key={child.id} className="flex items-center justify-between gap-2">
+                            <span className="text-[#1b1c1c] font-medium truncate" title={nameOf(child)}>
+                              {labelOf(child)} {child.title || child.type}
+                            </span>
+                            <span className="text-[#737785] shrink-0">
+                              ({child.sourceSide ?? 'auto'} → {child.targetSide ?? 'auto'})
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <div className="pt-1 text-[#737785] italic">
                         No sub-ideas attached
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {/* 6. Saved References & Links */}
-                <div className="flex flex-col gap-1.5">
-                  <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-[#595959]">
-                    SAVED REFERENCES & LINKS
-                  </span>
-                  <div className="flex items-center justify-between p-2.5 border border-[#ebebeb] rounded-[2px] bg-[#ffffff] font-mono text-[9.5px]">
-                    <div className="flex items-center gap-1.5 text-[#1b1c1c] truncate">
-                      <svg className="w-3.5 h-3.5 text-[#737785] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                      </svg>
-                      <span className="truncate hover:underline cursor-pointer">youtube.com/watch?v=creative-habits</span>
-                    </div>
-                    <span className="text-[#737785] text-[9px] shrink-0">Video Link</span>
                   </div>
                 </div>
               </div>
@@ -487,13 +555,20 @@ export function NodeInspectorRail({
       <div className="border-t border-[#ebebeb] bg-[#ffffff] p-4 flex flex-col gap-3 shrink-0 select-none">
         {selectedNode && (
           <div className="flex flex-col gap-1 font-mono text-[9px] text-[#595959]">
-            <div className="flex items-center justify-between">
-              <span>ID: <strong className="text-[#1b1c1c] font-normal">{nodeIdFormatted}</strong></span>
-              <span>PARENT: <strong className="text-[#1b1c1c] font-normal">{parentShortId}</strong></span>
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                IDEA: <strong className="text-[#1b1c1c] font-normal">{labelOf(selectedNode)}</strong>
+              </span>
+              <span className="truncate">
+                PARENT:{' '}
+                <strong className="text-[#1b1c1c] font-normal">
+                  {parentNode ? labelOf(parentNode) : 'none'}
+                </strong>
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span>CREATED: 2025-02-14</span>
-              <span>UPDATED: Just now</span>
+              <span>CREATED: {formatDate(selectedNode.createdAt) ?? '—'}</span>
+              <span>UPDATED: {formatRelativeTime(selectedNode.updatedAt) ?? '—'}</span>
             </div>
             {selectedNode.parentId !== null && (
               <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-[#ebebeb]">
@@ -510,18 +585,11 @@ export function NodeInspectorRail({
                   title="Connect under a different parent idea"
                   data-testid="reconnect-parent-select"
                 >
-                  {canvas.nodes
-                    .filter((n) => n.id !== selectedNode.id && !hasCycle(canvas, selectedNode.id, n.id))
-                    .map((n) => {
-                      const label = n.parentId === null
-                        ? `ROOT: ${n.title ? n.title.slice(0, 16) : 'Main Idea'}`
-                        : `N-${n.id.slice(0, 2).toUpperCase()}: ${n.title ? n.title.slice(0, 14) : n.type}`;
-                      return (
-                        <option key={n.id} value={n.id}>
-                          {label}
-                        </option>
-                      );
-                    })}
+                  {reparentOptions.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.parentId === null ? 'ROOT' : labelOf(n)} {nameOf(n).slice(0, 40)}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
@@ -543,26 +611,13 @@ export function NodeInspectorRail({
             </div>
 
             <div className="bg-[#eef3fd] border border-[#c3c6d6] text-[#0051c3] px-2 py-1.5 rounded-[2px] font-mono text-[9px] flex items-center justify-center gap-1.5">
-              <span className="animate-spin text-[11px]">↻</span>
-              <span>Moving idea: release to place here</span>
+              <span>Moving idea: release to place it here</span>
             </div>
-
-            <button
-              type="button"
-              disabled
-              className="w-full h-8 bg-[#4472c4] text-white font-mono text-[10px] font-medium rounded-[2px] flex items-center justify-center gap-1.5 cursor-not-allowed opacity-90"
-            >
-              <span>✋</span>
-              <span>Repositioning Active...</span>
-            </button>
           </div>
         ) : selectedNode ? (
           /* Normal Footer State (Screenshot 1) */
           <div className="flex flex-col gap-2.5 pt-2 border-t border-[#ebebeb]">
-            <div className="flex items-center gap-1.5 font-mono text-[9px] text-[#737785]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#0051c3]" />
-              <span>Saved automatically</span>
-            </div>
+            <SaveIndicator status={saveStatus} />
 
             <div className="flex items-center gap-2">
               <Button
@@ -584,8 +639,8 @@ export function NodeInspectorRail({
             </div>
           </div>
         ) : (
-          <div className="text-center font-mono text-[9px] text-[#737785]">
-            Saved automatically
+          <div className="flex justify-center">
+            <SaveIndicator status={saveStatus} />
           </div>
         )}
       </div>

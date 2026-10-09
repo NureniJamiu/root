@@ -45,7 +45,13 @@ import type {
   MouseEvent as ReactMouseEvent,
 } from 'react';
 
-import { canvasActions, useCanvasStore } from '../data';
+import {
+  IMAGE_DATA_URL_MAX_BYTES,
+  NODE_BODY_MAX,
+  NODE_TITLE_MAX,
+  canvasActions,
+  useCanvasStore,
+} from '../data';
 import type { ImageEntry, Node, NodeType, UUID } from '../data';
 
 import { typeStyles } from './typeStyles';
@@ -55,10 +61,10 @@ import { typeStyles } from './typeStyles';
 /* -------------------------------------------------------------------------- */
 
 /** Title cap (design.md §Edge Cases; Requirement 4.2). */
-const TITLE_MAX = 200;
+const TITLE_MAX = NODE_TITLE_MAX;
 
 /** Body cap (design.md §Edge Cases; Requirement 4.3). */
-const BODY_MAX = 20_000;
+const BODY_MAX = NODE_BODY_MAX;
 
 /**
  * Threshold at which the body character counter switches to the
@@ -72,7 +78,7 @@ const BODY_COUNTER_WARN_AT = BODY_MAX - 200;
  * `addImage` mutator applies the same 2 MB check on the serialized
  * form — see design.md §Image Handling, Requirement 4.4).
  */
-const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const IMAGE_MAX_BYTES = IMAGE_DATA_URL_MAX_BYTES;
 
 /** Buttons render in this fixed order (design.md §Editor Flow). */
 const TYPE_ORDER: readonly NodeType[] = [
@@ -87,14 +93,14 @@ const TYPE_ORDER: readonly NodeType[] = [
  * DESIGN.md color.surface.strong token so the selection indicator
  * matches the card selection border and the overall accent.
  */
-const SURFACE_STRONG = '#ff3c00'; // color.surface.strong
+const SURFACE_STRONG = '#0051c3'; // cobalt: selection / action accent
 
 /**
  * Palette color used when the character counter is in warn state, and
  * for the drop-zone-rejected border flash. Uses color.surface.strong
  * as the single "alert/action" accent in the new palette.
  */
-const SECONDARY = '#ff3c00'; // color.surface.strong
+const SECONDARY = '#de5052'; // warning accent
 
 /**
  * How long the drop-zone border flashes when a non-image payload is
@@ -382,7 +388,6 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
           color: '#191818',              // color.text.primary
           border: '1px solid #312e2e',   // color.text.tertiary
           borderRadius: 8,               // radius.sm
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.22)',
           padding: 16,                   // space.7
           width: 480,
           maxWidth: '90vw',

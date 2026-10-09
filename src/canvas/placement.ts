@@ -18,6 +18,10 @@
  * call site via a context, keeping the `nodes/` → `canvas/` boundary
  * clean (Requirement 10.3).
  *
+ * Pass measured card sizes (see `measuredSizes.ts`) to account for cards
+ * that have grown with their content; without them every card is assumed to
+ * be `NODE_WIDTH` × `NODE_HEIGHT`.
+ *
  * Algorithm:
  *   1. Look up the parent node. Unknown `parentId` returns the origin;
  *      the mutator layer will reject the resulting `addChild` call
@@ -42,6 +46,7 @@
  */
 
 import type { Canvas, Node, Position, UUID } from '../data';
+import type { NodeSize, NodeSizes } from './measuredSizes';
 
 /**
  * Standard card width in canvas units used by the placement algorithm.
@@ -82,6 +87,18 @@ interface BBox {
   readonly h: number;
 }
 
+const DEFAULT_SIZE: NodeSize = { width: NODE_WIDTH, height: NODE_HEIGHT };
+
+function sizeOf(sizes: NodeSizes | undefined, id: UUID): NodeSize {
+  return sizes?.get(id) ?? DEFAULT_SIZE;
+}
+
+function bboxOf(node: Node, sizes: NodeSizes | undefined): BBox {
+  const size = sizeOf(sizes, node.id);
+  return { x: node.position.x, y: node.position.y, w: size.width, h: size.height };
+}
+
+/** Box of a card that does not exist yet, so it has the default size. */
 function bboxAt(p: Position): BBox {
   return { x: p.x, y: p.y, w: NODE_WIDTH, h: NODE_HEIGHT };
 }
@@ -111,7 +128,11 @@ function overlaps(a: BBox, b: BBox): boolean {
  * performed here; callers hand the value to `canvasActions.addChild`,
  * which routes through the store's `canvasSchema.safeParse` gate.
  */
-export function computeChildPosition(canvas: Canvas, parentId: UUID): Position {
+export function computeChildPosition(
+  canvas: Canvas,
+  parentId: UUID,
+  sizes?: NodeSizes,
+): Position {
   const parent = canvas.nodes.find((n) => n.id === parentId);
   if (parent === undefined) {
     // Unknown parent: return a well-defined origin. The `addChild`
@@ -121,16 +142,14 @@ export function computeChildPosition(canvas: Canvas, parentId: UUID): Position {
   }
 
   const siblings = canvas.nodes.filter((n) => n.parentId === parentId);
-  const forbidden: BBox[] = [
-    bboxAt(parent.position),
-    ...siblings.map((s) => bboxAt(s.position)),
-  ];
+  const forbidden: BBox[] = [bboxOf(parent, sizes), ...siblings.map((s) => bboxOf(s, sizes))];
+  const parentWidth = sizeOf(sizes, parent.id).width;
 
   // Preferred candidate: immediately to the right of the parent at the
   // same `y`. This is disjoint from the parent's bbox by construction
   // (horizontal shift > NODE_WIDTH), so we only need to check siblings.
   const preferred: Position = {
-    x: parent.position.x + NODE_WIDTH + SIBLING_GAP,
+    x: parent.position.x + parentWidth + SIBLING_GAP,
     y: parent.position.y,
   };
   const preferredBox = bboxAt(preferred);
@@ -148,7 +167,7 @@ export function computeChildPosition(canvas: Canvas, parentId: UUID): Position {
     Number.NEGATIVE_INFINITY,
   );
   return {
-    x: parent.position.x + NODE_WIDTH + SIBLING_GAP,
+    x: parent.position.x + parentWidth + SIBLING_GAP,
     y: maxBottom + SIBLING_GAP,
   };
 }
@@ -157,12 +176,15 @@ export function computeChildPosition(canvas: Canvas, parentId: UUID): Position {
  * Arranges canvas nodes in a top-to-bottom tree layout.
  * Guarantees:
  *  1. Root node placed at top.
- *  2. Children placed vertically below parents (depth * vertical step).
+ *  2. Children placed on rows below their parents; a row starts below the
+ *     tallest card of the row above, so tall cards never run into the next row.
  *  3. Siblings and subtrees placed side-by-side with non-overlapping bounding boxes.
  *  4. All connections (parentId) remain intact.
  *  5. Connection sides update to facing sides (bottom -> top) for unpinned connections.
+ *
+ * Pass measured card sizes to lay out the cards as they are actually rendered.
  */
-export function computeTreeLayout(canvas: Canvas): Canvas {
+export function computeTreeLayout(canvas: Canvas, sizes?: NodeSizes): Canvas {
   if (canvas.nodes.length <= 1) return canvas;
 
   const root = canvas.nodes.find((n) => n.parentId === null);
@@ -179,47 +201,65 @@ export function computeTreeLayout(canvas: Canvas): Canvas {
 
   const HORIZONTAL_GAP = 60;
   const VERTICAL_GAP = 120;
-  const LEVEL_HEIGHT = NODE_HEIGHT + VERTICAL_GAP;
+  const ORIGIN_X = 100;
+  const ORIGIN_Y = 80;
+
+  // Row heights: each row is as tall as its tallest card.
+  const rowHeights: number[] = [];
+  const depthOf = new Map<UUID, number>();
+  const measure = (nodeId: UUID, depth: number): void => {
+    depthOf.set(nodeId, depth);
+    rowHeights[depth] = Math.max(rowHeights[depth] ?? 0, sizeOf(sizes, nodeId).height);
+    for (const child of childrenMap.get(nodeId) ?? []) measure(child.id, depth + 1);
+  };
+  measure(root.id, 0);
+
+  const rowTops: number[] = [];
+  let top = ORIGIN_Y;
+  rowHeights.forEach((height, depth) => {
+    rowTops[depth] = top;
+    top += height + VERTICAL_GAP;
+  });
 
   const positions = new Map<UUID, Position>();
-  let currentLeftX = 100;
+  let currentLeftX = ORIGIN_X;
 
-  function layoutSubtree(nodeId: UUID, depth: number): { minX: number; maxX: number } {
+  function layoutSubtree(nodeId: UUID): { minX: number; maxX: number } {
     const children = childrenMap.get(nodeId) ?? [];
+    const width = sizeOf(sizes, nodeId).width;
+    const y = rowTops[depthOf.get(nodeId) ?? 0] ?? ORIGIN_Y;
 
     if (children.length === 0) {
       const x = currentLeftX;
-      const y = 80 + depth * LEVEL_HEIGHT;
       positions.set(nodeId, { x, y });
-      currentLeftX += NODE_WIDTH + HORIZONTAL_GAP;
-      return { minX: x, maxX: x + NODE_WIDTH };
+      currentLeftX += width + HORIZONTAL_GAP;
+      return { minX: x, maxX: x + width };
     }
 
     let minX = Infinity;
     let maxX = -Infinity;
 
     for (const child of children) {
-      const childSpan = layoutSubtree(child.id, depth + 1);
+      const childSpan = layoutSubtree(child.id);
       minX = Math.min(minX, childSpan.minX);
       maxX = Math.max(maxX, childSpan.maxX);
     }
 
     // Center parent horizontally above its children span
-    const x = Math.round((minX + maxX - NODE_WIDTH) / 2);
-    const y = 80 + depth * LEVEL_HEIGHT;
+    const x = Math.round((minX + maxX - width) / 2);
     positions.set(nodeId, { x, y });
 
-    return { minX: Math.min(minX, x), maxX: Math.max(maxX, x + NODE_WIDTH) };
+    return { minX: Math.min(minX, x), maxX: Math.max(maxX, x + width) };
   }
 
-  layoutSubtree(root.id, 0);
+  layoutSubtree(root.id);
 
-  // Normalize so leftmost node starts at x = 100
+  // Normalize so leftmost node starts at ORIGIN_X
   let minGlobalX = Infinity;
   for (const pos of positions.values()) {
     if (pos.x < minGlobalX) minGlobalX = pos.x;
   }
-  const xOffset = minGlobalX < 100 ? 100 - minGlobalX : 0;
+  const xOffset = minGlobalX < ORIGIN_X ? ORIGIN_X - minGlobalX : 0;
 
   const nextNodes = canvas.nodes.map((node) => {
     const pos = positions.get(node.id) ?? node.position;
