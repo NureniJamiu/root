@@ -15,7 +15,14 @@
 import { newId } from './ids';
 import { IMAGE_DATA_URL_MAX_BYTES } from './limits';
 import { now } from './time';
-import { computeFacingSides, downstreamIds, isDuplicateEdge, resolveEdgeSides, subtreeIds } from './graph';
+import {
+  computeFacingSides,
+  downstreamIds,
+  isDuplicateEdge,
+  resolveEdgeSides,
+  subtreeIds,
+  visibleNodeIds,
+} from './graph';
 import type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
 
 /* -------------------------------------------------------------------------- */
@@ -293,7 +300,92 @@ export function setCollapsed(c: Canvas, id: UUID, collapsed: boolean): Canvas {
     updatedAt: ts,
   }));
   if (nextNodes === null) return c;
-  return { ...c, nodes: nextNodes, updatedAt: ts };
+  // Showing or hiding all of them ends any one-at-a-time reveal.
+  return { ...c, nodes: nextNodes, edges: unhideFrom(c.edges, new Set([id])), updatedAt: ts };
+}
+
+/** Clear the `hidden` flag on connectors leaving any of `sources`. Keeps the array when nothing changes. */
+function unhideFrom(edges: readonly Edge[], sources: ReadonlySet<UUID>): Edge[] {
+  if (!edges.some((e) => e.hidden === true && sources.has(e.source))) return edges as Edge[];
+  return edges.map((e) => {
+    if (e.hidden !== true || !sources.has(e.source)) return e;
+    const { hidden: _hidden, ...rest } = e;
+    return rest;
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* revealChild / hideChild                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Show one child of `parentId` (an idea it connects to) without showing the
+ * others. A collapsed parent switches to revealing its children one at a
+ * time: every other child stays hidden. The revealed child keeps its own
+ * branch folded (it is collapsed if it was hidden and has children), so ideas
+ * further down are revealed the same way. Once every child is shown the
+ * parent is simply expanded. Returns `c` when `childId` is not a child of
+ * `parentId` or is already shown.
+ */
+export function revealChild(c: Canvas, parentId: UUID, childId: UUID): Canvas {
+  const parent = c.nodes.find((n) => n.id === parentId);
+  if (!parent || !c.edges.some((e) => e.source === parentId && e.target === childId)) return c;
+  const visible = visibleNodeIds(c);
+  if (visible.has(childId) && visible.has(parentId) && !parent.collapsed &&
+      !c.edges.some((e) => e.source === parentId && e.target === childId && e.hidden === true)) {
+    return c;
+  }
+
+  const ts = now();
+  let edges: Edge[] = c.edges.map((e) => {
+    if (e.source !== parentId) return e;
+    if (e.target === childId) {
+      if (e.hidden !== true) return e;
+      const { hidden: _hidden, ...rest } = e;
+      return rest;
+    }
+    // A collapsed parent hid them all; keep the others hidden one by one.
+    return parent.collapsed && e.hidden !== true ? { ...e, hidden: true } : e;
+  });
+  // Every child shown: back to a plainly expanded parent.
+  if (!edges.some((e) => e.source === parentId && e.hidden === true)) {
+    edges = unhideFrom(edges, new Set([parentId]));
+  }
+  const childHasChildren = c.edges.some((e) => e.source === childId);
+  const nodes = c.nodes.map((n) => {
+    if (n.id === parentId && n.collapsed) return { ...n, collapsed: false, updatedAt: ts };
+    if (n.id === childId && !visible.has(childId) && childHasChildren && !n.collapsed) {
+      return { ...n, collapsed: true, updatedAt: ts };
+    }
+    return n;
+  });
+  return { ...c, nodes, edges, updatedAt: ts };
+}
+
+/**
+ * Hide one child of `parentId` again, leaving its other children shown. When
+ * that leaves no child shown, the parent is simply collapsed. Returns `c` when
+ * `childId` is not a child of `parentId` or is already hidden by it.
+ */
+export function hideChild(c: Canvas, parentId: UUID, childId: UUID): Canvas {
+  const parent = c.nodes.find((n) => n.id === parentId);
+  if (!parent || parent.collapsed) return c;
+  const toChild = c.edges.filter((e) => e.source === parentId && e.target === childId);
+  if (toChild.length === 0 || toChild.every((e) => e.hidden === true)) return c;
+
+  const ts = now();
+  const edges = c.edges.map((e) =>
+    e.source === parentId && e.target === childId ? { ...e, hidden: true } : e,
+  );
+  if (edges.every((e) => e.source !== parentId || e.hidden === true)) {
+    return {
+      ...c,
+      nodes: c.nodes.map((n) => (n.id === parentId ? { ...n, collapsed: true, updatedAt: ts } : n)),
+      edges: unhideFrom(edges, new Set([parentId])),
+      updatedAt: ts,
+    };
+  }
+  return { ...c, edges, updatedAt: ts };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -308,14 +400,7 @@ export function setCollapsed(c: Canvas, id: UUID, collapsed: boolean): Canvas {
  */
 export function expandSubtree(c: Canvas, id: UUID): Canvas {
   if (!c.nodes.some((n) => n.id === id)) return c;
-  const branch = downstreamIds(c, id);
-  branch.add(id);
-  if (!c.nodes.some((n) => branch.has(n.id) && n.collapsed)) return c;
-  const ts = now();
-  const nextNodes = c.nodes.map((n) =>
-    branch.has(n.id) && n.collapsed ? { ...n, collapsed: false, updatedAt: ts } : n,
-  );
-  return { ...c, nodes: nextNodes, updatedAt: ts };
+  return expandMany(c, [id]);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -331,13 +416,14 @@ export function collapseMany(c: Canvas, ids: Iterable<UUID>): Canvas {
   const wanted = new Set(ids);
   const hasChildren = new Set(c.edges.map((e) => e.source));
   const ts = now();
-  let changed = false;
+  const collapsedNow = new Set<UUID>();
   const nextNodes = c.nodes.map((n) => {
     if (!wanted.has(n.id) || n.collapsed || !hasChildren.has(n.id)) return n;
-    changed = true;
+    collapsedNow.add(n.id);
     return { ...n, collapsed: true, updatedAt: ts };
   });
-  return changed ? { ...c, nodes: nextNodes, updatedAt: ts } : c;
+  if (collapsedNow.size === 0) return c;
+  return { ...c, nodes: nextNodes, edges: unhideFrom(c.edges, collapsedNow), updatedAt: ts };
 }
 
 /**
@@ -359,7 +445,9 @@ export function expandMany(c: Canvas, ids: Iterable<UUID>): Canvas {
     changed = true;
     return { ...n, collapsed: false, updatedAt: ts };
   });
-  return changed ? { ...c, nodes: nextNodes, updatedAt: ts } : c;
+  const nextEdges = unhideFrom(c.edges, branch);
+  if (nextEdges !== c.edges) changed = true;
+  return changed ? { ...c, nodes: nextNodes, edges: nextEdges, updatedAt: ts } : c;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -146,11 +146,7 @@ export function StructuralIndexRail({
                 aria-current={isActive ? 'page' : undefined}
                 className="flex flex-col min-w-0 flex-1 text-left bg-transparent border-0 p-0 cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#0051c3]"
               >
-                <span className="font-serif text-[14px] font-medium leading-[18px] truncate">{title}</span>
-                <span className="font-mono text-[9.5px] text-[#737785] tracking-wide truncate">
-                  {project.nodeCount} {project.nodeCount === 1 ? 'idea' : 'ideas'}
-                  {updated ? ` · ${updated}` : ''}
-                </span>
+                <span className="font-serif text-[14px] font-medium leading-[18px] truncate grid py-3">{title}</span>
               </button>
 
               {onDeleteProject &&

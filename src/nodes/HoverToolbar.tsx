@@ -1,10 +1,14 @@
 /**
- * `HoverToolbar` — the row of action buttons rendered inside a `NodeCard`.
+ * `HoverToolbar` — the row of action buttons that floats just above a
+ * `NodeCard`'s top-right corner while the card is hovered or focused.
  *
  * The toolbar exposes these actions (design.md §Node UI Layer):
  *   - `add-child`  — insert a new idea connected from this one and open its editor.
  *   - `edit`       — open the `NodeEditor` on this node (images are attached there).
  *   - `cycle-type` — cycle `topic → finding → question → conclusion → topic`.
+ *   - `collapse` / `expand` — hide or show every connected idea at once.
+ *   - reveal arrow — opens `ChildRevealMenu` to show or hide connected
+ *                    ideas one at a time, in any order.
  *   - `delete`     — open the `DeletePrompt`. The prompt itself bypasses
  *                    the modal when nothing hangs only from this idea.
  *
@@ -15,11 +19,13 @@
  * `nodes/` layer having to import from `canvas/` (Requirement 10.3).
  */
 
-import type { ReactNode } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import type { ReactNode, Ref } from 'react';
 
-import { canvasActions, descendantCount, useCanvasStore } from '../data';
+import { canvasActions, descendantCount, hasHiddenChildren, useCanvasStore } from '../data';
 import type { Node, NodeType, UUID } from '../data';
 
+import { ChildRevealMenu } from './ChildRevealMenu';
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -37,6 +43,12 @@ import { useToolbarCallbacks } from './toolbarCallbacks';
 function selectHasHideable(nodeId: UUID) {
   return (s: { canvas: Parameters<typeof descendantCount>[0] }): boolean =>
     descendantCount(s.canvas, nodeId) > 0;
+}
+
+/** Selector: does the node connect to anything at all (so it has ideas to list)? */
+function selectHasChildren(nodeId: UUID) {
+  return (s: { canvas: Parameters<typeof descendantCount>[0] }): boolean =>
+    s.canvas.edges.some((e) => e.source === nodeId);
 }
 
 /**
@@ -63,6 +75,18 @@ export interface HoverToolbarProps {
 export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
   const { onAddChild } = useToolbarCallbacks();
   const hasChildren = useCanvasStore(selectHasHideable(node.id));
+  const hasAnyChild = useCanvasStore(selectHasChildren(node.id));
+  // Collapsed, or showing only some of its connected ideas.
+  const partlyHidden = useCanvasStore((s) => hasHiddenChildren(s.canvas, node.id));
+  const [menuAnchor, setMenuAnchor] = useState<DOMRect | null>(null);
+  const arrowRef = useRef<HTMLButtonElement | null>(null);
+  const closeMenu = useCallback((fromKeyboard?: boolean) => {
+    setMenuAnchor(null);
+    if (fromKeyboard) arrowRef.current?.focus();
+  }, []);
+  const toggleMenu = (): void => {
+    setMenuAnchor((open) => (open ? null : arrowRef.current?.getBoundingClientRect() ?? null));
+  };
 
   const handleAddChild = (): void => {
     // The provider is responsible for computing the child position and
@@ -87,47 +111,75 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
     canvasActions.setCollapsed(node.id, true);
   };
   const onExpand = (): void => {
-    // R6.3: set collapsed to false (expand affordance).
+    // R6.3: show every connected idea (also ends a one-at-a-time reveal).
     canvasActions.setCollapsed(node.id, false);
   };
 
   return (
     <div
-      className="flex flex-row items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+      // Floats just above the card's top-right corner. The bottom padding
+      // bridges the gap so the pointer can travel from card to buttons
+      // without the toolbar fading out; while hidden it catches no clicks.
+      className={`absolute right-0 bottom-full z-20 w-max pb-1.5 transition-[opacity,transform] duration-150 ease-out group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:translate-y-0 group-focus-within:pointer-events-auto ${
+        menuAnchor ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-1 pointer-events-none'
+      }`}
       data-testid="hover-toolbar"
     >
-      <ToolbarButton label="Add connected idea" onClick={handleAddChild} testId="btn-add-child">
-        <PlusIcon />
-      </ToolbarButton>
-      <ToolbarButton label="Edit (notes and images)" onClick={onEdit} testId="btn-edit">
-        <PencilIcon />
-      </ToolbarButton>
-      <ToolbarButton
-        label={`Change card type (current: ${node.type})`}
-        onClick={onCycleType}
-        testId="btn-cycle-type"
+      <div
+        className="flex flex-row items-center gap-1 rounded-[4px] bg-white p-[3px]"
+        style={{ border: '1px solid #e2e2e2', boxShadow: '0 4px 12px rgba(27, 28, 28, 0.10)' }}
       >
-        <CycleIcon />
-      </ToolbarButton>
-      {/* Collapse affordance (R6.1): only when node has children and is not
-          collapsed. Expand affordance (R6.3): when node is collapsed. */}
-      {node.collapsed ? (
-        <ToolbarButton label="Expand connected ideas" onClick={onExpand} testId="btn-expand">
-          <ChevronRightIcon />
+        <ToolbarButton label="Add connected idea" onClick={handleAddChild} testId="btn-add-child">
+          <PlusIcon />
         </ToolbarButton>
-      ) : hasChildren ? (
-        <ToolbarButton label="Collapse connected ideas" onClick={onCollapse} testId="btn-collapse">
-          <ChevronDownIcon />
+        <ToolbarButton label="Edit (notes and images)" onClick={onEdit} testId="btn-edit">
+          <PencilIcon />
         </ToolbarButton>
-      ) : null}
-      <ToolbarButton
-        label="Delete"
-        onClick={onDelete}
-        testId="btn-delete"
-        variant="destructive"
-      >
-        <CloseIcon />
-      </ToolbarButton>
+        <ToolbarButton
+          label={`Change card type (current: ${node.type})`}
+          onClick={onCycleType}
+          testId="btn-cycle-type"
+        >
+          <CycleIcon />
+        </ToolbarButton>
+        {/* Collapse affordance (R6.1): when every connected idea is shown.
+            Expand affordance (R6.3): when some or all of them are hidden. The
+            arrow beside it reveals them one at a time. */}
+        {(partlyHidden || hasChildren || hasAnyChild) && (
+          <div className="inline-flex items-center">
+            {partlyHidden ? (
+              <ToolbarButton label="Expand connected ideas" onClick={onExpand} testId="btn-expand" joined={hasAnyChild ? 'left' : undefined}>
+                <ChevronRightIcon />
+              </ToolbarButton>
+            ) : hasChildren ? (
+              <ToolbarButton label="Collapse connected ideas" onClick={onCollapse} testId="btn-collapse" joined={hasAnyChild ? 'left' : undefined}>
+                <ChevronDownIcon />
+              </ToolbarButton>
+            ) : null}
+            {hasAnyChild && (
+            <ToolbarButton
+              label="Show or hide connected ideas one by one"
+              onClick={toggleMenu}
+              testId="btn-reveal-menu"
+              joined={partlyHidden || hasChildren ? 'right' : undefined}
+              buttonRef={arrowRef}
+              pressed={menuAnchor !== null}
+            >
+              <CaretIcon />
+            </ToolbarButton>
+            )}
+          </div>
+        )}
+        {menuAnchor && <ChildRevealMenu nodeId={node.id} anchor={menuAnchor} onClose={closeMenu} />}
+        <ToolbarButton
+          label="Delete"
+          onClick={onDelete}
+          testId="btn-delete"
+          variant="destructive"
+        >
+          <CloseIcon />
+        </ToolbarButton>
+      </div>
     </div>
   );
 }
@@ -142,6 +194,10 @@ interface ToolbarButtonProps {
   readonly testId: string;
   readonly children: ReactNode;
   readonly variant?: 'default' | 'destructive';
+  /** Half of a split button: square off the side that touches its partner. */
+  readonly joined?: 'left' | 'right' | undefined;
+  readonly buttonRef?: Ref<HTMLButtonElement>;
+  readonly pressed?: boolean;
 }
 
 function ToolbarButton({
@@ -150,10 +206,16 @@ function ToolbarButton({
   testId,
   children,
   variant = 'default',
+  joined,
+  buttonRef,
+  pressed,
 }: ToolbarButtonProps): JSX.Element {
   return (
     <button
+      ref={buttonRef}
       type="button"
+      aria-pressed={pressed}
+      data-child-reveal-toggle={testId === 'btn-reveal-menu' ? '' : undefined}
       aria-label={label}
       title={label}
       onClick={(e) => {
@@ -173,16 +235,26 @@ function ToolbarButton({
           : 'hover:bg-[#f5f3f3] hover:border-[#000000] hover:text-[#000000]'
       }`}
       style={{
-        width: 22,
+        width: testId === 'btn-reveal-menu' ? 14 : 22,
         height: 22,
         border: '1px solid #ebebeb',
-        background: '#ffffff',
-        color: '#404040',
+        background: pressed ? '#f5f3f3' : '#ffffff',
+        color: pressed ? '#000000' : '#404040',
         boxShadow: 'none',
+        ...(joined === 'left' ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 } : {}),
+        ...(joined === 'right' ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0, marginLeft: -1 } : {}),
       }}
       data-testid={testId}
     >
       {children}
     </button>
+  );
+}
+
+function CaretIcon(): JSX.Element {
+  return (
+    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true">
+      <path d="M1 2.5h6L4 6z" />
+    </svg>
   );
 }

@@ -76,6 +76,11 @@ export const edgeSchema = z.object({
   targetSide: sideSchema,
   sourcePinned: z.boolean().default(false),
   targetPinned: z.boolean().default(false),
+  /**
+   * The target is kept out of view by the source, which reveals its ideas
+   * one at a time (see `revealChild`). Absent when not hidden.
+   */
+  hidden: z.boolean().optional(),
 });
 
 /* -------------------------------------------------------------------------- */

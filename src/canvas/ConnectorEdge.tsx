@@ -30,6 +30,8 @@ import {
 export interface ConnectorEdgeData {
   readonly color: string;
   readonly dashed: boolean;
+  /** Set while the card at either end is animating in or out. */
+  readonly opacity?: number;
 }
 
 /** How far above the middle of the curve the remove button sits, so clicking (or double-clicking) the curve itself never hits it. */
@@ -81,7 +83,13 @@ function ConnectorEdgeImpl(props: EdgeProps<ConnectorEdgeData>): JSX.Element {
   const dotRadius = selected ? EDGE_DOT_RADIUS + 2.5 : active ? EDGE_DOT_RADIUS + 1.5 : EDGE_DOT_RADIUS;
 
   return (
-    <g onMouseEnter={show} onMouseLeave={hide} data-testid={`connector-${id}`} data-selected={selected ? 'true' : 'false'}>
+    <g
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      style={data?.opacity !== undefined ? { opacity: data.opacity } : undefined}
+      data-testid={`connector-${id}`}
+      data-selected={selected ? 'true' : 'false'}
+    >
       {active && (
         <path d={path} fill="none" stroke={color} strokeWidth={10} strokeOpacity={0.16} strokeLinecap="round" />
       )}

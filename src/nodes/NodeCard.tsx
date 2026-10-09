@@ -26,7 +26,7 @@ import { Fragment, memo } from 'react';
 import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
-import { formatNodeLabel, nodeOrdinal, useCanvasStore } from '../data';
+import { formatNodeLabel, hasHiddenChildren, hiddenDescendantCount, nodeOrdinal, useCanvasStore } from '../data';
 import type { Node, Side, UUID } from '../data';
 
 import { CollapseBadge } from './CollapseBadge';
@@ -60,6 +60,10 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
     (s) => s.canvas.edges.reduce((n, e) => (e.source === data.nodeId || e.target === data.nodeId ? n + 1 : n), 0),
   );
   const ordinal = useCanvasStore((s) => nodeOrdinal(s.canvas, data.nodeId));
+  // Collapsed, or partway through revealing its connected ideas one at a time.
+  const showsHiddenBadge = useCanvasStore(
+    (s) => hasHiddenChildren(s.canvas, data.nodeId) && hiddenDescendantCount(s.canvas, data.nodeId) > 0,
+  );
 
   // Transiently deleted node guard
   if (node === undefined) return null;
@@ -103,6 +107,10 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
       data-node-type={node.type}
       data-selected={selected ? 'true' : 'false'}
     >
+      {/* Actions float above the top-right corner on hover (hidden while dragging,
+          where the drag badge takes that spot). */}
+      {!isDragging && <HoverToolbar node={node} />}
+
       {/* Real-time dragging coordinate delta badge */}
       {isDragging && (
         <div
@@ -157,7 +165,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         {/* Card Footer: Metadata, Branch Stats, and Clean Collapsed Badge */}
         <div className="flex items-center justify-between pt-1.5 border-t border-[#ebebeb] font-mono text-[9px] text-[#737785] tracking-wide select-none">
           <span>{shortId}</span>
-          {node.collapsed ? (
+          {node.collapsed || showsHiddenBadge ? (
             <CollapseBadge nodeId={node.id} />
           ) : (
             <span>
@@ -224,12 +232,11 @@ interface HeaderProps {
 function Header({ node, isConclusion }: HeaderProps): JSX.Element {
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Upper metadata row: Type Pill, Status Pill & Actions */}
+      {/* Upper metadata row: Type Pill */}
       <div className="flex flex-row items-center justify-between gap-1">
         <div className="flex items-center gap-1.5">
           <TypeBadge type={node.type} />
         </div>
-        <HoverToolbar node={node} />
       </div>
 
       {/* Title */}

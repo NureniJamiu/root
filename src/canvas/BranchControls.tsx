@@ -52,7 +52,9 @@ export function BranchToolbarGroup({ selectedIds }: BranchToolbarGroupProps): JS
     if (effectiveScope === 'selected') {
       for (const id of targetIds) for (const d of downstreamIds(canvas, id)) branch.add(d);
     }
-    const expandable = canvas.nodes.some((n) => branch.has(n.id) && n.collapsed);
+    const expandable =
+      canvas.nodes.some((n) => branch.has(n.id) && n.collapsed) ||
+      canvas.edges.some((e) => e.hidden === true && branch.has(e.source));
     return { canCollapse: collapsible, canExpand: expandable };
   }, [canvas, targetIds, effectiveScope]);
 

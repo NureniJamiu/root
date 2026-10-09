@@ -1,13 +1,14 @@
 /**
- * `CollapseBadge` — the small pill rendered on a collapsed `NodeCard`.
+ * `CollapseBadge` — the small pill rendered on a card that hides some of
+ * what hangs from it: collapsed, or revealing its connected ideas one at a
+ * time.
  *
- * The badge shows the count of ideas hidden by collapsing the node
- * (those that hang only from it), computed via `descendantCount(canvas, id)` (Requirement 6.5
- * and design.md §Node UI Layer). It is only rendered when
- * `node.collapsed === true`; the parent `NodeCard` decides visibility.
+ * The badge shows how many of the ideas that hang only from the node are
+ * hidden right now (`hiddenDescendantCount`, Requirement 6.5). Clicking it
+ * shows every connected idea. The parent `NodeCard` decides visibility.
  */
 
-import { canvasActions, descendantCount, useCanvasStore } from '../data';
+import { canvasActions, hiddenDescendantCount, useCanvasStore } from '../data';
 import type { UUID } from '../data';
 
 import { BranchIcon } from './icons';
@@ -17,7 +18,7 @@ export interface CollapseBadgeProps {
 }
 
 export function CollapseBadge({ nodeId }: CollapseBadgeProps): JSX.Element {
-  const count = useCanvasStore((s) => descendantCount(s.canvas, nodeId));
+  const count = useCanvasStore((s) => hiddenDescendantCount(s.canvas, nodeId));
   return (
     <button
       type="button"

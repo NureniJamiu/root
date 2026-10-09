@@ -227,66 +227,13 @@ body {
 }
 
 /*
- * Branch motion (see canvas/useBranchMotion.ts). An idea that appears grows
- * out of the idea it hangs from; one that is hidden slides back into it.
- * --branch-dx / --branch-dy hold the offset to that parent.
+ * Branch motion (see canvas/useBranchMotion.ts): cards and connectors in
+ * flight are positioned and faded from script, frame by frame. They do not
+ * catch clicks meant for what lies under them.
  */
-.react-flow__node.node-entering > * {
-  animation: root-branch-in 420ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
-}
-
-/* A card in flight does not catch clicks meant for what lies under it. */
-.react-flow__node.node-entering,
-.react-flow__node.node-leaving {
+.react-flow__node.node-in-flight,
+.react-flow__edge.edge-in-flight {
   pointer-events: none;
-}
-
-.react-flow__node.node-leaving > * {
-  animation: root-branch-out 240ms cubic-bezier(0.4, 0, 1, 1) both;
-}
-
-.react-flow__edge.edge-entering {
-  animation: root-edge-in 360ms ease-out 80ms both;
-}
-
-.react-flow__edge.edge-leaving {
-  pointer-events: none;
-  animation: root-edge-out 180ms ease-in both;
-}
-
-@keyframes root-branch-in {
-  from {
-    opacity: 0;
-    transform: translate(var(--branch-dx, 0), var(--branch-dy, 0)) scale(0.55);
-  }
-  60% {
-    opacity: 1;
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes root-branch-out {
-  from {
-    opacity: 1;
-    transform: none;
-  }
-  to {
-    opacity: 0;
-    transform: translate(var(--branch-dx, 0), var(--branch-dy, 0)) scale(0.55);
-  }
-}
-
-@keyframes root-edge-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes root-edge-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
 }
 
 /* The walkthrough bar slides up into place. */
@@ -300,11 +247,124 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .react-flow__node.node-entering > *,
-  .react-flow__node.node-leaving > *,
-  .react-flow__edge.edge-entering,
-  .react-flow__edge.edge-leaving,
   .root-walkthrough-bar {
     animation: none;
   }
+}
+
+/*
+ * The list of connected ideas under a card's reveal arrow (nodes/
+ * ChildRevealMenu.tsx): a line drops from the arrow and each idea hangs off
+ * it in its own box. Boxes slide out one after another and grow a little
+ * under the pointer.
+ */
+.reveal-tree-row {
+  --tree-line: #9a9da8;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 3px 0 3px 18px;
+  animation: reveal-tree-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* The spine: full height between boxes, down to the middle of the last. */
+.reveal-tree-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-left: 1.5px solid var(--tree-line);
+}
+.reveal-tree-row:first-child::before {
+  top: -6px;
+}
+.reveal-tree-row.is-last::before {
+  bottom: 50%;
+  border-bottom: 1.5px solid var(--tree-line);
+  border-bottom-left-radius: 5px;
+  width: 18px;
+}
+
+/* The branch from the spine to each box. */
+.reveal-tree-branch {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 18px;
+  border-top: 1.5px solid var(--tree-line);
+}
+.reveal-tree-row.is-last .reveal-tree-branch {
+  display: none;
+}
+
+.reveal-tree-row.is-mirrored {
+  padding: 3px 18px 3px 0;
+}
+.reveal-tree-row.is-mirrored::before {
+  left: auto;
+  right: 0;
+  border-left: 0;
+  border-right: 1.5px solid var(--tree-line);
+}
+.reveal-tree-row.is-mirrored.is-last::before {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 5px;
+}
+.reveal-tree-row.is-mirrored .reveal-tree-branch {
+  left: auto;
+  right: 0;
+}
+
+.reveal-tree-item {
+  border: 1px solid #e2e2e2;
+  box-shadow: 0 1px 2px rgba(27, 28, 28, 0.05);
+  transform-origin: left center;
+  transition:
+    transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 180ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+.reveal-tree-row.is-mirrored .reveal-tree-item {
+  transform-origin: right center;
+}
+.reveal-tree-item.is-shown {
+  border-color: #c3c6d6;
+}
+.reveal-tree-item:hover,
+.reveal-tree-item:focus-visible {
+  transform: scale(1.06);
+  border-color: #1b1c1c;
+  box-shadow: 0 6px 16px rgba(27, 28, 28, 0.12);
+}
+.reveal-tree-item:active {
+  transform: scale(1.02);
+}
+
+@keyframes reveal-tree-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-tree-row {
+    animation: none;
+  }
+  .reveal-tree-item,
+  .reveal-tree-item:hover,
+  .reveal-tree-item:focus-visible,
+  .reveal-tree-item:active {
+    transition: none;
+    transform: none;
+  }
+}
+
+/*
+ * A hovered or focused card sits above its neighbours, so the action
+ * buttons floating over its top edge are never covered by another card.
+ */
+.react-flow__node:hover,
+.react-flow__node:focus-within {
+  z-index: 1000 !important;
 }

@@ -198,6 +198,14 @@ export function AppShell(): JSX.Element {
     setInspectorOpen(true);
   }, [setInspectorOpen]);
 
+  // Ideas selected from outside the canvas (picking one in a card's list of
+  // connected ideas) open the inspector the same way.
+  const lastSelectedRef = useRef(selectedNodeId);
+  useEffect(() => {
+    if (selectedNodeId !== null && selectedNodeId !== lastSelectedRef.current) setInspectorOpen(true);
+    lastSelectedRef.current = selectedNodeId;
+  }, [selectedNodeId, setInspectorOpen]);
+
   const handleCanvasPaneClick = useCallback(() => {
     canvasActions.select(null);
   }, []);

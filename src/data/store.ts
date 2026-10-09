@@ -52,6 +52,8 @@ import {
   moveNodes as mutMoveNodes,
   removeEdge as mutRemoveEdge,
   removeImage as mutRemoveImage,
+  revealChild as mutRevealChild,
+  hideChild as mutHideChild,
   setCanvasTitle as mutSetCanvasTitle,
   setCollapsed as mutSetCollapsed,
   updateEdge as mutUpdateEdge,
@@ -496,6 +498,27 @@ export const canvasActions = {
     commitCanvasWrite(
       'setCollapsed',
       (s) => mutSetCollapsed(s.canvas, id, collapsed),
+      () => ({}),
+    );
+  },
+
+  /**
+   * Show one direct child of `parentId` (and its connector) without its
+   * siblings. Revealing the last hidden child leaves the parent expanded.
+   */
+  revealChild(parentId: UUID, childId: UUID): void {
+    commitCanvasWrite(
+      'revealChild',
+      (s) => mutRevealChild(s.canvas, parentId, childId),
+      () => ({}),
+    );
+  },
+
+  /** Hide one direct child of `parentId` again; hiding the last one collapses the parent. */
+  hideChild(parentId: UUID, childId: UUID): void {
+    commitCanvasWrite(
+      'hideChild',
+      (s) => mutHideChild(s.canvas, parentId, childId),
       () => ({}),
     );
   },

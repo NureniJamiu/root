@@ -65,6 +65,8 @@ export {
   moveNodes,
   removeEdge,
   removeImage,
+  revealChild,
+  hideChild,
   setCanvasTitle,
   setCollapsed,
   updateEdge,
@@ -73,6 +75,7 @@ export {
 export type { ConnectorEnds, NodePatch } from './mutators';
 
 export {
+  childReveals,
   computeFacingSides,
   connectionsOf,
   descendantCount,
@@ -80,6 +83,8 @@ export {
   edgeKey,
   exclusiveDownstreamIds,
   formatNodeLabel,
+  hasHiddenChildren,
+  hiddenDescendantCount,
   incomingIndex,
   isDuplicateEdge,
   nodeLabel,

@@ -59,6 +59,7 @@ export function deriveReactFlowGraph(
   options?: DeriveGraphOptions,
 ): ReactFlowGraph {
   const visible = shownNodeIds(canvas, options?.revealed ?? []);
+  const revealed = new Set(options?.revealed ?? []);
   const byId = new Map(canvas.nodes.map((n) => [n.id, n]));
 
   const nodes: RFNode<ResearchNodeData>[] = [];
@@ -75,6 +76,9 @@ export function deriveReactFlowGraph(
   const edges: RFEdge<ConnectorEdgeData>[] = [];
   for (const edge of canvas.edges) {
     if (!visible.has(edge.source) || !visible.has(edge.target)) continue;
+    // A child its parent has not revealed keeps that connector hidden even
+    // when another path shows the child, unless a walkthrough revealed it.
+    if (edge.hidden === true && !revealed.has(edge.target)) continue;
     const from = byId.get(edge.source);
     const to = byId.get(edge.target);
     const sides = from && to ? resolveEdgeSides(edge, from.position, to.position) : edge;

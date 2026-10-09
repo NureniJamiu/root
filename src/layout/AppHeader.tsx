@@ -195,9 +195,8 @@ export function AppHeader({
                 >
                   <Badge
                     variant={type}
-                    className={`transition-opacity ${isActive ? 'ring-1 ring-offset-1 ring-[#000000]' : ''} ${
-                      isDimmed ? 'opacity-40 hover:opacity-80' : 'hover:opacity-100'
-                    }`}
+                    className={`transition-opacity ${isActive ? 'ring-1 ring-offset-1 ring-[#000000]' : ''} ${isDimmed ? 'opacity-40 hover:opacity-80' : 'hover:opacity-100'
+                      }`}
                   >
                     {TYPE_LABELS[type]}
                   </Badge>
@@ -280,11 +279,10 @@ export function AppHeader({
             <button
               type="button"
               onClick={onToggleInspector}
-              className={`w-7 h-7 inline-flex items-center justify-center rounded-[2px] transition-colors cursor-pointer ${
-                isInspectorOpen
-                  ? 'text-[#000000] bg-[#f0eded]'
-                  : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
-              }`}
+              className={`w-7 h-7 inline-flex items-center justify-center rounded-[2px] transition-colors cursor-pointer ${isInspectorOpen
+                ? 'text-[#000000] bg-[#f0eded]'
+                : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
+                }`}
               title={isInspectorOpen ? 'Hide inspector' : 'Show inspector'}
               aria-label={isInspectorOpen ? 'Hide inspector' : 'Show inspector'}
               aria-expanded={isInspectorOpen}
