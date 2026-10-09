@@ -41,7 +41,7 @@
  * that is provably conflict-free, not an optimal layout.
  */
 
-import type { Canvas, Position, UUID } from '../data';
+import type { Canvas, Node, Position, UUID } from '../data';
 
 /**
  * Standard card width in canvas units used by the placement algorithm.

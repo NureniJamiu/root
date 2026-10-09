@@ -28,7 +28,7 @@ import { useMemo } from 'react';
 import type { Edge, Node as RFNode } from 'reactflow';
 
 import { useCanvasStore, visibleNodeIds } from '../data';
-import type { Canvas, UUID } from '../data';
+import type { Canvas, Position, UUID } from '../data';
 
 import {
   DEFAULT_EDGE_STYLE,
@@ -55,7 +55,7 @@ import { resolveConnectionSides } from './reconnect';
 export interface DeriveGraphOptions {
   readonly selectedNodeId?: UUID | null;
   readonly draggingNodeId?: UUID | null;
-  readonly nodePositions?: Map<UUID, Position>;
+  readonly nodePositions?: Map<UUID, Position> | undefined;
 }
 
 /**

@@ -30,20 +30,34 @@ app.use(
 // Body parser for JSON payloads (canvas graphs can be large)
 app.use(express.json({ limit: '50mb' }));
 
-// Helper to resolve current authenticated user or fallback to 'guest'
-async function resolveUserId(req: express.Request): Promise<string> {
+// Resolve the signed-in user's id, or null when there is no valid session.
+async function getUserId(req: express.Request): Promise<string | null> {
   try {
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
     });
-    if (session?.user?.id) {
-      return session.user.id;
-    }
+    return session?.user?.id ?? null;
   } catch (_err) {
-    // Session retrieval error or unauthenticated
+    return null;
   }
-  return 'guest';
 }
+
+// Every project route requires a signed-in user; the id is stored on res.locals.
+async function requireUser(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+): Promise<void> {
+  const userId = await getUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: 'Not signed in' });
+    return;
+  }
+  res.locals.userId = userId;
+  next();
+}
+
+app.use('/api/projects', requireUser);
 
 /* -------------------------------------------------------------------------- */
 /* Project API Routes (Database-backed)                                       */
@@ -62,7 +76,7 @@ interface ProjectRow {
 // 1. List all projects for current user (summaries only, excluding heavy canvas payloads)
 app.get('/api/projects', async (req, res) => {
   try {
-    const userId = await resolveUserId(req);
+    const userId: string = res.locals.userId;
     const rows = db
       .prepare(
         'SELECT id, title, nodeCount, createdAt, updatedAt FROM project WHERE userId = ? ORDER BY updatedAt DESC',
@@ -115,12 +129,12 @@ app.get('/api/projects', async (req, res) => {
 // 2. Get single project with full canvas document
 app.get('/api/projects/:id', async (req, res) => {
   try {
-    const userId = await resolveUserId(req);
+    const userId: string = res.locals.userId;
     const { id } = req.params;
 
     const row = db
       .prepare(
-        "SELECT id, title, canvas, nodeCount, createdAt, updatedAt FROM project WHERE id = ? AND (userId = ? OR userId = 'guest')",
+        "SELECT id, title, canvas, nodeCount, createdAt, updatedAt FROM project WHERE id = ? AND userId = ?",
       )
       .get(id, userId) as Omit<ProjectRow, 'userId'> | undefined;
 
@@ -159,7 +173,7 @@ app.get('/api/projects/:id', async (req, res) => {
 // 3. Create a new project
 app.post('/api/projects', async (req, res) => {
   try {
-    const userId = await resolveUserId(req);
+    const userId: string = res.locals.userId;
     const body = req.body || {};
     const now = new Date().toISOString();
     const id = body.id || crypto.randomUUID();
@@ -204,17 +218,23 @@ app.post('/api/projects', async (req, res) => {
 // 4. Update project (title, canvas, nodeCount)
 app.put('/api/projects/:id', async (req, res) => {
   try {
-    const userId = await resolveUserId(req);
+    const userId: string = res.locals.userId;
     const { id } = req.params;
     const body = req.body || {};
     const now = new Date().toISOString();
 
     const existing = db
-      .prepare("SELECT id, title, canvas, nodeCount FROM project WHERE id = ? AND (userId = ? OR userId = 'guest')")
+      .prepare("SELECT id, title, canvas, nodeCount FROM project WHERE id = ? AND userId = ?")
       .get(id, userId) as ProjectRow | undefined;
 
     if (!existing) {
-      // Upsert if not existing
+      // Upsert only when no project with this id exists at all; an id owned
+      // by another user is reported as not found.
+      const taken = db.prepare('SELECT 1 FROM project WHERE id = ?').get(id);
+      if (taken) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+
       const title = body.title || 'Interactive Graph';
       const canvasData = body.canvas || { id, title, nodes: [], edges: [], createdAt: now, updatedAt: now };
       const serializedCanvas = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData);
@@ -245,7 +265,7 @@ app.put('/api/projects/:id', async (req, res) => {
     db.prepare(
       `UPDATE project
        SET title = ?, canvas = ?, nodeCount = ?, updatedAt = ?
-       WHERE id = ? AND (userId = ? OR userId = 'guest')`,
+       WHERE id = ? AND userId = ?`,
     ).run(title, serializedCanvas, nodeCount, now, id, userId);
 
     return res.json({
@@ -264,11 +284,11 @@ app.put('/api/projects/:id', async (req, res) => {
 // 5. Delete project
 app.delete('/api/projects/:id', async (req, res) => {
   try {
-    const userId = await resolveUserId(req);
+    const userId: string = res.locals.userId;
     const { id } = req.params;
 
     db.prepare(
-      "DELETE FROM project WHERE id = ? AND (userId = ? OR userId = 'guest')",
+      "DELETE FROM project WHERE id = ? AND userId = ?",
     ).run(id, userId);
 
     return res.json({ success: true, id });

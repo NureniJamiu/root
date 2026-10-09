@@ -68,10 +68,10 @@ export function resolveConnectionSides(
   sourcePos: Position,
   targetPos: Position,
   connection?: {
-    sourceSide?: Side | null;
-    targetSide?: Side | null;
-    sourcePinned?: boolean | null;
-    targetPinned?: boolean | null;
+    sourceSide?: Side | null | undefined;
+    targetSide?: Side | null | undefined;
+    sourcePinned?: boolean | null | undefined;
+    targetPinned?: boolean | null | undefined;
   },
 ): { sourceSide: Side; targetSide: Side } {
   const automatic = computeFacingSides(sourcePos, targetPos);

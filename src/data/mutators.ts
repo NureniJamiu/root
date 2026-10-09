@@ -370,10 +370,10 @@ export function deleteSubtree(c: Canvas, id: UUID): Canvas {
 
 export interface ConnectionPatch {
   parentId?: UUID;
-  sourceSide?: Side;
-  targetSide?: Side;
-  sourcePinned?: boolean;
-  targetPinned?: boolean;
+  sourceSide?: Side | undefined;
+  targetSide?: Side | undefined;
+  sourcePinned?: boolean | undefined;
+  targetPinned?: boolean | undefined;
 }
 
 /**
