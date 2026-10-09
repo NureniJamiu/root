@@ -39,7 +39,7 @@
  *                                                    SaveErrorDetail
  */
 
-export type { Canvas, ImageEntry, Node, NodeType, Position, UUID } from './types';
+export type { Canvas, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
 
 export {
   canvasSchema,
@@ -47,6 +47,7 @@ export {
   nodeSchema,
   nodeTypeSchema,
   positionSchema,
+  sideSchema,
 } from './schema';
 
 export {
@@ -60,9 +61,10 @@ export {
   removeImage,
   reparentChild,
   setCollapsed,
+  updateConnection,
   updateNode,
 } from './mutators';
-export type { NodePatch } from './mutators';
+export type { ConnectionPatch, NodePatch } from './mutators';
 
 export {
   childrenIndex,

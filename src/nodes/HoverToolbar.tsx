@@ -105,7 +105,7 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
       className="flex flex-row items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
       data-testid="hover-toolbar"
     >
-      <ToolbarButton label="Add child" onClick={handleAddChild} testId="btn-add-child">
+      <ToolbarButton label="Add sub-idea" onClick={handleAddChild} testId="btn-add-child">
         <PlusIcon />
       </ToolbarButton>
       <ToolbarButton label="Edit" onClick={onEdit} testId="btn-edit">
@@ -115,7 +115,7 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
         <ImageIcon />
       </ToolbarButton>
       <ToolbarButton
-        label={`Cycle type (current: ${node.type})`}
+        label={`Change card type (current: ${node.type})`}
         onClick={onCycleType}
         testId="btn-cycle-type"
       >
@@ -124,11 +124,11 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
       {/* Collapse affordance (R6.1): only when node has children and is not
           collapsed. Expand affordance (R6.3): when node is collapsed. */}
       {node.collapsed ? (
-        <ToolbarButton label="Expand subtree" onClick={onExpand} testId="btn-expand">
+        <ToolbarButton label="Expand branch" onClick={onExpand} testId="btn-expand">
           <ChevronRightIcon />
         </ToolbarButton>
       ) : hasChildren ? (
-        <ToolbarButton label="Collapse subtree" onClick={onCollapse} testId="btn-collapse">
+        <ToolbarButton label="Collapse branch" onClick={onCollapse} testId="btn-collapse">
           <ChevronDownIcon />
         </ToolbarButton>
       ) : null}

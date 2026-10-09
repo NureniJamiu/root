@@ -21,7 +21,13 @@
  * routine, and any helpers — they are implementation detail.
  */
 
-export { CANVAS_KEY, RAW_KEY } from './keys';
+export {
+  CANVAS_KEY,
+  RAW_KEY,
+  UI_ACTIVE_PROJECT_KEY,
+  UI_PROJECTS_OPEN_KEY,
+  UI_INSPECTOR_OPEN_KEY,
+} from './keys';
 export { installPersistenceMiddleware } from './middleware';
 export { loadInitialCanvas } from './load';
 export {

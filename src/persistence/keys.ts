@@ -1,23 +1,19 @@
 /**
- * `localStorage` key constants for the Root MVP persistence layer.
+ * Key constants for client-side storage and recovery.
  *
- * `CANVAS_KEY` is the slot the debounced middleware writes the serialized
- * `Canvas` document into on every 500 ms flush and on `beforeunload`
- * (R8.1, R8.2, R8.6). It is also the slot `loadInitialCanvas` reads on
- * app start (R8.3, R8.4).
+ * NOTE: The primary source of truth for projects and canvas documents
+ * is the SQLite database via `/api/projects`.
  *
- * `RAW_KEY` is the recovery slot: when `parseCanvas` cannot deserialize
- * the payload found at `CANVAS_KEY` on load, the load path copies the
- * offending raw string here untouched (R8.5). Keeping the corrupted
- * payload out of the primary slot lets the app fall back to an empty
- * canvas without losing the bytes the user might want to inspect or
- * hand-fix later. The primary slot is intentionally left alone so a
- * subsequent write can overwrite it cleanly.
- *
- * Keys are namespaced with the `root-mvp:` prefix so this app can
- * coexist with other tools on the same origin without collision, and so
- * the `.raw` suffix is unambiguous when inspecting devtools.
+ * `localStorage` is strictly restricted to:
+ *   1. Client-side UI preferences (active tab, collapsed rail toggles)
+ *   2. Emergency crash recovery slot (RAW_KEY) when corrupt data is detected.
  */
 
+// Legacy / recovery slots
 export const CANVAS_KEY = 'root-mvp:canvas' as const;
 export const RAW_KEY = 'root-mvp:canvas.raw' as const;
+
+// Client UI Preferences (appropriate use of localStorage)
+export const UI_ACTIVE_PROJECT_KEY = 'root-ui:active-project-id' as const;
+export const UI_PROJECTS_OPEN_KEY = 'root-ui:is-projects-open' as const;
+export const UI_INSPECTOR_OPEN_KEY = 'root-ui:is-inspector-open' as const;

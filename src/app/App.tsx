@@ -43,7 +43,6 @@ import {
   canvasActions,
   emptyCanvas,
   parseCanvas,
-  serializeCanvas,
   useCanvasStore,
   onSaveError as onStoreSaveError,
 } from '../data';
@@ -66,9 +65,24 @@ import {
   loadInitialCanvas,
   onLoadError,
   onSaveError as onPersistenceSaveError,
+  UI_ACTIVE_PROJECT_KEY,
+  UI_PROJECTS_OPEN_KEY,
+  UI_INSPECTOR_OPEN_KEY,
 } from '../persistence';
-import { AuthProvider } from '../auth';
+import { AuthProvider, useOptionalAuth } from '../auth';
 import { RouterProvider, RootRouter } from '../routing';
+import {
+  fetchProjects,
+  fetchProject,
+  createProjectApi,
+  updateProjectApi,
+  deleteProjectApi,
+} from '../lib/projects-api';
+
+if (typeof window !== 'undefined') {
+  (window as any).__ROOT_CANVAS_STORE__ = useCanvasStore;
+  (window as any).__ROOT_CANVAS_ACTIONS__ = canvasActions;
+}
 
 /* -------------------------------------------------------------------------- */
 /* ToolbarCallbacks — module scope so identity is stable across renders      */
@@ -289,17 +303,52 @@ export function AppShell(): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const openNodeId = useCanvasStore((s) => s.editor.openNodeId);
   const deleteNodeId = useCanvasStore((s) => s.deletePrompt.nodeId);
+  const auth = useOptionalAuth();
 
   const [canvasControls, setCanvasControls] = useState<CanvasViewControls | null>(null);
   const [activeTypeFilter, setActiveTypeFilter] = useState<NodeType | null>(null);
 
-  // Pane closable states
-  const [isProjectsOpen, setIsProjectsOpen] = useState(true);
-  const [isInspectorOpen, setIsInspectorOpen] = useState(true);
+  // Pane closable states — initialized from UI preferences in localStorage
+  const [isProjectsOpen, setIsProjectsOpen] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(UI_PROJECTS_OPEN_KEY);
+      return stored !== null ? stored === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(UI_INSPECTOR_OPEN_KEY);
+      return stored !== null ? stored === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const setProjectsOpen = useCallback((next: boolean) => {
+    setIsProjectsOpen(next);
+    try {
+      localStorage.setItem(UI_PROJECTS_OPEN_KEY, String(next));
+    } catch {
+      /* preference is best-effort */
+    }
+  }, []);
+
+  const setInspectorOpen = useCallback((next: boolean) => {
+    setIsInspectorOpen(next);
+    try {
+      localStorage.setItem(UI_INSPECTOR_OPEN_KEY, String(next));
+    } catch {
+      /* preference is best-effort */
+    }
+  }, []);
+
   const [isPanActive, setIsPanActive] = useState(false);
   const [dragInfo, setDragInfo] = useState<DragState | null>(null);
 
-  // Projects list state
+  // Projects list state backed by SQLite Database
   const [projects, setProjects] = useState<readonly ProjectItem[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string>('');
 
@@ -316,96 +365,111 @@ export function AppShell(): JSX.Element {
   // Stable cleanup ref so the effect teardown always cancels the latest
   // installed middleware without stale-closure issues.
   const cleanupRef = useRef<(() => void) | null>(null);
+  const dbSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // 1. Initialize projects list from localStorage if available
-    let initialProjects: ProjectItem[] = [];
-    try {
-      const stored = localStorage.getItem('root-mvp:projects');
-      if (stored) {
-        initialProjects = JSON.parse(stored);
-      }
-    } catch (_err) {
-      /* ignore */
-    }
+    let isMounted = true;
 
-    let savedActiveId: string | null = null;
-    try {
-      savedActiveId = localStorage.getItem('root-mvp:active-project-id');
-    } catch (_err) {
-      /* ignore */
-    }
-
-    let initialCanvas: Canvas | null = null;
-    if (savedActiveId) {
+    async function initializeDashboard() {
+      // 1. One-time migration of any legacy database-like localStorage keys
       try {
-        const raw = localStorage.getItem(`root-mvp:project:${savedActiveId}`);
-        if (raw) {
-          const parsed = parseCanvas(raw);
-          if (parsed.ok) {
-            initialCanvas = parsed.canvas;
+        const legacyProjectsRaw = localStorage.getItem('root-mvp:projects');
+        if (legacyProjectsRaw) {
+          const legacyProjects: ProjectItem[] = JSON.parse(legacyProjectsRaw);
+          for (const p of legacyProjects) {
+            const rawCanvas = localStorage.getItem(`root-mvp:project:${p.id}`);
+            let cData: Canvas | null = null;
+            if (rawCanvas) {
+              const parsed = parseCanvas(rawCanvas);
+              if (parsed.ok) cData = parsed.canvas;
+            }
+            if (!cData) {
+              cData = { ...emptyCanvas(), id: p.id, title: p.title };
+            }
+            await updateProjectApi(p.id, {
+              title: p.title,
+              canvas: cData,
+              nodeCount: p.nodeCount,
+            });
+            localStorage.removeItem(`root-mvp:project:${p.id}`);
           }
+          localStorage.removeItem('root-mvp:projects');
         }
       } catch (_err) {
         /* ignore */
       }
-    }
 
-    if (!initialCanvas) {
-      initialCanvas = loadInitialCanvas();
-    }
+      // 2. Fetch projects from SQLite database
+      const dbProjects = await fetchProjects();
+      if (!isMounted) return;
 
-    canvasActions; // ensure the actions object is initialized
-    useCanvasStore.setState({ canvas: initialCanvas });
+      const fallbackCanvas = loadInitialCanvas();
 
-    if (!initialProjects.length) {
-      initialProjects = [
-        {
-          id: initialCanvas.id,
-          title: initialCanvas.title || 'Interactive Graph',
-          nodeCount: initialCanvas.nodes.length,
-          updatedAt: initialCanvas.updatedAt,
-        },
-      ];
-      try {
-        localStorage.setItem('root-mvp:projects', JSON.stringify(initialProjects));
-        localStorage.setItem(`root-mvp:project:${initialCanvas.id}`, serializeCanvas(initialCanvas));
-      } catch (_err) {}
-    } else {
-      const exists = initialProjects.some((p) => p.id === initialCanvas!.id);
-      if (!exists) {
-        initialProjects.push({
-          id: initialCanvas.id,
-          title: initialCanvas.title || 'Interactive Graph',
-          nodeCount: initialCanvas.nodes.length,
-          updatedAt: initialCanvas.updatedAt,
+      let activeId =
+        localStorage.getItem(UI_ACTIVE_PROJECT_KEY) ||
+        localStorage.getItem('root-mvp:active-project-id');
+      let currentProjects = dbProjects;
+
+      if (currentProjects.length === 0) {
+        // Create initial default project in SQLite database
+        const created = await createProjectApi({
+          id: fallbackCanvas.id,
+          title: fallbackCanvas.title || 'Idea Canvas',
+          canvas: fallbackCanvas,
+          nodeCount: fallbackCanvas.nodes.length,
         });
+        const initialItem: ProjectItem = created ?? {
+          id: fallbackCanvas.id,
+          title: fallbackCanvas.title || 'Idea Canvas',
+          nodeCount: fallbackCanvas.nodes.length,
+          updatedAt: fallbackCanvas.updatedAt,
+        };
+        currentProjects = [initialItem];
+        activeId = initialItem.id;
+      }
+
+      if (!activeId || !currentProjects.some((p) => p.id === activeId)) {
+        activeId = currentProjects[0]!.id;
+      }
+
+      setProjects(currentProjects);
+      setActiveProjectId(activeId);
+      try {
+        localStorage.setItem(UI_ACTIVE_PROJECT_KEY, activeId);
+        localStorage.removeItem('root-mvp:active-project-id');
+      } catch {}
+
+      // 3. Load active project canvas document from database
+      const projDetail = await fetchProject(activeId);
+      if (!isMounted) return;
+
+      const initialCanvas = projDetail?.canvas ?? fallbackCanvas;
+      canvasActions; // ensure the actions object is initialized
+      useCanvasStore.setState({ canvas: initialCanvas });
+      if (typeof window !== 'undefined') {
+        (window as any).__ROOT_INITIALIZED__ = true;
       }
     }
 
-    setProjects(initialProjects);
-    setActiveProjectId(initialCanvas.id);
-    try {
-      localStorage.setItem('root-mvp:active-project-id', initialCanvas.id);
-    } catch (_err) {}
+    initializeDashboard();
 
-    // 2. Install the debounced persistence middleware.
+    // 4. Install the debounced persistence middleware (for memory sync & emergency crash tolerance)
     cleanupRef.current = installPersistenceMiddleware();
 
     return () => {
+      isMounted = false;
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
   }, []);
 
-  // Sync active project canvas, title and node count in real time
+  // Sync active project canvas, title and node count to SQLite database in real time (debounced)
   useEffect(() => {
     if (!activeProjectId) return;
-    try {
-      localStorage.setItem(`root-mvp:project:${activeProjectId}`, serializeCanvas(canvas));
-    } catch (_err) {}
-    setProjects((prev) => {
-      const next = prev.map((p) =>
+
+    // Optimistically update project summary in memory
+    setProjects((prev) =>
+      prev.map((p) =>
         p.id === activeProjectId
           ? {
               ...p,
@@ -414,81 +478,99 @@ export function AppShell(): JSX.Element {
               updatedAt: canvas.updatedAt,
             }
           : p,
-      );
-      try {
-        localStorage.setItem('root-mvp:projects', JSON.stringify(next));
-      } catch (_err) {}
-      return next;
-    });
+      ),
+    );
+
+    // Debounce save to database (500ms)
+    if (dbSyncTimeoutRef.current) {
+      clearTimeout(dbSyncTimeoutRef.current);
+    }
+    dbSyncTimeoutRef.current = setTimeout(() => {
+      updateProjectApi(activeProjectId, {
+        title: canvas.title,
+        canvas,
+        nodeCount: canvas.nodes.length,
+      });
+    }, 500);
+
+    return () => {
+      if (dbSyncTimeoutRef.current) {
+        clearTimeout(dbSyncTimeoutRef.current);
+      }
+    };
   }, [canvas, activeProjectId]);
 
-  const handleNewProject = useCallback(() => {
-    // Flush current canvas before creating new project
+  const handleNewProject = useCallback(async () => {
+    // Flush current canvas to database before switching
     const currentCanvas = useCanvasStore.getState().canvas;
-    try {
-      localStorage.setItem(`root-mvp:project:${currentCanvas.id}`, serializeCanvas(currentCanvas));
-    } catch (_err) {}
+    if (activeProjectId) {
+      await updateProjectApi(activeProjectId, {
+        title: currentCanvas.title,
+        canvas: currentCanvas,
+        nodeCount: currentCanvas.nodes.length,
+      });
+    }
 
     const newCanvas: Canvas = {
       ...emptyCanvas(),
       title: `Project ${projects.length + 1}`,
     };
-    const newProjectItem: ProjectItem = {
+
+    const created = await createProjectApi({
+      id: newCanvas.id,
+      title: newCanvas.title,
+      canvas: newCanvas,
+      nodeCount: 0,
+    });
+
+    const newProjectItem: ProjectItem = created ?? {
       id: newCanvas.id,
       title: newCanvas.title,
       nodeCount: 0,
       updatedAt: newCanvas.updatedAt,
     };
-    const nextProjects = [...projects, newProjectItem];
+
+    const nextProjects = [newProjectItem, ...projects.filter((p) => p.id !== newProjectItem.id)];
     setProjects(nextProjects);
     setActiveProjectId(newCanvas.id);
     try {
-      localStorage.setItem('root-mvp:projects', JSON.stringify(nextProjects));
-      localStorage.setItem(`root-mvp:project:${newCanvas.id}`, serializeCanvas(newCanvas));
-      localStorage.setItem('root-mvp:active-project-id', newCanvas.id);
-    } catch (_err) {
-      /* ignore */
-    }
+      localStorage.setItem(UI_ACTIVE_PROJECT_KEY, newCanvas.id);
+    } catch (_err) {}
+
     useCanvasStore.setState({
       canvas: newCanvas,
       selection: { nodeId: null },
       editor: { openNodeId: null },
     });
-  }, [projects]);
+  }, [projects, activeProjectId]);
 
   const handleSelectProject = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (id === activeProjectId) return;
-      // Flush current project canvas before switching
+      // Flush current project canvas to database before switching
       const currentCanvas = useCanvasStore.getState().canvas;
-      try {
-        localStorage.setItem(`root-mvp:project:${currentCanvas.id}`, serializeCanvas(currentCanvas));
-      } catch (_err) {}
+      if (activeProjectId) {
+        updateProjectApi(activeProjectId, {
+          title: currentCanvas.title,
+          canvas: currentCanvas,
+          nodeCount: currentCanvas.nodes.length,
+        });
+      }
 
       const target = projects.find((p) => p.id === id);
       if (target) {
         setActiveProjectId(id);
         try {
-          localStorage.setItem('root-mvp:active-project-id', id);
+          localStorage.setItem(UI_ACTIVE_PROJECT_KEY, id);
         } catch (_err) {}
 
-        let targetCanvas: Canvas | null = null;
-        try {
-          const raw = localStorage.getItem(`root-mvp:project:${id}`);
-          if (raw) {
-            const parsed = parseCanvas(raw);
-            if (parsed.ok) targetCanvas = parsed.canvas;
-          }
-        } catch (_err) {
-          /* ignore */
-        }
-        if (!targetCanvas) {
-          targetCanvas = {
-            ...emptyCanvas(),
-            id: target.id,
-            title: target.title,
-          };
-        }
+        const projDetail = await fetchProject(id);
+        const targetCanvas: Canvas = projDetail?.canvas ?? {
+          ...emptyCanvas(),
+          id: target.id,
+          title: target.title,
+        };
+
         useCanvasStore.setState({
           canvas: targetCanvas,
           selection: { nodeId: null },
@@ -501,12 +583,9 @@ export function AppShell(): JSX.Element {
   );
 
   const handleDeleteProject = useCallback(
-    (idToDelete: string) => {
+    async (idToDelete: string) => {
+      deleteProjectApi(idToDelete);
       const remaining = projects.filter((p) => p.id !== idToDelete);
-      try {
-        localStorage.removeItem(`root-mvp:project:${idToDelete}`);
-        localStorage.setItem('root-mvp:projects', JSON.stringify(remaining));
-      } catch (_err) {}
 
       if (idToDelete === activeProjectId) {
         if (remaining.length > 0) {
@@ -514,24 +593,15 @@ export function AppShell(): JSX.Element {
           setProjects(remaining);
           setActiveProjectId(next.id);
           try {
-            localStorage.setItem('root-mvp:active-project-id', next.id);
+            localStorage.setItem(UI_ACTIVE_PROJECT_KEY, next.id);
           } catch (_err) {}
 
-          let targetCanvas: Canvas | null = null;
-          try {
-            const raw = localStorage.getItem(`root-mvp:project:${next.id}`);
-            if (raw) {
-              const parsed = parseCanvas(raw);
-              if (parsed.ok) targetCanvas = parsed.canvas;
-            }
-          } catch (_err) {}
-          if (!targetCanvas) {
-            targetCanvas = {
-              ...emptyCanvas(),
-              id: next.id,
-              title: next.title,
-            };
-          }
+          const nextProj = await fetchProject(next.id);
+          const targetCanvas: Canvas = nextProj?.canvas ?? {
+            ...emptyCanvas(),
+            id: next.id,
+            title: next.title,
+          };
           useCanvasStore.setState({
             canvas: targetCanvas,
             selection: { nodeId: null },
@@ -539,12 +609,18 @@ export function AppShell(): JSX.Element {
           });
           setTimeout(() => canvasControls?.fitView(), 50);
         } else {
-          // If all projects deleted, create a fresh default project
+          // If all projects deleted, create a fresh default project in database
           const newCanvas: Canvas = {
             ...emptyCanvas(),
-            title: 'Interactive Graph',
+            title: 'Idea Canvas',
           };
-          const newProjectItem: ProjectItem = {
+          const created = await createProjectApi({
+            id: newCanvas.id,
+            title: newCanvas.title,
+            canvas: newCanvas,
+            nodeCount: 0,
+          });
+          const newProjectItem: ProjectItem = created ?? {
             id: newCanvas.id,
             title: newCanvas.title,
             nodeCount: 0,
@@ -553,9 +629,7 @@ export function AppShell(): JSX.Element {
           setProjects([newProjectItem]);
           setActiveProjectId(newCanvas.id);
           try {
-            localStorage.setItem('root-mvp:projects', JSON.stringify([newProjectItem]));
-            localStorage.setItem(`root-mvp:project:${newCanvas.id}`, serializeCanvas(newCanvas));
-            localStorage.setItem('root-mvp:active-project-id', newCanvas.id);
+            localStorage.setItem(UI_ACTIVE_PROJECT_KEY, newCanvas.id);
           } catch (_err) {}
           useCanvasStore.setState({
             canvas: newCanvas,
@@ -592,14 +666,14 @@ export function AppShell(): JSX.Element {
 
   const handleCreateRoot = useCallback((premise?: string) => {
     canvasActions.addRoot(ROOT_INITIAL_POSITION);
-    const chosen = premise || 'Mechanisms of Cellular Senescence & Telomere Dynamics';
+    const chosen = premise || 'Content Strategy: Launching a Video Series';
     setTimeout(() => {
       const root = useCanvasStore.getState().canvas.nodes[0];
       if (root) {
-        if (chosen.includes('Cellular Senescence') || !premise) {
+        if (!premise || chosen.includes('Content Strategy') || chosen.includes('Weekly Content Plan')) {
           canvasActions.updateNode(root.id, {
-            title: 'Mechanisms of Cellular Senescence & Telomere Dynamics',
-            body: 'Investigating the molecular pathways linking shelterin complex erosion to p53/p21 checkpoint activation in human somatic cells.',
+            title: chosen || 'Content Strategy: Launching a Video Series',
+            body: 'Outlining topics, hooks, and production steps to produce high-impact, engaging content consistently.',
           });
 
           // Pre-populate branches matching visual guide
@@ -614,30 +688,30 @@ export function AppShell(): JSX.Element {
             const cNode = nodes[3];
             if (qNode) {
               canvasActions.updateNode(qNode.id, {
-                title: 'Does Shelterin Dissociation Prepare Double-Strand Breaks?',
+                title: 'What core questions and hooks hook viewers first?',
                 type: 'question',
-                body: 'Assessing whether TRF2 shelterin depletion exposes ends directly or triggers ATM/ATR response pathways in human somatic cells.',
+                body: 'Reviewing top viewer comments, community questions, and real pain points to frame relatable hooks.',
               });
             }
             if (fNode) {
               canvasActions.updateNode(fNode.id, {
-                title: 'TRF2 Shelterin Complex Degradation Observed',
+                title: 'Short visual breakdowns generate 3x higher retention',
                 type: 'finding',
-                body: 'Confocal immunofluorescence shows 73% TRF2 delocalization within 48h of induced stress. γ-H2AX foci colocalize at telomeres (TIFs).',
+                body: 'Audience testing showed 73% higher completion rate when points are accompanied by clear visual cards and diagrams.',
               });
               canvasActions.addImage(fNode.id, {
                 id: crypto.randomUUID(),
                 dataUrl:
-                  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225"><rect width="400" height="225" fill="%23060a12"/><g stroke="%2338bdf8" stroke-width="2.5" fill="none" opacity="0.85"><path d="M60 40 Q70 60 90 70 M80 50 Q110 65 130 90 M140 30 Q160 55 170 80 M200 45 Q210 70 230 85 M250 30 Q270 55 285 75 M310 40 Q330 65 345 80 M50 140 Q75 150 95 175 M110 130 Q130 155 145 180 M170 145 Q190 160 210 190 M230 135 Q250 160 270 185 M295 130 Q315 155 330 175 M350 140 Q365 160 380 180"/></g><g stroke="%234ade80" stroke-width="3" fill="none"><circle cx="90" cy="70" r="2.5" fill="%234ade80"/><circle cx="130" cy="90" r="2.5" fill="%234ade80"/><circle cx="170" cy="80" r="2.5" fill="%234ade80"/><circle cx="230" cy="85" r="2.5" fill="%234ade80"/><circle cx="285" cy="75" r="2.5" fill="%234ade80"/><circle cx="95" cy="175" r="2.5" fill="%234ade80"/><circle cx="145" cy="180" r="2.5" fill="%234ade80"/><circle cx="210" cy="190" r="2.5" fill="%234ade80"/><circle cx="270" cy="185" r="2.5" fill="%234ade80"/></g></svg>',
+                  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="225" viewBox="0 0 400 225"><rect width="400" height="225" fill="%230b1120"/><rect x="30" y="30" width="100" height="70" rx="4" fill="%231e293b" stroke="%233b82f6" stroke-width="2"/><text x="80" y="70" fill="%23ffffff" font-family="sans-serif" font-size="12" text-anchor="middle">HOOK</text><path d="M130 65 L170 65" stroke="%233b82f6" stroke-width="2" stroke-dasharray="4"/><rect x="170" y="30" width="100" height="70" rx="4" fill="%231e293b" stroke="%2310b981" stroke-width="2"/><text x="220" y="70" fill="%23ffffff" font-family="sans-serif" font-size="12" text-anchor="middle">BREAKDOWN</text><path d="M270 65 L310 65" stroke="%2310b981" stroke-width="2" stroke-dasharray="4"/><rect x="310" y="30" width="60" height="70" rx="4" fill="%231e293b" stroke="%23f59e0b" stroke-width="2"/><text x="340" y="70" fill="%23ffffff" font-family="sans-serif" font-size="12" text-anchor="middle">CTA</text><path d="M80 140 Q200 110 320 170" stroke="%2338bdf8" stroke-width="3" fill="none"/><circle cx="80" cy="140" r="4" fill="%2338bdf8"/><circle cx="200" cy="125" r="4" fill="%2338bdf8"/><circle cx="320" cy="170" r="4" fill="%2338bdf8"/><text x="200" y="195" fill="%2394a3b8" font-family="sans-serif" font-size="11" text-anchor="middle">Retention Curve Across Video Sections</text></svg>',
                 addedAt: new Date().toISOString(),
               });
               canvasActions.select(fNode.id);
             }
             if (cNode) {
               canvasActions.updateNode(cNode.id, {
-                title: 'p53-Dependent Cell Cycle Arrest Irreversible',
+                title: 'Publish weekly 5-minute guides with actionable takeaways',
                 type: 'conclusion',
-                body: 'Downstream p21/CIP1 accumulation locks CDK preventing retinoblastoma phosphorylation permanent cessation.',
+                body: 'Adopt a simple 3-part formula: intriguing hook, 3 visual examples, and one concrete action step to test immediately.',
               });
             }
           }, 0);
@@ -648,46 +722,41 @@ export function AppShell(): JSX.Element {
     }, 0);
   }, []);
 
-  // When a node is selected, ensure the node inspector slides open
+  // Selecting an idea reveals the inspector. Closing it is left to the
+  // header toggle so the pane never disappears out from under the user.
   const handleNodeSelect = useCallback(() => {
-    setIsInspectorOpen(true);
-  }, []);
+    setInspectorOpen(true);
+  }, [setInspectorOpen]);
 
-  // When clicking on empty canvas pane, close the inspector
   const handleCanvasPaneClick = useCallback(() => {
-    setIsInspectorOpen(false);
     canvasActions.select(null);
   }, []);
 
-  // Clicking anywhere outside the canvas (if not on a node or another node) closes the inspector
-  useEffect(() => {
-    function handleGlobalPointerDown(e: MouseEvent) {
-      if (!isInspectorOpen) return;
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
+  const selectedNodeId = useCanvasStore((s) => s.selection.nodeId);
+  const addIdeaParent =
+    canvas.nodes.find((n) => n.id === selectedNodeId) ?? canvas.nodes.find((n) => n.parentId === null);
 
-      // If clicking inside the node inspector rail, keep open
-      if (target.closest('[data-testid="node-inspector-rail"]')) return;
-      // If clicking a node card or interactive element on a node, keep open
-      if (target.closest('.react-flow__node') || target.closest('[data-testid^="node-card-"]')) return;
-      // If clicking buttons that toggle/open inspector or dialogs, keep open
-      if (
-        target.closest('[data-testid="btn-toggle-inspector"]') ||
-        target.closest('[data-testid="btn-open-inspector"]') ||
-        target.closest('[data-testid="node-editor"]') ||
-        target.closest('[data-testid="delete-prompt"]')
-      ) {
-        return;
-      }
-
-      // Otherwise, close inspector pane
-      setIsInspectorOpen(false);
-      canvasActions.select(null);
+  const handleAddIdea = useCallback(() => {
+    if (!addIdeaParent) {
+      handleCreateRoot();
+      return;
     }
+    toolbarCallbacks.onAddChild(addIdeaParent.id);
+  }, [addIdeaParent, handleCreateRoot]);
 
-    window.addEventListener('pointerdown', handleGlobalPointerDown);
-    return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
-  }, [isInspectorOpen]);
+  const navigateTo = useCallback((path: string) => {
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await auth?.signOut();
+    } catch (_err) {
+      /* ignore */
+    }
+    navigateTo('/auth/login');
+  }, [auth, navigateTo]);
 
   // Global shortcut: press 'N' or 'n' to create root node when canvas has no nodes
   useEffect(() => {
@@ -710,7 +779,7 @@ export function AppShell(): JSX.Element {
     <ToolbarCallbacksProvider value={toolbarCallbacks}>
       <div
         id="root-app"
-        className="w-screen h-screen flex flex-col bg-[#f9f9fb] overflow-hidden select-none"
+        className="w-screen h-screen flex bg-[#f9f9fb] overflow-hidden select-none"
         style={{
           width: '100vw',
           height: '100vh',
@@ -718,144 +787,86 @@ export function AppShell(): JSX.Element {
           overflow: 'hidden',
         }}
       >
-        {/* Top App Header */}
-        <AppHeader
-          title={canvas.title || 'Root — Untitled Research Canvas'}
-          onTitleChange={(title) => {
-            const currentCanvas = useCanvasStore.getState().canvas;
-            useCanvasStore.setState({ canvas: { ...currentCanvas, title } });
-          }}
-          nodeCount={canvas.nodes.length}
-          branchCount={branchCount}
-          zoomPercent={canvasControls?.zoomPercent ?? 100}
-          onZoomIn={() => canvasControls?.zoomIn()}
-          onZoomOut={() => canvasControls?.zoomOut()}
-          onFitView={() => canvasControls?.fitView()}
-          onCenterRoot={() => canvasControls?.centerRoot()}
-          onAddNode={() => {
-            if (canvas.nodes.length === 0) {
-              handleCreateRoot();
-            } else {
-              const root = canvas.nodes[0];
-              if (root) toolbarCallbacks.onAddChild(root.id);
+        {/* Left: Projects sidebar — full height, owns brand + account */}
+        <div
+          className={`h-full transition-[width,opacity] duration-200 ease-out shrink-0 overflow-hidden ${
+            isProjectsOpen ? 'w-[264px] opacity-100' : 'w-0 opacity-0 pointer-events-none'
+          }`}
+          aria-hidden={!isProjectsOpen}
+        >
+          <StructuralIndexRail
+            nodeCount={canvas.nodes.length}
+            isOpen={isProjectsOpen}
+            onClose={() => setProjectsOpen(false)}
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelectProject={handleSelectProject}
+            onNewProject={handleNewProject}
+            onDeleteProject={handleDeleteProject}
+            onNavigateHome={() => navigateTo('/')}
+            user={auth?.user ?? null}
+            onSignOut={handleSignOut}
+          />
+        </div>
+
+        {/* Right: workbench column (header above canvas + inspector) */}
+        <div className="flex-1 min-w-0 h-full flex flex-col">
+          <AppHeader
+            title={canvas.title || 'Untitled Project'}
+            onTitleChange={(title) => {
+              const currentCanvas = useCanvasStore.getState().canvas;
+              useCanvasStore.setState({ canvas: { ...currentCanvas, title } });
+            }}
+            nodeCount={canvas.nodes.length}
+            branchCount={branchCount}
+            onAddNode={handleAddIdea}
+            addNodeHint={
+              addIdeaParent
+                ? `Add a sub-idea under “${addIdeaParent.title || 'Untitled idea'}”`
+                : 'Create your main idea'
             }
-          }}
-          isPanActive={isPanActive}
-          onTogglePan={() => setIsPanActive((prev) => !prev)}
-          isSidebarOpen={isProjectsOpen}
-          onToggleSidebar={() => setIsProjectsOpen((prev) => !prev)}
-          isInspectorOpen={isInspectorOpen}
-          onToggleInspector={() => setIsInspectorOpen((prev) => !prev)}
-          activeTypeFilter={activeTypeFilter}
-          onSelectTypeFilter={setActiveTypeFilter}
-          onNavigateHome={() => {
-            if (typeof window !== 'undefined') {
-              window.history.pushState({}, '', '/');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }
-          }}
-          onSignOut={() => {
-            try {
-              localStorage.removeItem('root-auth:user');
-            } catch (_err) {
-              /* ignore */
-            }
-            if (typeof window !== 'undefined') {
-              window.history.pushState({}, '', '/auth/login');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }
-          }}
-        />
+            isSidebarOpen={isProjectsOpen}
+            onToggleSidebar={() => setProjectsOpen(!isProjectsOpen)}
+            isInspectorOpen={isInspectorOpen}
+            onToggleInspector={() => setInspectorOpen(!isInspectorOpen)}
+            activeTypeFilter={activeTypeFilter}
+            onSelectTypeFilter={setActiveTypeFilter}
+            onNavigateHome={() => navigateTo('/')}
+          />
 
-        {/* 3-Pane Workbench Body */}
-        <div className="flex-1 w-full flex overflow-hidden relative">
-          {/* Left: Projects Rail (280px) with slide transition */}
-          <div
-            className={`h-full transition-all duration-300 ease-in-out shrink-0 overflow-hidden ${
-              isProjectsOpen
-                ? 'w-[280px] translate-x-0 opacity-100'
-                : 'w-0 -translate-x-full opacity-0 pointer-events-none'
-            }`}
-          >
-            <StructuralIndexRail
-              nodeCount={canvas.nodes.length}
-              isOpen={isProjectsOpen}
-              onClose={() => setIsProjectsOpen(false)}
-              projects={projects}
-              activeProjectId={activeProjectId}
-              onSelectProject={handleSelectProject}
-              onNewProject={handleNewProject}
-              onDeleteProject={handleDeleteProject}
-            />
-          </div>
+          <div className="flex-1 min-h-0 w-full flex overflow-hidden relative">
+            {/* Center: Canvas Viewport */}
+            <div className="flex-1 min-w-0 h-full relative overflow-hidden">
+              <CanvasView
+                onControlsReady={setCanvasControls}
+                onNodeSelect={handleNodeSelect}
+                onPaneClick={handleCanvasPaneClick}
+                onDragChange={setDragInfo}
+                isPanActive={isPanActive}
+                onTogglePan={() => setIsPanActive((prev) => !prev)}
+                highlightType={activeTypeFilter}
+              />
 
-          {/* Center: Canvas Viewport */}
-          <div className="flex-1 h-full relative overflow-hidden">
-            {/* If Projects sidebar is closed, provide a dock toggle button at top-left of canvas */}
-            {!isProjectsOpen && (
-              <button
-                type="button"
-                onClick={() => setIsProjectsOpen(true)}
-                className="absolute top-3 left-3 z-20 p-1.5 bg-[#ffffff] border border-[#ebebeb] hover:border-[#000000] rounded-[2px] shadow-sm text-[#737785] hover:text-[#000000] transition-all cursor-pointer"
-                title="Open Projects Sidebar"
-                aria-label="Open Projects Sidebar"
-                data-testid="btn-open-projects"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M9 3v18" />
-                  <path d="m14 9-3 3 3 3" />
-                </svg>
-              </button>
-            )}
+              {/* Empty Canvas Affordance (R2.1) */}
+              {canvas.nodes.length === 0 && (
+                <EmptyCanvasState onCreateRoot={handleCreateRoot} />
+              )}
+            </div>
 
-            {/* If Node Inspector is closed, provide a dock toggle button at top-right of canvas */}
-            {!isInspectorOpen && (
-              <button
-                type="button"
-                onClick={() => setIsInspectorOpen(true)}
-                className="absolute top-3 right-3 z-20 p-1.5 bg-[#ffffff] border border-[#ebebeb] hover:border-[#000000] rounded-[2px] shadow-sm text-[#737785] hover:text-[#000000] transition-all cursor-pointer"
-                title="Open Node Inspector"
-                aria-label="Open Node Inspector"
-                data-testid="btn-open-inspector"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M15 3v18" />
-                  <path d="m10 15 3-3-3-3" />
-                </svg>
-              </button>
-            )}
-
-            <CanvasView
-              onControlsReady={setCanvasControls}
-              onNodeSelect={handleNodeSelect}
-              onPaneClick={handleCanvasPaneClick}
-              onDragChange={setDragInfo}
-              isPanActive={isPanActive}
-            />
-
-            {/* Empty Canvas Affordance (R2.1) */}
-            {canvas.nodes.length === 0 && (
-              <EmptyCanvasState onCreateRoot={handleCreateRoot} />
-            )}
-          </div>
-
-          {/* Right: Node Inspector Rail (360px) with slide transition */}
-          <div
-            className={`h-full transition-all duration-300 ease-in-out shrink-0 overflow-hidden ${
-              isInspectorOpen
-                ? 'w-[360px] translate-x-0 opacity-100'
-                : 'w-0 translate-x-full opacity-0 pointer-events-none'
-            }`}
-          >
-            <NodeInspectorRail
-              isOpen={isInspectorOpen}
-              onClose={() => setIsInspectorOpen(false)}
-              onOpenEditor={(id) => canvasActions.openEditor(id)}
-              onAddChild={(id) => toolbarCallbacks.onAddChild(id)}
-              dragInfo={dragInfo}
-            />
+            {/* Right: Node Inspector Rail (360px) */}
+            <div
+              className={`h-full transition-[width,opacity] duration-200 ease-out shrink-0 overflow-hidden ${
+                isInspectorOpen ? 'w-[360px] opacity-100' : 'w-0 opacity-0 pointer-events-none'
+              }`}
+              aria-hidden={!isInspectorOpen}
+            >
+              <NodeInspectorRail
+                isOpen={isInspectorOpen}
+                onOpenEditor={(id) => canvasActions.openEditor(id)}
+                onAddChild={(id) => toolbarCallbacks.onAddChild(id)}
+                dragInfo={dragInfo}
+              />
+            </div>
           </div>
         </div>
 

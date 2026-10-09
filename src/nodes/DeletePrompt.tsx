@@ -171,7 +171,7 @@ export function DeletePrompt({
           className="text-body"
           style={{ margin: 0, fontWeight: 400, fontSize: 16 }}
         >
-          Delete node?
+          Delete this idea?
         </h2>
 
         <p
@@ -180,8 +180,8 @@ export function DeletePrompt({
           style={{ margin: '8px 0 16px 0' }}
         >
           {isRootWithChildren
-            ? 'This node is the root and has descendants. It can only be deleted together with its entire subtree.'
-            : "What should happen to this node's descendants?"}
+            ? 'This is your central idea. Deleting it will also remove all connected sub-ideas.'
+            : 'What should happen to the sub-ideas connected to this?'}
         </p>
 
         <div className="flex flex-col gap-2">
@@ -189,17 +189,17 @@ export function DeletePrompt({
             testId="btn-delete-node-only"
             disabled={isRootWithChildren}
             onClick={() => onConfirm('nodeOnly')}
-            title="Reparent this node's direct children to its parent, then remove this node."
+            title="Keep sub-ideas by moving them to the parent above, then remove this idea."
           >
-            Delete node only
+            Delete this idea only
           </ChoiceButton>
 
           <ChoiceButton
             testId="btn-delete-subtree"
             onClick={() => onConfirm('subtree')}
-            title="Remove this node and every descendant."
+            title="Remove this idea and all connected sub-ideas."
           >
-            Delete node and entire subtree
+            Delete idea and all sub-ideas
           </ChoiceButton>
         </div>
 

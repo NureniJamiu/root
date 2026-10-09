@@ -40,7 +40,7 @@ export function ForgotPasswordPage(): JSX.Element {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="researcher@institute.org"
+              placeholder="you@example.com"
               required
               className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
             />

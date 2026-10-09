@@ -51,8 +51,8 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    expect(screen.getByText(/Deconstruct complex ideas into structured scientific trees/i)).toBeInTheDocument();
-    expect(screen.getByText(/Launch Workbench/i)).toBeInTheDocument();
+    expect(screen.getByText(/Organize your ideas visually/i)).toBeInTheDocument();
+    expect(screen.getByText(/Start Creating/i)).toBeInTheDocument();
   });
 
   it('navigates to auth login page when clicking Sign In', async () => {
@@ -67,7 +67,7 @@ describe('App Router & Auth Gating Structure', () => {
     });
 
     expect(screen.getByRole('heading', { name: /Sign In/i })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/researcher@institute\.org/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/you@example\.com/i)).toBeInTheDocument();
   });
 
   it('navigates to register page when requesting account creation', async () => {
@@ -106,7 +106,8 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    // AppHeader workbench title should be visible
-    expect(screen.getByText(/Root — Untitled Research Canvas/i)).toBeInTheDocument();
+    // AppHeader workbench title and the signed-in profile should be visible
+    expect(screen.getByText(/Untitled Project/i)).toBeInTheDocument();
+    expect(screen.getByTestId('rail-user-profile')).toHaveTextContent('test@root.app');
   });
 });

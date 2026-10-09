@@ -62,6 +62,37 @@ describe('Batch Fixes Verification', () => {
     expect(handleSelectProject).toHaveBeenCalledWith('p2');
   });
 
+  it('Projects rail footer shows sign out above the signed-in profile, and delete asks for confirmation', () => {
+    const handleSignOut = vi.fn();
+    const handleDelete = vi.fn();
+
+    render(
+      <StructuralIndexRail
+        nodeCount={0}
+        projects={[{ id: 'p1', title: 'Biology Research', nodeCount: 3 }]}
+        activeProjectId="p1"
+        onDeleteProject={handleDelete}
+        user={{ name: 'Ada Lovelace', email: 'ada@example.com' }}
+        onSignOut={handleSignOut}
+      />
+    );
+
+    const signOut = screen.getByTestId('btn-sign-out');
+    const profile = screen.getByTestId('rail-user-profile');
+    expect(profile).toHaveTextContent('Ada Lovelace');
+    expect(profile).toHaveTextContent('ada@example.com');
+    expect(profile).toHaveTextContent('AL');
+    // Profile sits beneath the sign out button
+    expect(signOut.compareDocumentPosition(profile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(signOut);
+    expect(handleSignOut).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId('btn-delete-project-p1'));
+    expect(handleDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('btn-confirm-delete-project-p1'));
+    expect(handleDelete).toHaveBeenCalledWith('p1');
+  });
+
   it('NodeInspectorRail renders close button and calls onClose to slide right', () => {
     const handleClose = vi.fn();
 
@@ -78,83 +109,81 @@ describe('Batch Fixes Verification', () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it('AppHeader renders RootLogo, sidebar toggle, inspector toggle, and functional Pan/Fit/Root buttons', () => {
-    const onTogglePan = vi.fn();
+  it('AppHeader shows sidebar toggle + logo only while collapsed, and toggles the inspector', () => {
     const onToggleSidebar = vi.fn();
     const onToggleInspector = vi.fn();
-    const onFitView = vi.fn();
-    const onCenterRoot = vi.fn();
-    const onZoomIn = vi.fn();
-    const onZoomOut = vi.fn();
+    const onSelectTypeFilter = vi.fn();
+    const onAddNode = vi.fn();
 
     const { rerender } = render(
       <AppHeader
         title="My Canvas"
         nodeCount={5}
         branchCount={2}
-        zoomPercent={120}
-        onZoomIn={onZoomIn}
-        onZoomOut={onZoomOut}
-        onFitView={onFitView}
-        onCenterRoot={onCenterRoot}
-        onAddNode={vi.fn()}
-        isPanActive={false}
-        onTogglePan={onTogglePan}
+        onAddNode={onAddNode}
         isSidebarOpen={true}
         onToggleSidebar={onToggleSidebar}
         isInspectorOpen={true}
         onToggleInspector={onToggleInspector}
+        activeTypeFilter={null}
+        onSelectTypeFilter={onSelectTypeFilter}
       />
     );
 
-    // RootLogo has aria-label="Root"
-    expect(screen.getByLabelText('Root')).toBeInTheDocument();
+    // Sidebar open: the logo and expand toggle live in the sidebar, not the header
+    expect(screen.queryByTestId('btn-toggle-sidebar')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Root')).not.toBeInTheDocument();
 
-    // Verify Pan button
-    const panBtn = screen.getByTestId('btn-pan');
-    expect(panBtn).toHaveTextContent('Pan');
-    fireEvent.click(panBtn);
-    expect(onTogglePan).toHaveBeenCalledTimes(1);
-
-    // Verify Fit and Root
-    const fitBtn = screen.getByTestId('btn-fit');
-    fireEvent.click(fitBtn);
-    expect(onFitView).toHaveBeenCalledTimes(1);
-
-    const rootBtn = screen.getByTestId('btn-root');
-    fireEvent.click(rootBtn);
-    expect(onCenterRoot).toHaveBeenCalledTimes(1);
-
-    // Verify Sidebar & Inspector toggle buttons
-    const sidebarToggle = screen.getByTestId('btn-toggle-sidebar');
-    fireEvent.click(sidebarToggle);
-    expect(onToggleSidebar).toHaveBeenCalledTimes(1);
-
-    const inspectorToggle = screen.getByTestId('btn-toggle-inspector');
-    fireEvent.click(inspectorToggle);
+    fireEvent.click(screen.getByTestId('btn-toggle-inspector'));
     expect(onToggleInspector).toHaveBeenCalledTimes(1);
 
-    // Verify active Pan state
+    fireEvent.click(screen.getByTestId('filter-question'));
+    expect(onSelectTypeFilter).toHaveBeenCalledWith('question');
+
+    fireEvent.click(screen.getByTestId('btn-add-idea'));
+    expect(onAddNode).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId('btn-guide'));
+    expect(screen.getByTestId('guide-popover')).toBeInTheDocument();
+
+    // Viewport controls no longer live in the header
+    expect(screen.queryByTestId('btn-fit')).not.toBeInTheDocument();
+
     rerender(
       <AppHeader
         title="My Canvas"
         nodeCount={5}
         branchCount={2}
-        zoomPercent={120}
-        onZoomIn={onZoomIn}
-        onZoomOut={onZoomOut}
-        onFitView={onFitView}
-        onCenterRoot={onCenterRoot}
-        onAddNode={vi.fn()}
-        isPanActive={true}
-        onTogglePan={onTogglePan}
-        isSidebarOpen={true}
+        onAddNode={onAddNode}
+        isSidebarOpen={false}
         onToggleSidebar={onToggleSidebar}
-        isInspectorOpen={true}
+        isInspectorOpen={false}
         onToggleInspector={onToggleInspector}
       />
     );
-    expect(screen.getByTestId('btn-pan')).toHaveTextContent('Panning');
+    expect(screen.getByLabelText('Root')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('btn-toggle-sidebar'));
+    expect(onToggleSidebar).toHaveBeenCalledTimes(1);
+  });
+
+  it('CanvasView toolbar is the single home for pan, zoom, fit, root and auto layout', () => {
+    const onTogglePan = vi.fn();
+    useCanvasStore.setState({
+      canvas: emptyCanvas(),
+      selection: { nodeId: null },
+      editor: { openNodeId: null },
+      deletePrompt: { nodeId: null },
+      viewport: { x: 0, y: 0, zoom: 1 },
+    });
+
+    render(<CanvasView isPanActive={false} onTogglePan={onTogglePan} />);
+
+    for (const id of ['btn-zoom-in', 'btn-zoom-out', 'btn-fit', 'btn-root', 'btn-auto-layout']) {
+      expect(screen.getAllByTestId(id)).toHaveLength(1);
+    }
+    fireEvent.click(screen.getByTestId('btn-pan'));
+    expect(onTogglePan).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('btn-pan')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('CanvasView does not contain any coordinate labels (COORD:)', () => {

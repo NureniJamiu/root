@@ -75,10 +75,6 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
   const isRoot = node.parentId === null;
   const shortId = isRoot
     ? 'ROOT-01'
-    : node.type === 'finding'
-    ? 'N-04: TRF2'
-    : node.type === 'question'
-    ? 'N-02: QST'
     : `N-${node.id.slice(0, 2).toUpperCase()}`;
 
   // Top accent bar color
@@ -134,33 +130,53 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="target-left"
         type="target"
         position={RFPosition.Left}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-30"
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
         isConnectable={true}
+        isConnectableStart={true}
+        isConnectableEnd={true}
+        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } z-30`}
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        data-testid="handle-target-left"
       />
       <Handle
         id="target-right"
         type="target"
         position={RFPosition.Right}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-10"
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
         isConnectable={true}
+        isConnectableStart={true}
+        isConnectableEnd={true}
+        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } z-30`}
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        data-testid="handle-target-right"
       />
       <Handle
         id="target-top"
         type="target"
         position={RFPosition.Top}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-30"
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
         isConnectable={true}
+        isConnectableStart={true}
+        isConnectableEnd={true}
+        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } z-30`}
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        data-testid="handle-target-top"
       />
       <Handle
         id="target-bottom"
         type="target"
         position={RFPosition.Bottom}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-10"
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
         isConnectable={true}
+        isConnectableStart={true}
+        isConnectableEnd={true}
+        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } z-30`}
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        data-testid="handle-target-bottom"
       />
 
       {/* Top 3px colored accent bar */}
@@ -174,8 +190,8 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         }}
       />
 
-      {/* Inner Card Body */}
-      <div className="p-3 flex flex-col gap-2">
+      {/* Inner Card Body with nodrag so typing and clicking do not drag the node */}
+      <div className="p-3 flex flex-col gap-2 nodrag">
         <Header
           node={node}
           selected={selected}
@@ -185,16 +201,16 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
 
         <BodyPreview body={node.body} isConclusion={isConclusion} />
 
-        {/* Microscopy Plate / Image preview */}
+        {/* Image / Asset preview */}
         {node.images.length > 0 && (
           <div className="relative w-full h-[115px] bg-[#000000] rounded-[2px] overflow-hidden border border-[#ebebeb] flex items-center justify-center my-0.5">
             <img
               src={node.images[0]?.dataUrl}
-              alt="Microscopy Plate"
+              alt="Attached Visual"
               className="w-full h-full object-cover"
             />
             <div className="absolute bottom-0 inset-x-0 bg-black/75 px-2 py-0.5 flex items-center justify-between font-mono text-[8px] text-white tracking-wider">
-              <span>Zeiss LSM 880 • Telomere FISH</span>
+              <span>Visual Asset • Reference</span>
             </div>
           </div>
         )}
@@ -208,10 +224,10 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
             <span>
               {isRoot
                 ? hasCollapsedChildren
-                  ? `${childCount} Branches (1 Collapsed)`
-                  : `${childCount} Branches`
+                  ? `${childCount} ${childCount === 1 ? 'Branch' : 'Branches'} (1 Collapsed)`
+                  : `${childCount} ${childCount === 1 ? 'Branch' : 'Branches'}`
                 : childCount > 0
-                ? `${childCount} ${childCount === 1 ? 'child' : 'children'}`
+                ? `${childCount} ${childCount === 1 ? 'sub-idea' : 'sub-ideas'}`
                 : ''}
             </span>
           )}
@@ -223,33 +239,53 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         id="source-right"
         type="source"
         position={RFPosition.Right}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-30"
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
         isConnectable={true}
+        isConnectableStart={true}
+        isConnectableEnd={true}
+        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } z-20`}
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        data-testid="handle-source-right"
       />
       <Handle
         id="source-left"
         type="source"
         position={RFPosition.Left}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-10"
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
         isConnectable={true}
+        isConnectableStart={true}
+        isConnectableEnd={true}
+        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } z-20`}
+        style={{ top: '50%', transform: 'translateY(-50%)' }}
+        data-testid="handle-source-left"
       />
       <Handle
         id="source-top"
         type="source"
         position={RFPosition.Top}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-10"
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
         isConnectable={true}
+        isConnectableStart={true}
+        isConnectableEnd={true}
+        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } z-20`}
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        data-testid="handle-source-top"
       />
       <Handle
         id="source-bottom"
         type="source"
         position={RFPosition.Bottom}
-        className="w-2.5 h-2.5 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair opacity-0 group-hover:opacity-100 z-30"
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
         isConnectable={true}
+        isConnectableStart={true}
+        isConnectableEnd={true}
+        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
+          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } z-20`}
+        style={{ left: '50%', transform: 'translateX(-50%)' }}
+        data-testid="handle-source-bottom"
       />
     </div>
   );
@@ -303,7 +339,7 @@ function Header({ node, selected, isDragging, isConclusion }: HeaderProps): JSX.
       >
         {node.title || (
           <span style={{ opacity: 0.45, fontStyle: 'italic' }}>
-            Untitled node
+            Untitled idea
           </span>
         )}
       </div>
