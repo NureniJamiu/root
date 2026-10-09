@@ -11,6 +11,7 @@ import type { z } from 'zod';
 
 import type {
   canvasSchema,
+  edgeSchema,
   imageEntrySchema,
   nodeSchema,
   nodeTypeSchema,
@@ -26,4 +27,5 @@ export type Position = z.infer<typeof positionSchema>;
 export type ImageEntry = z.infer<typeof imageEntrySchema>;
 export type Side = z.infer<typeof sideSchema>;
 export type Node = z.infer<typeof nodeSchema>;
+export type Edge = z.infer<typeof edgeSchema>;
 export type Canvas = z.infer<typeof canvasSchema>;

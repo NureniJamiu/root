@@ -17,7 +17,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { addRoot, emptyCanvas } from '../../data/mutators';
+import { addNode, emptyCanvas } from '../../data/mutators';
 import { canvasActions, useCanvasStore } from '../../data/store';
 import type { CanvasState } from '../../data/store';
 import { NodeEditor } from '../NodeEditor';
@@ -33,11 +33,11 @@ import { NodeEditor } from '../NodeEditor';
  */
 function stateWithOneNode(): { state: CanvasState; nodeId: string } {
   const base = emptyCanvas();
-  const canvas = addRoot(base, { position: { x: 0, y: 0 } });
+  const canvas = addNode(base, { position: { x: 0, y: 0 } });
   const nodeId = canvas.nodes[0]!.id;
   const state: CanvasState = {
     canvas,
-    selection: { nodeId: null },
+    selection: { nodeId: null, edgeId: null },
     editor: { openNodeId: nodeId },
     deletePrompt: { nodeId: null },
     viewport: { x: 0, y: 0, zoom: 1 },

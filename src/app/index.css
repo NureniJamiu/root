@@ -105,26 +105,90 @@ body {
   background: #737785;
 }
 
-/* Edge updater reconnection anchors */
+/*
+ * Connector end anchors (React Flow's reconnect hit areas). A connector is
+ * raised above the cards while it is selected, so its ends can be grabbed
+ * even where they meet a card's connection dot. Connector colour, hover and
+ * selected styling are drawn by canvas/ConnectorEdge, not here.
+ */
 .react-flow__edgeupdater {
   cursor: grab !important;
   pointer-events: all !important;
-  transition: r 150ms ease, fill 150ms ease, stroke 150ms ease;
+  fill: transparent;
+  stroke: transparent;
+  transition: fill 150ms ease, stroke 150ms ease;
 }
 
 .react-flow__edgeupdater:hover {
   cursor: grabbing !important;
-  fill: #0051c3 !important;
-  stroke: #ffffff !important;
-  stroke-width: 2px !important;
+  fill: rgba(0, 81, 195, 0.14) !important;
+  stroke: #0051c3 !important;
+  stroke-width: 1.5px !important;
 }
 
-.react-flow__edge:hover .react-flow__edge-path {
-  stroke: #0051c3 !important;
-  stroke-width: 2.5px !important;
+/*
+ * Connection handles on idea cards (see nodes/NodeCard.tsx).
+ * Hidden until the card is hovered or selected, or a connector is being
+ * dragged anywhere on the canvas (`.is-connecting`, set by CanvasView).
+ * While a connector hovers over a card body, CanvasView marks the card with
+ * data-drop-side so the side it would attach to lights up.
+ */
+.react-flow__handle.rf-handle {
+  width: 14px;
+  height: 14px;
+  min-width: 0;
+  min-height: 0;
+  background: #ffffff;
+  border: 2px solid #0051c3;
+  border-radius: 9999px;
+  opacity: 0;
+  cursor: crosshair;
+  z-index: 20;
+  transition: opacity 120ms ease-out, scale 120ms ease-out, background-color 120ms ease-out;
+}
+.react-flow__handle.rf-handle.rf-handle-source {
+  z-index: 30;
+}
+.react-flow__handle-left.rf-handle {
+  left: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.react-flow__handle-right.rf-handle {
+  right: -7px;
+  left: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.react-flow__handle-top.rf-handle {
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.react-flow__handle-bottom.rf-handle {
+  bottom: -7px;
+  top: auto;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke: #0051c3 !important;
-  stroke-width: 2.5px !important;
+.react-flow__node:hover .rf-handle,
+.react-flow__node.selected .rf-handle,
+.react-flow__node:focus-within .rf-handle,
+.is-connecting .rf-handle {
+  opacity: 1;
+}
+.react-flow__handle.rf-handle:hover,
+.react-flow__handle.rf-handle.valid,
+.react-flow__handle.rf-handle.connectingto {
+  background: #0051c3;
+  scale: 1.3;
+}
+.react-flow__node[data-drop-side='top'] .rf-handle-top,
+.react-flow__node[data-drop-side='right'] .rf-handle-right,
+.react-flow__node[data-drop-side='bottom'] .rf-handle-bottom,
+.react-flow__node[data-drop-side='left'] .rf-handle-left {
+  opacity: 1;
+  background: #0051c3;
+  scale: 1.45;
 }

@@ -2,7 +2,7 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { addChild, addImage, addRoot, emptyCanvas, updateNode } from '../../data/mutators';
+import { addChild, addImage, addNode, emptyCanvas, updateNode } from '../../data/mutators';
 import type { Canvas } from '../../data/types';
 import { IMAGE_REF_DATA_URL } from '../image-ref';
 import { createProjectStore, ensureProjectSchema, ProjectError } from '../project-store';
@@ -13,7 +13,7 @@ const OTHER = 'user-2';
 const IMAGE = 'data:image/png;base64,AAAA';
 
 function canvasWithImage(): { canvas: Canvas; imageId: string } {
-  let canvas = addRoot({ ...emptyCanvas(), title: 'With image' }, { position: { x: 0, y: 0 } });
+  let canvas = addNode({ ...emptyCanvas(), title: 'With image' }, { position: { x: 0, y: 0 } });
   const imageId = crypto.randomUUID();
   canvas = addImage(canvas, canvas.nodes[0]!.id, {
     id: imageId,
@@ -50,15 +50,34 @@ describe('project store', () => {
   it('rejects an invalid canvas instead of storing it', () => {
     const bad = { ...emptyCanvas(), nodes: [{ not: 'a node' }] };
     expect(() => store.create(USER, { canvas: bad as unknown as Canvas })).toThrow(ProjectError);
-    let canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+    let canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     canvas = addChild(canvas, canvas.nodes[0]!.id, { position: { x: 1, y: 1 } });
-    const twoRoots = { ...canvas, nodes: canvas.nodes.map((n) => ({ ...n, parentId: null })) };
+    const selfLoop = { ...canvas, edges: canvas.edges.map((e) => ({ ...e, target: e.source })) };
     const project = store.create(USER, { title: 'ok' });
-    expect(() => store.update(USER, project.id, { canvas: twoRoots })).toThrow(/exactly 1 root/);
+    expect(() => store.update(USER, project.id, { canvas: selfLoop })).toThrow(/to itself/);
+  });
+
+  it('migrates a project saved in the older parentId format when it is read back', () => {
+    const project = store.create(USER, { title: 'legacy' });
+    const a = crypto.randomUUID();
+    const b = crypto.randomUUID();
+    const ts = new Date().toISOString();
+    const node = (id: string, parentId: string | null, x: number) => ({
+      id, parentId, title: id, body: '', images: [], type: 'topic', position: { x, y: 0 },
+      collapsed: false, createdAt: ts, updatedAt: ts,
+    });
+    const legacy = { id: project.id, title: 'legacy', updatedAt: ts, nodes: [node(a, null, 0), node(b, a, 400)] };
+    db.prepare('UPDATE project SET canvas = ? WHERE id = ?').run(JSON.stringify(legacy), project.id);
+
+    const loaded = store.get(USER, project.id)!;
+
+    expect(loaded.canvas.edges).toHaveLength(1);
+    expect(loaded.canvas.edges[0]).toMatchObject({ source: a, target: b, sourceSide: 'right', targetSide: 'left' });
+    expect(loaded.canvas.nodes.every((n) => !('parentId' in n))).toBe(true);
   });
 
   it('computes nodeCount itself and ignores a client-supplied value', () => {
-    let canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+    let canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     canvas = addChild(canvas, canvas.nodes[0]!.id, { position: { x: 1, y: 1 } });
     const created = store.create(USER, { canvas, nodeCount: 999 } as never);
     expect(created.nodeCount).toBe(2);

@@ -18,7 +18,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseCanvas } from '../serialize';
-import type { Canvas, Node, UUID } from '../types';
+import type { Canvas, Edge, Node, UUID } from '../types';
 
 /* -------------------------------------------------------------------------- */
 /* Fixtures                                                                    */
@@ -39,7 +39,6 @@ const TIMESTAMP = '2024-01-01T00:00:00.000Z';
 function makeNode(overrides: Partial<Node> & { id: UUID }): Node {
   return {
     id: overrides.id,
-    parentId: overrides.parentId ?? null,
     title: overrides.title ?? '',
     body: overrides.body ?? '',
     images: overrides.images ?? [],
@@ -51,11 +50,16 @@ function makeNode(overrides: Partial<Node> & { id: UUID }): Node {
   };
 }
 
-function makeCanvas(nodes: Node[]): Canvas {
+function makeEdge(source: UUID, target: UUID, id: UUID = '30000000-0000-4000-8000-000000000001'): Edge {
+  return { id, source, target, sourceSide: 'right', targetSide: 'left', sourcePinned: false, targetPinned: false };
+}
+
+function makeCanvas(nodes: Node[], edges: Edge[] = []): Canvas {
   return {
     id: CANVAS_ID,
     title: '',
     nodes,
+    edges,
     updatedAt: TIMESTAMP,
   };
 }
@@ -102,12 +106,7 @@ describe('parseCanvas — malformed JSON', () => {
 
 describe('parseCanvas — valid JSON failing schema', () => {
   it('rejects duplicate node ids', () => {
-    // Two nodes sharing the same id. Keep the root count at one so the
-    // duplicate-id issue is the primary invariant under test, not the
-    // root-count invariant.
-    const root = makeNode({ id: NODE_IDS.a, parentId: null });
-    const dup = makeNode({ id: NODE_IDS.a, parentId: NODE_IDS.a });
-    const raw = JSON.stringify(makeCanvas([root, dup]));
+    const raw = JSON.stringify(makeCanvas([makeNode({ id: NODE_IDS.a }), makeNode({ id: NODE_IDS.a })]));
 
     const failure = expectFailure(parseCanvas(raw));
 
@@ -115,49 +114,49 @@ describe('parseCanvas — valid JSON failing schema', () => {
     expect(failure.error).toContain('duplicate node id');
   });
 
-  it('rejects a non-empty canvas with no root', () => {
-    // Every node has a non-null parentId. The a↔b cycle also triggers a
-    // cycle report; the missing-root message is what we're asserting here.
-    const a = makeNode({ id: NODE_IDS.a, parentId: NODE_IDS.b });
-    const b = makeNode({ id: NODE_IDS.b, parentId: NODE_IDS.a });
-    const raw = JSON.stringify(makeCanvas([a, b]));
+  it('rejects a connector to a missing card', () => {
+    const raw = JSON.stringify(makeCanvas([makeNode({ id: NODE_IDS.a })], [makeEdge(NODE_IDS.a, NODE_IDS.ghost)]));
 
     const failure = expectFailure(parseCanvas(raw));
 
     expect(failure.raw).toBe(raw);
-    expect(failure.error).toContain('expected exactly 1 root, got 0');
+    expect(failure.error).toContain('dangling edge');
   });
 
-  it('rejects a parent cycle', () => {
-    // a → b → c → a. Detected by the acyclic-chain invariant.
-    const a = makeNode({ id: NODE_IDS.a, parentId: NODE_IDS.c });
-    const b = makeNode({ id: NODE_IDS.b, parentId: NODE_IDS.a });
-    const c = makeNode({ id: NODE_IDS.c, parentId: NODE_IDS.b });
-    const raw = JSON.stringify(makeCanvas([a, b, c]));
+  it('rejects a connector from a card to itself', () => {
+    const raw = JSON.stringify(makeCanvas([makeNode({ id: NODE_IDS.a })], [makeEdge(NODE_IDS.a, NODE_IDS.a)]));
 
     const failure = expectFailure(parseCanvas(raw));
 
-    expect(failure.raw).toBe(raw);
-    expect(failure.error).toContain('cycle involving node');
+    expect(failure.error).toContain('to itself');
   });
 
-  it('rejects a dangling parentId', () => {
-    const root = makeNode({ id: NODE_IDS.a, parentId: null });
-    const orphan = makeNode({ id: NODE_IDS.b, parentId: NODE_IDS.ghost });
-    const raw = JSON.stringify(makeCanvas([root, orphan]));
+  it('migrates a canvas saved in the older parentId format instead of rejecting it', () => {
+    const legacy = {
+      id: CANVAS_ID,
+      title: 'Old',
+      updatedAt: TIMESTAMP,
+      nodes: [
+        { ...makeNode({ id: NODE_IDS.a }), parentId: null },
+        { ...makeNode({ id: NODE_IDS.b, position: { x: 400, y: 0 } }), parentId: NODE_IDS.a },
+      ],
+    };
 
-    const failure = expectFailure(parseCanvas(raw));
+    const result = parseCanvas(JSON.stringify(legacy));
 
-    expect(failure.raw).toBe(raw);
-    expect(failure.error).toContain('dangling parentId');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.canvas.edges).toHaveLength(1);
+      expect(result.canvas.edges[0]).toMatchObject({ source: NODE_IDS.a, target: NODE_IDS.b });
+    }
   });
 
   it('echoes raw payload byte-for-byte, including whitespace', () => {
     // The recovery slot must receive the *original* string, not a
     // re-serialization. Use a payload with distinctive whitespace so a
     // hidden re-serialize would be detectable.
-    const root = makeNode({ id: NODE_IDS.a, parentId: null });
-    const dup = makeNode({ id: NODE_IDS.a, parentId: NODE_IDS.a });
+    const root = makeNode({ id: NODE_IDS.a });
+    const dup = makeNode({ id: NODE_IDS.a });
     const raw = JSON.stringify(makeCanvas([root, dup]), null, 2);
 
     const failure = expectFailure(parseCanvas(raw));

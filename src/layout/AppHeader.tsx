@@ -12,11 +12,11 @@ export interface AppHeaderProps {
   readonly titleMaxLength?: number;
   readonly onTitleChange?: (newTitle: string) => void;
   readonly nodeCount: number;
-  readonly branchCount: number;
+  readonly connectionCount: number;
   readonly onAddNode: () => void;
   /** Disable Add Idea while there is no project to add to (still loading, or failed to load). */
   readonly addNodeDisabled?: boolean;
-  /** Tooltip for the Add Idea button, e.g. which idea the new card will branch from. */
+  /** Tooltip for the Add Idea button, e.g. which idea the new card will connect to. */
   readonly addNodeHint?: string;
   readonly isSidebarOpen?: boolean;
   readonly onToggleSidebar?: () => void;
@@ -37,8 +37,11 @@ const TYPE_LABELS: Record<NodeType, string> = {
 const GUIDE_ITEMS: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
   { keys: ['Space', 'Drag'], label: 'Pan the canvas' },
   { keys: ['Scroll'], label: 'Zoom in and out' },
-  { keys: ['Del'], label: 'Delete the selected idea' },
-  { keys: ['N'], label: 'Start the first idea on an empty canvas' },
+  { keys: ['Double-click'], label: 'Add an idea on empty canvas' },
+  { keys: ['Shift', 'Drag'], label: 'Snap a dragged idea to the grid' },
+  { keys: ['Del'], label: 'Delete the selected idea or connector' },
+  { keys: ['Esc'], label: 'Clear the selection' },
+  { keys: ['N'], label: 'Add an idea in the middle of the view' },
   { keys: ['Ctrl/⌘', 'Z'], label: 'Undo the last change' },
   { keys: ['Ctrl/⌘', 'Shift', 'Z'], label: 'Redo' },
 ];
@@ -48,7 +51,7 @@ export function AppHeader({
   titleMaxLength,
   onTitleChange,
   nodeCount,
-  branchCount,
+  connectionCount,
   onAddNode,
   addNodeDisabled = false,
   addNodeHint,
@@ -167,8 +170,8 @@ export function AppHeader({
             </button>
           )}
           <span className="ml-2 font-mono text-[10px] text-[#737785] tracking-wide whitespace-nowrap shrink-0">
-            {nodeCount} {nodeCount === 1 ? 'idea' : 'ideas'} · {branchCount}{' '}
-            {branchCount === 1 ? 'branch' : 'branches'}
+            {nodeCount} {nodeCount === 1 ? 'idea' : 'ideas'} · {connectionCount}{' '}
+            {connectionCount === 1 ? 'connection' : 'connections'}
           </span>
         </div>
       </div>
@@ -232,10 +235,10 @@ export function AppHeader({
               data-testid="guide-popover"
             >
               <p className="font-serif text-[13px] leading-[19px] text-[#404040] m-0 mb-3">
-                Hover an idea to branch, edit or collapse it. Drag from a card&apos;s edge dot to another card to connect them.
+                Hover an idea to add a connected idea, edit or collapse it. Drag from a dot on any side of a card to any side of another card (or drop on the card itself) to connect them. A card can have as many connectors as you like.
               </p>
               <p className="font-serif text-[13px] leading-[19px] text-[#404040] m-0 mb-3">
-                A dashed connector leads to a Question; every other connector is solid.
+                Click a connector to select it, then press Delete or use its ✕ button to remove it. With a connector selected, drag either end to re-attach it (dropped on empty canvas, it goes back). A side you pick stays put; double-click a connector to let it follow the facing sides again. A dashed connector leads to a Question.
               </p>
               <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
                 {GUIDE_ITEMS.map((item) => (

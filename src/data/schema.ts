@@ -1,16 +1,22 @@
 /**
- * Zod schemas for the Root MVP data model.
+ * Zod schemas for the Root data model.
  *
- * Implements Requirement 9 (canonical serialization + structural invariants)
- * and provides the source of truth from which `src/data/types.ts` derives its
- * TypeScript types via `z.infer`.
+ * A canvas is a free graph: `nodes` (ideas) joined by `edges` (connectors).
+ * Any node may have any number of connectors, on any of its four sides, and
+ * the canvas may be empty or hold several unconnected clusters.
  *
- * The `canvasSchema.superRefine` block enforces the four structural invariants
- * called out in design.md §Data Models:
- *   1. `id` is unique across `nodes`.
- *   2. When the canvas is non-empty, exactly one node has `parentId === null`.
- *   3. No node references a `parentId` that is not present in `nodes`.
- *   4. The parent chain is acyclic.
+ * `canvasSchema` enforces these structural invariants:
+ *   1. Node ids are unique.
+ *   2. Edge ids are unique.
+ *   3. Every edge joins two nodes that exist, and never a node to itself.
+ *
+ * Each connector end is either *pinned* (the user chose its side; it stays
+ * there when cards move) or automatic (it follows the sides that face each
+ * other and is refreshed whenever a card moves).
+ *
+ * Canvases saved before connectors were first-class (each node carried a
+ * `parentId` and optional side hints) are migrated on parse, see
+ * `migrateLegacyCanvas`.
  */
 
 import { z } from 'zod';
@@ -39,15 +45,14 @@ export const imageEntrySchema = z.object({
   addedAt: z.string().datetime(),
 });
 
-/* -------------------------------------------------------------------------- */
-/* Node schema                                                                */
-/* -------------------------------------------------------------------------- */
-
 export const sideSchema = z.enum(['top', 'right', 'bottom', 'left']);
+
+/* -------------------------------------------------------------------------- */
+/* Node + edge schemas                                                        */
+/* -------------------------------------------------------------------------- */
 
 export const nodeSchema = z.object({
   id: z.string().uuid(),
-  parentId: z.string().uuid().nullable(),
   title: z.string().max(NODE_TITLE_MAX),
   body: z.string().max(NODE_BODY_MAX),
   images: z.array(imageEntrySchema),
@@ -56,76 +61,134 @@ export const nodeSchema = z.object({
   collapsed: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-  sourceSide: sideSchema.optional(),
-  targetSide: sideSchema.optional(),
-  sourcePinned: z.boolean().optional(),
-  targetPinned: z.boolean().optional(),
 });
+
+/**
+ * A connector from `source` to `target`. `sourceSide` / `targetSide` are the
+ * sides of the two cards it is attached to. An end that is `*Pinned` keeps its
+ * side when cards move; an end that is not follows the facing sides.
+ */
+export const edgeSchema = z.object({
+  id: z.string().uuid(),
+  source: z.string().uuid(),
+  target: z.string().uuid(),
+  sourceSide: sideSchema,
+  targetSide: sideSchema,
+  sourcePinned: z.boolean().default(false),
+  targetPinned: z.boolean().default(false),
+});
+
+/* -------------------------------------------------------------------------- */
+/* Legacy migration                                                           */
+/* -------------------------------------------------------------------------- */
+
+type Loose = Record<string, unknown>;
+
+function isRecord(v: unknown): v is Loose {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function isPosition(v: unknown): v is { x: number; y: number } {
+  return isRecord(v) && typeof v.x === 'number' && typeof v.y === 'number';
+}
+
+/** Sides that face each other, along the larger distance between two cards. */
+function facingSides(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): { sourceSide: string; targetSide: string } {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0
+      ? { sourceSide: 'right', targetSide: 'left' }
+      : { sourceSide: 'left', targetSide: 'right' };
+  }
+  return dy >= 0
+    ? { sourceSide: 'bottom', targetSide: 'top' }
+    : { sourceSide: 'top', targetSide: 'bottom' };
+}
+
+/**
+ * Turn a canvas that stores `parentId` on each node into one with `edges`.
+ * Anything that is not a legacy canvas is returned untouched. The connector
+ * reuses the child's id as its own id, which keeps ids unique and stable.
+ */
+export function migrateLegacyCanvas(input: unknown): unknown {
+  if (!isRecord(input) || !Array.isArray(input.nodes)) return input;
+  const legacy = input.nodes.some((n) => isRecord(n) && 'parentId' in n);
+  if (!legacy && Array.isArray(input.edges)) return input;
+
+  const byId = new Map<string, Loose>();
+  for (const n of input.nodes) if (isRecord(n) && typeof n.id === 'string') byId.set(n.id, n);
+
+  const edges: Loose[] = Array.isArray(input.edges) ? [...(input.edges as Loose[])] : [];
+  for (const node of input.nodes) {
+    if (!isRecord(node) || typeof node.parentId !== 'string') continue;
+    const parent = byId.get(node.parentId);
+    if (!parent) continue; // dangling parent: the child simply becomes a free card
+    const auto =
+      isPosition(parent.position) && isPosition(node.position)
+        ? facingSides(parent.position, node.position)
+        : { sourceSide: 'right', targetSide: 'left' };
+    edges.push({
+      id: node.id,
+      source: node.parentId,
+      target: node.id,
+      sourceSide: node.sourceSide ?? auto.sourceSide,
+      targetSide: node.targetSide ?? auto.targetSide,
+      sourcePinned: node.sourcePinned === true,
+      targetPinned: node.targetPinned === true,
+    });
+  }
+  const nodes = input.nodes.map((n) => {
+    if (!isRecord(n)) return n;
+    const { parentId: _p, sourceSide: _s, targetSide: _t, sourcePinned: _sp, targetPinned: _tp, ...rest } = n;
+    return rest;
+  });
+  return { ...input, nodes, edges };
+}
 
 /* -------------------------------------------------------------------------- */
 /* Canvas schema + structural invariants                                      */
 /* -------------------------------------------------------------------------- */
 
-export const canvasSchema = z
+const canvasObjectSchema = z
   .object({
     id: z.string().uuid(),
     title: z.string().max(CANVAS_TITLE_MAX),
     nodes: z.array(nodeSchema),
+    edges: z.array(edgeSchema),
     updatedAt: z.string().datetime(),
   })
   .superRefine((canvas, ctx) => {
-    // Invariant 1: unique ids + count roots in a single pass.
-    const ids = new Set<string>();
-    let rootCount = 0;
+    const nodeIds = new Set<string>();
     for (const n of canvas.nodes) {
-      if (ids.has(n.id)) {
+      if (nodeIds.has(n.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate node id ${n.id}` });
+      }
+      nodeIds.add(n.id);
+    }
+
+    const edgeIds = new Set<string>();
+    for (const e of canvas.edges) {
+      if (edgeIds.has(e.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `duplicate edge id ${e.id}` });
+      }
+      edgeIds.add(e.id);
+      if (e.source === e.target) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `duplicate node id ${n.id}`,
+          message: `edge ${e.id} connects node ${e.source} to itself`,
         });
       }
-      ids.add(n.id);
-      if (n.parentId === null) rootCount += 1;
-    }
-
-    // Invariant 3: parentId references an id that exists in the canvas.
-    for (const n of canvas.nodes) {
-      if (n.parentId !== null && !ids.has(n.parentId)) {
+      if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `dangling parentId ${n.parentId} on node ${n.id}`,
+          message: `dangling edge ${e.id}`,
         });
-      }
-    }
-
-    // Invariant 2: exactly one root when the canvas is non-empty.
-    if (canvas.nodes.length > 0 && rootCount !== 1) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `expected exactly 1 root, got ${rootCount}`,
-      });
-    }
-
-    // Invariant 4: parent chain is acyclic. Iterative walk with per-node
-    // visited set; also terminates on dangling parentId (already reported
-    // above) so we do not add duplicate cycle issues for that case.
-    const byId = new Map<string, (typeof canvas.nodes)[number]>();
-    for (const n of canvas.nodes) byId.set(n.id, n);
-    for (const n of canvas.nodes) {
-      let cur: string | null = n.parentId;
-      const seen = new Set<string>([n.id]);
-      while (cur !== null) {
-        if (seen.has(cur)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `cycle involving node ${n.id}`,
-          });
-          break;
-        }
-        seen.add(cur);
-        const parent = byId.get(cur);
-        if (parent === undefined) break; // dangling: already reported
-        cur = parent.parentId;
       }
     }
   });
+
+export const canvasSchema = z.preprocess(migrateLegacyCanvas, canvasObjectSchema);

@@ -31,7 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addChild,
   addImage,
-  addRoot,
+  addNode,
   deleteNodeOnly,
   deleteSubtree,
   emptyCanvas,
@@ -54,9 +54,9 @@ const GHOST_ID: UUID = '00000000-0000-4000-8000-0000000000ff';
  * a tuple with the ids so tests can address each node without re-scanning.
  */
 function makeRootWithChild(): { canvas: Canvas; rootId: UUID; leafId: UUID } {
-  const c0 = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+  const c0 = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
   const root = c0.nodes[0];
-  if (root === undefined) throw new Error('addRoot did not add a node');
+  if (root === undefined) throw new Error('addNode did not add a node');
   const c1 = addChild(c0, root.id, { position: { x: 100, y: 100 } });
   const leaf = c1.nodes.find((n) => n.id !== root.id);
   if (leaf === undefined) throw new Error('addChild did not add a node');
@@ -152,22 +152,15 @@ describe('mutators — edge cases', () => {
   });
 
   /* ---------------------------------------------------------------------- */
-  /* deleteNodeOnly on root-with-children is a no-op (R7.5)                  */
+  /* deleteNodeOnly on a connected card keeps the others                     */
   /* ---------------------------------------------------------------------- */
 
-  it('deleteNodeOnly on root-with-children returns the input canvas', () => {
+  it('deleteNodeOnly on the first card removes it and its connector but keeps the card it was connected to', () => {
     const { canvas, rootId, leafId } = makeRootWithChild();
 
     const result = deleteNodeOnly(canvas, rootId);
 
-    // Reparenting the child to `null` would produce two roots, so R7.5
-    // requires the mutator to reject at the boundary. Assert identity to
-    // prove no allocation occurred on the no-op path.
-    expect(result).toBe(canvas);
-    // The tree is intact: root and leaf both still present, parentage
-    // untouched.
-    expect(result.nodes).toHaveLength(2);
-    expect(result.nodes.find((n) => n.id === rootId)?.parentId).toBe(null);
-    expect(result.nodes.find((n) => n.id === leafId)?.parentId).toBe(rootId);
+    expect(result.nodes.map((n) => n.id)).toEqual([leafId]);
+    expect(result.edges).toEqual([]);
   });
 });

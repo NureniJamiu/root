@@ -29,7 +29,7 @@
  * flips the flag away from its original `true`. The property statement
  * is really about the false → true → false round-trip that R6.3
  * describes, so we `filter` the drawn id to nodes with
- * `collapsed === false`. Nodes born via `addRoot` / `addChild` are
+ * `collapsed === false`. Nodes born via `addNode` / `addChild` are
  * always created with `collapsed: false` (see mutators.ts), so the
  * filter still leaves a large in-canvas selection.
  *

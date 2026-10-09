@@ -1,51 +1,25 @@
 /**
- * Placement helper for the Canvas Layer.
+ * Placement helpers for the Canvas Layer.
  *
- * `computeChildPosition(canvas, parentId)` returns a `Position` for a
- * newly created child node such that its bounding box (at the standard
- * node width/height constants defined below) does not intersect the
- * parent's bounding box or any existing direct sibling's bounding box.
+ * `computeChildPosition(canvas, parentId)` returns a `Position` for a newly
+ * created child card: immediately right of the parent when that spot is free,
+ * otherwise the first free spot below it. `findFreePosition` is the same
+ * search for a card that hangs from nothing. Both guarantee the returned box
+ * (at the measured or standard card size) overlaps no existing card.
  *
- * Satisfies Requirement 3.2: "THE Canvas_Layer SHALL assign the
- * Child_Node an initial position offset from the parent Node such that
- * the new Node does not overlap the parent or any existing sibling."
- *
- * The function is pure — it does not touch React or the store. The call
- * site (the App shell wiring in `src/app/App.tsx`, which is the only
- * layer allowed to combine `canvas/` geometry with `data/` writes)
+ * The functions are pure; they do not touch React or the store. The App shell
+ * (the only layer allowed to combine `canvas/` geometry with `data/` writes)
  * passes the current canvas snapshot and routes the result into
- * `canvasActions.addChild`. The hover toolbar in `nodes/` triggers the
- * call site via a context, keeping the `nodes/` → `canvas/` boundary
- * clean (Requirement 10.3).
+ * `canvasActions`. The hover toolbar in `nodes/` reaches it through a
+ * context, keeping the `nodes/` -> `canvas/` boundary clean.
  *
- * Pass measured card sizes (see `measuredSizes.ts`) to account for cards
- * that have grown with their content; without them every card is assumed to
- * be `NODE_WIDTH` × `NODE_HEIGHT`.
- *
- * Algorithm:
- *   1. Look up the parent node. Unknown `parentId` returns the origin;
- *      the mutator layer will reject the resulting `addChild` call
- *      anyway, so the position is never observed.
- *   2. Preferred candidate: place the child immediately to the right
- *      of the parent, sharing the parent's `y`. This never overlaps
- *      the parent because the horizontal shift is
- *      `NODE_WIDTH + SIBLING_GAP > NODE_WIDTH`, so the two bounding
- *      boxes are strictly disjoint in `x`.
- *   3. If the preferred candidate overlaps any existing sibling's
- *      bounding box, fall back to placing the child strictly below
- *      every forbidden bbox. Setting the candidate's top edge to
- *      `max(forbidden.bottom) + SIBLING_GAP` guarantees no `y`-overlap
- *      with any forbidden bbox, which trivially rules out any 2D
- *      overlap (Property 5).
- *
- * The fallback trades ideal aesthetics for a hard non-overlap
- * guarantee — it may push a new child far down when siblings have been
- * dragged around, but the user can move the child manually after
- * creation (R5). This matches the MVP contract: an initial position
- * that is provably conflict-free, not an optimal layout.
+ * Pass measured card sizes (see `measuredSizes.ts`) to account for cards that
+ * have grown with their content; without them every card is assumed to be
+ * `NODE_WIDTH` x `NODE_HEIGHT`.
  */
 
-import type { Canvas, Node, Position, UUID } from '../data';
+import { computeFacingSides, outgoingIndex } from '../data';
+import type { Canvas, Node, Position, Side, UUID } from '../data';
 import type { NodeSize, NodeSizes } from './measuredSizes';
 
 /**
@@ -141,79 +115,96 @@ export function computeChildPosition(
     return { x: 0, y: 0 };
   }
 
-  const siblings = canvas.nodes.filter((n) => n.parentId === parentId);
-  const forbidden: BBox[] = [bboxOf(parent, sizes), ...siblings.map((s) => bboxOf(s, sizes))];
-  const parentWidth = sizeOf(sizes, parent.id).width;
-
-  // Preferred candidate: immediately to the right of the parent at the
-  // same `y`. This is disjoint from the parent's bbox by construction
-  // (horizontal shift > NODE_WIDTH), so we only need to check siblings.
+  // Preferred candidate: immediately to the right of the parent at the same
+  // `y`; when a card is already there (a sibling, or any other card on the
+  // canvas), step down until the spot is free.
   const preferred: Position = {
-    x: parent.position.x + parentWidth + SIBLING_GAP,
+    x: parent.position.x + sizeOf(sizes, parent.id).width + SIBLING_GAP,
     y: parent.position.y,
   };
-  const preferredBox = bboxAt(preferred);
-  const preferredCollides = forbidden.some((f) => overlaps(preferredBox, f));
-  if (!preferredCollides) {
-    return preferred;
-  }
-
-  // Fallback: place strictly below every forbidden bbox. The deepest
-  // forbidden `y + h` plus `SIBLING_GAP` becomes the candidate's top
-  // edge, so no `y`-overlap is possible with any forbidden bbox — and
-  // that alone rules out any 2D overlap.
-  const maxBottom = forbidden.reduce(
-    (acc, f) => Math.max(acc, f.y + f.h),
-    Number.NEGATIVE_INFINITY,
-  );
-  return {
-    x: parent.position.x + parentWidth + SIBLING_GAP,
-    y: maxBottom + SIBLING_GAP,
-  };
+  return findFreePosition(canvas, preferred, sizes);
 }
 
 /**
- * Arranges canvas nodes in a top-to-bottom tree layout.
- * Guarantees:
- *  1. Root node placed at top.
- *  2. Children placed on rows below their parents; a row starts below the
- *     tallest card of the row above, so tall cards never run into the next row.
- *  3. Siblings and subtrees placed side-by-side with non-overlapping bounding boxes.
- *  4. All connections (parentId) remain intact.
- *  5. Connection sides update to facing sides (bottom -> top) for unpinned connections.
+ * The free spot closest to `desired` for a new card: `desired` itself when no
+ * card is there, otherwise the spot straight below whatever is in the way,
+ * repeated until nothing is. Used for ideas created from the header, the
+ * keyboard or a double click, which do not hang from anything.
+ */
+export function findFreePosition(
+  canvas: Canvas,
+  desired: Position,
+  sizes?: NodeSizes,
+): Position {
+  const boxes = canvas.nodes.map((n) => bboxOf(n, sizes));
+  let candidate = desired;
+  // Each pass moves the candidate below at least one box it overlapped, so at
+  // most one pass per card is needed.
+  for (let i = 0; i <= boxes.length; i += 1) {
+    const box = bboxAt(candidate);
+    const blocking = boxes.filter((b) => overlaps(box, b));
+    if (blocking.length === 0) return candidate;
+    const bottom = blocking.reduce((acc, b) => Math.max(acc, b.y + b.h), Number.NEGATIVE_INFINITY);
+    candidate = { x: desired.x, y: bottom + SIBLING_GAP };
+  }
+  return candidate;
+}
+
+/**
+ * Arranges the canvas in rows, top to bottom, following the connectors.
+ *
+ * - A card with no incoming connector starts a tree. Every other card goes
+ *   one row below the first card found pointing at it; a card reachable only
+ *   through a cycle starts its own tree. Unconnected cards each form a
+ *   one-card tree, so they are laid out in the top row.
+ * - A row starts below the tallest card of the row above, so tall cards never
+ *   run into the next row. Trees sit side by side with non-overlapping boxes.
+ * - Every automatic connector end is re-attached to the facing sides: bottom
+ *   to top when it goes down a row, top to bottom when it goes up, and
+ *   right/left or left/right within a row. Pinned ends keep their side.
  *
  * Pass measured card sizes to lay out the cards as they are actually rendered.
  */
 export function computeTreeLayout(canvas: Canvas, sizes?: NodeSizes): Canvas {
-  if (canvas.nodes.length <= 1) return canvas;
+  if (canvas.nodes.length === 0) return canvas;
 
-  const root = canvas.nodes.find((n) => n.parentId === null);
-  if (!root) return canvas;
-
-  const childrenMap = new Map<UUID, Node[]>();
-  for (const n of canvas.nodes) {
-    if (n.parentId !== null) {
-      const list = childrenMap.get(n.parentId) ?? [];
-      list.push(n);
-      childrenMap.set(n.parentId, list);
-    }
-  }
+  const out = outgoingIndex(canvas);
+  const hasIncoming = new Set(canvas.edges.map((e) => e.target));
+  const byId = new Map(canvas.nodes.map((n) => [n.id, n]));
 
   const HORIZONTAL_GAP = 60;
   const VERTICAL_GAP = 120;
   const ORIGIN_X = 100;
   const ORIGIN_Y = 80;
 
+  // Spanning forest: each card is placed under the first card that reaches it.
+  const treeChildren = new Map<UUID, UUID[]>();
+  const depthOf = new Map<UUID, number>();
+  const roots: UUID[] = [];
+  const claim = (rootId: UUID): void => {
+    roots.push(rootId);
+    depthOf.set(rootId, 0);
+    const queue: UUID[] = [rootId];
+    for (let head = 0; head < queue.length; head += 1) {
+      const id = queue[head] as UUID;
+      for (const e of out.get(id) ?? []) {
+        if (depthOf.has(e.target) || !byId.has(e.target)) continue;
+        depthOf.set(e.target, (depthOf.get(id) ?? 0) + 1);
+        const list = treeChildren.get(id) ?? [];
+        list.push(e.target);
+        treeChildren.set(id, list);
+        queue.push(e.target);
+      }
+    }
+  };
+  for (const n of canvas.nodes) if (!hasIncoming.has(n.id)) claim(n.id);
+  for (const n of canvas.nodes) if (!depthOf.has(n.id)) claim(n.id); // cycles
+
   // Row heights: each row is as tall as its tallest card.
   const rowHeights: number[] = [];
-  const depthOf = new Map<UUID, number>();
-  const measure = (nodeId: UUID, depth: number): void => {
-    depthOf.set(nodeId, depth);
-    rowHeights[depth] = Math.max(rowHeights[depth] ?? 0, sizeOf(sizes, nodeId).height);
-    for (const child of childrenMap.get(nodeId) ?? []) measure(child.id, depth + 1);
-  };
-  measure(root.id, 0);
-
+  for (const [id, depth] of depthOf) {
+    rowHeights[depth] = Math.max(rowHeights[depth] ?? 0, sizeOf(sizes, id).height);
+  }
   const rowTops: number[] = [];
   let top = ORIGIN_Y;
   rowHeights.forEach((height, depth) => {
@@ -224,62 +215,75 @@ export function computeTreeLayout(canvas: Canvas, sizes?: NodeSizes): Canvas {
   const positions = new Map<UUID, Position>();
   let currentLeftX = ORIGIN_X;
 
-  function layoutSubtree(nodeId: UUID): { minX: number; maxX: number } {
-    const children = childrenMap.get(nodeId) ?? [];
-    const width = sizeOf(sizes, nodeId).width;
-    const y = rowTops[depthOf.get(nodeId) ?? 0] ?? ORIGIN_Y;
+  function layoutSubtree(id: UUID): { minX: number; maxX: number } {
+    const children = treeChildren.get(id) ?? [];
+    const width = sizeOf(sizes, id).width;
+    const y = rowTops[depthOf.get(id) ?? 0] ?? ORIGIN_Y;
 
     if (children.length === 0) {
       const x = currentLeftX;
-      positions.set(nodeId, { x, y });
+      positions.set(id, { x, y });
       currentLeftX += width + HORIZONTAL_GAP;
       return { minX: x, maxX: x + width };
     }
 
     let minX = Infinity;
     let maxX = -Infinity;
-
     for (const child of children) {
-      const childSpan = layoutSubtree(child.id);
-      minX = Math.min(minX, childSpan.minX);
-      maxX = Math.max(maxX, childSpan.maxX);
+      const span = layoutSubtree(child);
+      minX = Math.min(minX, span.minX);
+      maxX = Math.max(maxX, span.maxX);
     }
-
-    // Center parent horizontally above its children span
+    // Centre the card above the span of its children.
     const x = Math.round((minX + maxX - width) / 2);
-    positions.set(nodeId, { x, y });
-
+    positions.set(id, { x, y });
     return { minX: Math.min(minX, x), maxX: Math.max(maxX, x + width) };
   }
 
-  layoutSubtree(root.id);
+  for (const rootId of roots) layoutSubtree(rootId);
 
-  // Normalize so leftmost node starts at ORIGIN_X
+  // Keep the leftmost card at ORIGIN_X.
   let minGlobalX = Infinity;
-  for (const pos of positions.values()) {
-    if (pos.x < minGlobalX) minGlobalX = pos.x;
-  }
+  for (const pos of positions.values()) if (pos.x < minGlobalX) minGlobalX = pos.x;
   const xOffset = minGlobalX < ORIGIN_X ? ORIGIN_X - minGlobalX : 0;
 
+  const finalPositions = new Map<UUID, Position>();
   const nextNodes = canvas.nodes.map((node) => {
     const pos = positions.get(node.id) ?? node.position;
-    const finalPos = { x: pos.x + xOffset, y: pos.y };
+    const position = { x: pos.x + xOffset, y: pos.y };
+    finalPositions.set(node.id, position);
+    return { ...node, position };
+  });
 
-    // For non-root nodes, facing sides in top-to-bottom layout are bottom -> top
-    const sourceSide = node.sourcePinned ? node.sourceSide : 'bottom';
-    const targetSide = node.targetPinned ? node.targetSide : 'top';
-
+  const nextEdges = canvas.edges.map((edge) => {
+    const from = depthOf.get(edge.source) ?? 0;
+    const to = depthOf.get(edge.target) ?? 0;
+    let sourceSide: Side;
+    let targetSide: Side;
+    if (to > from) {
+      sourceSide = 'bottom';
+      targetSide = 'top';
+    } else if (to < from) {
+      sourceSide = 'top';
+      targetSide = 'bottom';
+    } else {
+      const a = finalPositions.get(edge.source);
+      const b = finalPositions.get(edge.target);
+      ({ sourceSide, targetSide } =
+        a && b ? computeFacingSides(a, b) : { sourceSide: 'right', targetSide: 'left' });
+    }
+    // Ends the user pinned keep their side; the rest follow the layout.
     return {
-      ...node,
-      position: finalPos,
-      sourceSide,
-      targetSide,
+      ...edge,
+      sourceSide: edge.sourcePinned ? edge.sourceSide : sourceSide,
+      targetSide: edge.targetPinned ? edge.targetSide : targetSide,
     };
   });
 
   return {
     ...canvas,
     nodes: nextNodes,
+    edges: nextEdges,
     updatedAt: new Date().toISOString(),
   };
 }

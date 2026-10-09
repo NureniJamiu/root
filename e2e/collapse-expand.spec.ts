@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { addIdea, expect, test } from './fixtures';
 
 /**
  * E2E: Collapse and expand a subtree
@@ -17,9 +17,8 @@ test('collapse and expand a subtree', async ({ dashboard: page }) => {
   // ── Step 1: the fixture signed in a new user and opened their empty project ──
 
   // ── Step 2: Create the root node ────────────────────────────────────────
-  const createRootBtn = page.getByTestId('btn-create-root');
-  await expect(createRootBtn).toBeVisible();
-  await createRootBtn.click();
+  await expect(page.locator('[data-testid^="node-card-"]')).toHaveCount(0);
+  await addIdea(page);
 
   // Close the auto-opened editor so subsequent hover interactions work cleanly.
   const nodeEditor = page.getByTestId('node-editor');
@@ -99,7 +98,7 @@ test('collapse and expand a subtree', async ({ dashboard: page }) => {
 
 test('collapse badge shows correct descendant count', async ({ dashboard: page }) => {
   // Create root.
-  await page.getByTestId('btn-create-root').click();
+  await addIdea(page);
   const nodeEditor = page.getByTestId('node-editor');
   await expect(nodeEditor).toBeVisible();
   await page.keyboard.press('Escape');

@@ -2,12 +2,11 @@
  * `HoverToolbar` — the row of action buttons rendered inside a `NodeCard`.
  *
  * The toolbar exposes these actions (design.md §Node UI Layer):
- *   - `add-child`  — insert a child under this node and open its editor.
+ *   - `add-child`  — insert a new idea connected from this one and open its editor.
  *   - `edit`       — open the `NodeEditor` on this node (images are attached there).
  *   - `cycle-type` — cycle `topic → finding → question → conclusion → topic`.
  *   - `delete`     — open the `DeletePrompt`. The prompt itself bypasses
- *                    the modal for leaves (Requirement 7.1) and enforces
- *                    root-with-children rules (Requirement 7.5).
+ *                    the modal when nothing hangs only from this idea.
  *
  * Most buttons dispatch directly through `canvasActions`. The `add-child`
  * action routes through the `ToolbarCallbacks` context so the app layer
@@ -18,7 +17,7 @@
 
 import type { ReactNode } from 'react';
 
-import { canvasActions, useCanvasStore } from '../data';
+import { canvasActions, descendantCount, useCanvasStore } from '../data';
 import type { Node, NodeType, UUID } from '../data';
 
 import {
@@ -32,13 +31,12 @@ import {
 import { useToolbarCallbacks } from './toolbarCallbacks';
 
 /**
- * Selector: does the given node have at least one child in the canvas?
- * Used to decide whether the collapse affordance should be shown
- * (Requirement 6.1: collapse affordance only appears when node has children).
+ * Selector: does collapsing the node hide anything? The collapse affordance
+ * is only offered when it does (Requirement 6.1).
  */
-function selectHasChildren(nodeId: UUID) {
-  return (s: { canvas: { nodes: readonly Node[] } }): boolean =>
-    s.canvas.nodes.some((n) => n.parentId === nodeId);
+function selectHasHideable(nodeId: UUID) {
+  return (s: { canvas: Parameters<typeof descendantCount>[0] }): boolean =>
+    descendantCount(s.canvas, nodeId) > 0;
 }
 
 /**
@@ -64,7 +62,7 @@ export interface HoverToolbarProps {
 
 export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
   const { onAddChild } = useToolbarCallbacks();
-  const hasChildren = useCanvasStore(selectHasChildren(node.id));
+  const hasChildren = useCanvasStore(selectHasHideable(node.id));
 
   const handleAddChild = (): void => {
     // The provider is responsible for computing the child position and
@@ -80,8 +78,8 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
     canvasActions.updateNode(node.id, { type: nextType(node.type) });
   };
   const onDelete = (): void => {
-    // Route through the delete prompt; it bypasses the modal for leaves
-    // and disables invalid options for root-with-children.
+    // Route through the delete prompt; it bypasses the modal when nothing
+    // hangs only from this idea.
     canvasActions.openDeletePrompt(node.id);
   };
   const onCollapse = (): void => {
@@ -98,7 +96,7 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
       className="flex flex-row items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
       data-testid="hover-toolbar"
     >
-      <ToolbarButton label="Add sub-idea" onClick={handleAddChild} testId="btn-add-child">
+      <ToolbarButton label="Add connected idea" onClick={handleAddChild} testId="btn-add-child">
         <PlusIcon />
       </ToolbarButton>
       <ToolbarButton label="Edit (notes and images)" onClick={onEdit} testId="btn-edit">
@@ -114,11 +112,11 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
       {/* Collapse affordance (R6.1): only when node has children and is not
           collapsed. Expand affordance (R6.3): when node is collapsed. */}
       {node.collapsed ? (
-        <ToolbarButton label="Expand branch" onClick={onExpand} testId="btn-expand">
+        <ToolbarButton label="Expand connected ideas" onClick={onExpand} testId="btn-expand">
           <ChevronRightIcon />
         </ToolbarButton>
       ) : hasChildren ? (
-        <ToolbarButton label="Collapse branch" onClick={onCollapse} testId="btn-collapse">
+        <ToolbarButton label="Collapse connected ideas" onClick={onCollapse} testId="btn-collapse">
           <ChevronDownIcon />
         </ToolbarButton>
       ) : null}

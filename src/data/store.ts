@@ -5,8 +5,8 @@
  *
  *   - `canvas`        — the persisted domain model (design.md §Data Models,
  *                        also the shape defined by `canvasSchema`).
- *   - `selection`     — which node the user has selected on the surface;
- *                        null when nothing is selected.
+ *   - `selection`     — which node or connector the user has selected on the
+ *                        surface; both null when nothing is selected.
  *   - `editor`        — which node's `NodeEditor` is open; null when the
  *                        editor is closed.
  *   - `deletePrompt`  — which node's delete confirmation modal is open.
@@ -39,23 +39,26 @@ import { canvasSchema } from './schema';
 import {
   addChild as mutAddChild,
   addImage as mutAddImage,
-  addRoot as mutAddRoot,
+  addNode as mutAddNode,
+  autoRouteEdge as mutAutoRouteEdge,
+  connect as mutConnect,
   deleteNodeOnly as mutDeleteNodeOnly,
   deleteSubtree as mutDeleteSubtree,
   emptyCanvas,
   expandSubtree as mutExpandSubtree,
   moveNode as mutMoveNode,
+  moveNodes as mutMoveNodes,
+  removeEdge as mutRemoveEdge,
   removeImage as mutRemoveImage,
-  reparentChild as mutReparentChild,
   setCanvasTitle as mutSetCanvasTitle,
   setCollapsed as mutSetCollapsed,
-  updateConnection as mutUpdateConnection,
+  updateEdge as mutUpdateEdge,
   updateNode as mutUpdateNode,
 } from './mutators';
-import type { ConnectionPatch, NodePatch } from './mutators';
+import type { ConnectorEnds, NodePatch } from './mutators';
 import { emitSaveError } from './storeEvents';
-import { subtreeIds } from './tree';
-import type { Canvas, ImageEntry, Position, UUID } from './types';
+import { subtreeIds } from './graph';
+import type { Canvas, ImageEntry, Position, Side, UUID } from './types';
 
 /* -------------------------------------------------------------------------- */
 /* State shape                                                                */
@@ -69,7 +72,7 @@ import type { Canvas, ImageEntry, Position, UUID } from './types';
  */
 export interface CanvasState {
   canvas: Canvas;
-  selection: { nodeId: UUID | null };
+  selection: { nodeId: UUID | null; edgeId: UUID | null };
   editor: { openNodeId: UUID | null };
   deletePrompt: { nodeId: UUID | null };
   viewport: { x: number; y: number; zoom: number };
@@ -88,7 +91,7 @@ export interface CanvasState {
 function initialState(): CanvasState {
   return {
     canvas: emptyCanvas(),
-    selection: { nodeId: null },
+    selection: { nodeId: null, edgeId: null },
     editor: { openNodeId: null },
     deletePrompt: { nodeId: null },
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -180,8 +183,14 @@ function uiForCanvas(canvas: Canvas, state: CanvasState): Partial<CanvasState> {
   if (state.deletePrompt.nodeId !== null && !ids.has(state.deletePrompt.nodeId)) {
     patch.deletePrompt = { nodeId: null };
   }
-  if (state.selection.nodeId !== null && !ids.has(state.selection.nodeId)) {
-    patch.selection = { nodeId: null };
+  const nodeGone = state.selection.nodeId !== null && !ids.has(state.selection.nodeId);
+  const edgeGone =
+    state.selection.edgeId !== null && !canvas.edges.some((e) => e.id === state.selection.edgeId);
+  if (nodeGone || edgeGone) {
+    patch.selection = {
+      nodeId: nodeGone ? null : state.selection.nodeId,
+      edgeId: edgeGone ? null : state.selection.edgeId,
+    };
   }
   return patch;
 }
@@ -219,6 +228,11 @@ function commitCanvasWrite(
     return;
   }
   const patch = commit(parsed.data, state);
+  // A removed connector cannot stay selected.
+  const selection = patch.selection ?? state.selection;
+  if (selection.edgeId !== null && !parsed.data.edges.some((e) => e.id === selection.edgeId)) {
+    patch.selection = { ...selection, edgeId: null };
+  }
   recordHistory(before, coalesceKey);
   useCanvasStore.setState({ canvas: parsed.data, ...patch });
 }
@@ -243,7 +257,7 @@ function clearUiForRemoved(
     patch.deletePrompt = { nodeId: null };
   }
   if (state.selection.nodeId !== null && removed.has(state.selection.nodeId)) {
-    patch.selection = { nodeId: null };
+    patch.selection = { nodeId: null, edgeId: state.selection.edgeId };
   }
   return patch;
 }
@@ -268,14 +282,13 @@ export const canvasActions = {
   /* ---------------------------------------------------------------------- */
 
   /**
-   * Add the initial root node at `position` and open its editor with focus
-   * intent (R2.4 — the editor's autoFocus prop then focuses the title
-   * field). No-op when the canvas already has a root.
+   * Add a new, unconnected idea at `position` and open its editor (the
+   * editor's autoFocus then focuses the title field). Works on any canvas.
    */
-  addRoot(position: Position): void {
+  addNode(position: Position): void {
     commitCanvasWrite(
-      'addRoot',
-      (s) => mutAddRoot(s.canvas, { position }),
+      'addNode',
+      (s) => mutAddNode(s.canvas, { position }),
       (parsed, s) => {
         const newId = findNewNodeId(s.canvas, parsed);
         return newId === null ? {} : { editor: { openNodeId: newId } };
@@ -284,14 +297,18 @@ export const canvasActions = {
   },
 
   /**
-   * Append a child under `parentId` and open its editor (R3.3 — the
-   * editor opens focused on the title so the user can start typing
-   * immediately). Guarded: unknown parent is a no-op inside the mutator.
+   * Append an idea at `position`, connect `parentId` to it, and open its
+   * editor. The connector uses the facing sides unless `sides` says
+   * otherwise. Guarded: unknown parent is a no-op inside the mutator.
    */
-  addChild(parentId: UUID, position: Position): void {
+  addChild(
+    parentId: UUID,
+    position: Position,
+    sides?: { sourceSide?: Side; targetSide?: Side },
+  ): void {
     commitCanvasWrite(
       'addChild',
-      (s) => mutAddChild(s.canvas, parentId, { position }),
+      (s) => mutAddChild(s.canvas, parentId, { position, ...sides }),
       (parsed, s) => {
         const newId = findNewNodeId(s.canvas, parsed);
         return newId === null ? {} : { editor: { openNodeId: newId } };
@@ -351,23 +368,51 @@ export const canvasActions = {
   },
 
   /**
-   * Update a child node's connection properties (parent, sides, pinned state).
+   * Commit the positions of several nodes as one edit (a multi-card drag).
    */
-  updateConnection(childId: UUID, patch: ConnectionPatch): void {
+  moveNodes(positions: ReadonlyMap<UUID, Position>): void {
     commitCanvasWrite(
-      'updateConnection',
-      (s) => mutUpdateConnection(s.canvas, childId, patch),
+      'moveNodes',
+      (s) => mutMoveNodes(s.canvas, positions),
       () => ({}),
     );
   },
 
   /**
-   * Re-parent a child node under a new parent node.
+   * Add a connector between two sides. Rejected silently (no write, no undo
+   * step) for self-connections, unknown nodes and exact duplicates.
    */
-  reparentChild(childId: UUID, newParentId: UUID): void {
+  connect(ends: ConnectorEnds): void {
     commitCanvasWrite(
-      'reparentChild',
-      (s) => mutReparentChild(s.canvas, childId, newParentId),
+      'connect',
+      (s) => mutConnect(s.canvas, ends),
+      () => ({}),
+    );
+  },
+
+  /** Re-attach a connector: move either end to another card or side. */
+  updateEdge(edgeId: UUID, ends: ConnectorEnds): void {
+    commitCanvasWrite(
+      'updateEdge',
+      (s) => mutUpdateEdge(s.canvas, edgeId, ends),
+      () => ({}),
+    );
+  },
+
+  /** Unpin both ends of a connector so it follows the facing sides again. */
+  autoRouteEdge(edgeId: UUID): void {
+    commitCanvasWrite(
+      'autoRouteEdge',
+      (s) => mutAutoRouteEdge(s.canvas, edgeId),
+      () => ({}),
+    );
+  },
+
+  /** Remove one connector; both cards stay. */
+  removeEdge(edgeId: UUID): void {
+    commitCanvasWrite(
+      'removeEdge',
+      (s) => mutRemoveEdge(s.canvas, edgeId),
       () => ({}),
     );
   },
@@ -427,7 +472,7 @@ export const canvasActions = {
     clearHistory();
     useCanvasStore.setState({
       canvas,
-      selection: { nodeId: null },
+      selection: { nodeId: null, edgeId: null },
       editor: { openNodeId: null },
       deletePrompt: { nodeId: null },
     });
@@ -454,11 +499,10 @@ export const canvasActions = {
   },
 
   /**
-   * Remove the node identified by `id`, reparenting its direct children
-   * to the removed node's own parent (R7.1 / R7.3). Guarded at the
-   * mutator boundary against root-with-children (R7.5). Any open editor
-   * or delete prompt on the removed node is closed as part of the same
-   * commit so the UI never points at a phantom id.
+   * Remove the node identified by `id` and its connectors; the ideas it
+   * was connected to stay. Any open editor or delete prompt on the removed
+   * node is closed as part of the same commit so the UI never points at a
+   * phantom id.
    */
   deleteNodeOnly(id: UUID): void {
     commitCanvasWrite(
@@ -469,8 +513,8 @@ export const canvasActions = {
   },
 
   /**
-   * Remove the node identified by `id` together with every transitive
-   * descendant (R7.4). Any UI state pointing at *any* removed node —
+   * Remove the node identified by `id` together with every idea that hangs
+   * only from it. Any UI state pointing at *any* removed node —
    * editor, delete prompt, or selection — is cleared in the same commit.
    */
   deleteSubtree(id: UUID): void {
@@ -492,10 +536,19 @@ export const canvasActions = {
 
   /**
    * Set the currently selected node, or clear the selection with `null`.
-   * Pure UI-state; does not touch `canvas`.
+   * Selecting a node deselects any connector. Pure UI-state; does not touch
+   * `canvas`.
    */
   select(nodeId: UUID | null): void {
-    useCanvasStore.setState({ selection: { nodeId } });
+    useCanvasStore.setState({ selection: { nodeId, edgeId: null } });
+  },
+
+  /**
+   * Select a connector (deselecting any node), or clear the selection with
+   * `null`.
+   */
+  selectEdge(edgeId: UUID | null): void {
+    useCanvasStore.setState({ selection: { nodeId: null, edgeId } });
   },
 
   /**

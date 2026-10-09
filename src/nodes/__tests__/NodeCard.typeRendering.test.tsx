@@ -34,7 +34,7 @@ vi.mock('reactflow', () => {
   return { Handle, Position };
 });
 
-import { emptyCanvas, addRoot, updateNode } from '../../data/mutators';
+import { emptyCanvas, addNode, updateNode } from '../../data/mutators';
 import { useCanvasStore } from '../../data/store';
 import type { CanvasState } from '../../data/store';
 import type { NodeType } from '../../data/types';
@@ -60,10 +60,10 @@ const NODE_TYPES: ReadonlyArray<NodeType> = [
  * test can pass it to `NodeCard` as `data.nodeId`.
  */
 function seedState(type: NodeType): { state: CanvasState; nodeId: string } {
-  const canvas = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+  const canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
   // The root is always created as 'topic'; patch to the desired type.
   const root = canvas.nodes[0];
-  if (!root) throw new Error('addRoot produced no node');
+  if (!root) throw new Error('addNode produced no node');
 
   const patchedCanvas =
     type === 'topic'
@@ -75,7 +75,7 @@ function seedState(type: NodeType): { state: CanvasState; nodeId: string } {
 
   const state: CanvasState = {
     canvas: patchedCanvas,
-    selection: { nodeId: null },
+    selection: { nodeId: null, edgeId: null },
     editor: { openNodeId: null },
     deletePrompt: { nodeId: null },
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -122,7 +122,7 @@ describe('NodeCard — type rendering', () => {
     // Reset the store singleton to a clean empty state before each test.
     useCanvasStore.setState({
       canvas: emptyCanvas(),
-      selection: { nodeId: null },
+      selection: { nodeId: null, edgeId: null },
       editor: { openNodeId: null },
       deletePrompt: { nodeId: null },
       viewport: { x: 0, y: 0, zoom: 1 },

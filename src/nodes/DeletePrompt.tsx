@@ -1,54 +1,42 @@
 /**
  * `DeletePrompt` — the delete-confirmation modal (Requirements 7.1–7.6).
  *
- * The component is rendered by `App.tsx` (task 13.1) whenever the store
- * has `state.deletePrompt.nodeId !== null` — typically because the user
- * clicked the delete button on a `HoverToolbar`, which routes through
- * `canvasActions.openDeletePrompt(nodeId)`.
+ * The component is rendered by `App.tsx` whenever the store has
+ * `state.deletePrompt.nodeId !== null` — typically because the user clicked
+ * the delete button on a `HoverToolbar` or pressed Delete on a selected idea,
+ * which routes through `canvasActions.openDeletePrompt(nodeId)`.
  *
- * Behavior by node shape (design.md §Delete Flow):
+ * Behavior by node shape:
  *
- *   - Leaf (no children)               → the modal is bypassed and the
- *                                        delete happens immediately
- *                                        (R7.1). Implemented as a
- *                                        mount-effect firing
- *                                        `onConfirm('subtree')` — on a
- *                                        leaf, `deleteSubtree` and
- *                                        `deleteNodeOnly` are equivalent
- *                                        (Property 12 vs. Property 13,
- *                                        task 4.12 unit test), so the
- *                                        subtree branch is used for its
- *                                        single canonical semantics.
- *   - Interior node with children      → both options rendered (R7.2).
- *   - Root node with children (R7.5)   → both options rendered, but the
- *                                        "Delete node only" button is
- *                                        disabled — reparenting the
- *                                        children of the root would
- *                                        break the "exactly one root"
- *                                        invariant (design.md §Data
- *                                        Model — canvasSchema).
- *   - Cancel (R7.6)                    → parent's `onCancel` handler
- *                                        closes the modal without
- *                                        touching the canvas.
+ *   - Nothing hangs only from the idea → the modal is bypassed and the delete
+ *     happens immediately. Implemented as a mount-effect firing
+ *     `onConfirm('subtree')`; when nothing hangs only from the idea,
+ *     `deleteSubtree` and `deleteNodeOnly` are equivalent.
+ *   - Other ideas hang only from it   → both options are offered:
+ *       · "this idea only" removes it and its connectors; the ideas it was
+ *         connected to stay where they are;
+ *       · "idea and everything that hangs from it" also removes the ideas
+ *         reachable only through it. Ideas that something else also points at
+ *         are kept.
+ *   - Cancel (R7.6)                    → parent's `onCancel` handler closes
+ *                                        the modal without touching the canvas.
  *
- * The component is purely presentational: it dispatches nothing on its
- * own. `App.tsx` wires `onCancel` to `canvasActions.closeDeletePrompt`
- * and `onConfirm` to `canvasActions.deleteNodeOnly` /
- * `canvasActions.deleteSubtree`, both of which auto-close the prompt as
- * part of their commit (see `clearUiForRemoved` in `data/store.ts`).
+ * The component is purely presentational: it dispatches nothing on its own.
+ * `App.tsx` wires `onCancel` to `canvasActions.closeDeletePrompt` and
+ * `onConfirm` to `canvasActions.deleteNodeOnly` / `canvasActions.deleteSubtree`,
+ * both of which auto-close the prompt as part of their commit.
  */
 
 import { useEffect, useRef } from 'react';
 
-import { useCanvasStore } from '../data';
+import { descendantCount, useCanvasStore } from '../data';
 import type { Node, UUID } from '../data';
 
 /**
- * The two confirm modes exposed by the prompt. `nodeOnly` reparents the
- * target's direct children to the target's parent (R7.3); `subtree`
- * removes the target and every transitive descendant (R7.4). For a leaf
- * the two are equivalent, and the leaf bypass uses `subtree` as the
- * canonical choice.
+ * The two confirm modes exposed by the prompt. `nodeOnly` removes the target
+ * and its connectors; `subtree` also removes every idea that hangs only from
+ * it. When nothing hangs only from it the two are equivalent, and the bypass
+ * uses `subtree` as the canonical choice.
  */
 export type DeleteMode = 'nodeOnly' | 'subtree';
 
@@ -70,14 +58,13 @@ function selectNode(nodeId: UUID) {
 }
 
 /**
- * Store selector: does any node have `parentId === nodeId`? A boolean
- * scalar is returned (rather than the child list) so Zustand's default
- * `Object.is` equality check short-circuits re-renders when the shape of
- * the children set changes but the has-children answer does not.
+ * Store selector: does any idea hang only from `nodeId`? A boolean scalar is
+ * returned so Zustand's default `Object.is` equality check short-circuits
+ * re-renders when the set changes but the answer does not.
  */
-function selectHasChildren(nodeId: UUID) {
-  return (s: { canvas: { nodes: readonly Node[] } }): boolean =>
-    s.canvas.nodes.some((n) => n.parentId === nodeId);
+function selectHasDependents(nodeId: UUID) {
+  return (s: { canvas: Parameters<typeof descendantCount>[0] }): boolean =>
+    descendantCount(s.canvas, nodeId) > 0;
 }
 
 export function DeletePrompt({
@@ -86,7 +73,7 @@ export function DeletePrompt({
   onConfirm,
 }: DeletePromptProps): JSX.Element | null {
   const node = useCanvasStore(selectNode(nodeId));
-  const hasChildren = useCanvasStore(selectHasChildren(nodeId));
+  const hasChildren = useCanvasStore(selectHasDependents(nodeId));
 
   // Keep the latest `onConfirm` in a ref so the leaf-bypass effect only
   // depends on the target's identity, not on a callback whose reference
@@ -134,8 +121,6 @@ export function DeletePrompt({
   // be a flash of unwanted UI.
   if (!hasChildren) return null;
 
-  const isRootWithChildren = node.parentId === null;
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
@@ -179,17 +164,14 @@ export function DeletePrompt({
           className="text-body"
           style={{ margin: '8px 0 16px 0' }}
         >
-          {isRootWithChildren
-            ? 'This is your central idea. Deleting it will also remove all connected sub-ideas.'
-            : 'What should happen to the sub-ideas connected to this?'}
+          Some ideas hang only from this one. What should happen to them?
         </p>
 
         <div className="flex flex-col gap-2">
           <ChoiceButton
             testId="btn-delete-node-only"
-            disabled={isRootWithChildren}
             onClick={() => onConfirm('nodeOnly')}
-            title="Keep sub-ideas by moving them to the parent above, then remove this idea."
+            title="Remove this idea and its connectors. The ideas it was connected to stay."
           >
             Delete this idea only
           </ChoiceButton>
@@ -197,9 +179,9 @@ export function DeletePrompt({
           <ChoiceButton
             testId="btn-delete-subtree"
             onClick={() => onConfirm('subtree')}
-            title="Remove this idea and all connected sub-ideas."
+            title="Remove this idea and every idea that hangs only from it."
           >
-            Delete idea and all sub-ideas
+            Delete idea and everything that hangs from it
           </ChoiceButton>
         </div>
 

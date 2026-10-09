@@ -36,6 +36,11 @@ export async function openDashboard(page: Page): Promise<void> {
   );
 }
 
+/** Add an idea with the header button (an unconnected one when nothing is selected). */
+export async function addIdea(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /Add Idea/i }).click();
+}
+
 /** Wait until the inspector's save indicator says everything is on the server. */
 export async function waitForSaved(page: Page): Promise<void> {
   await expect(page.getByTestId('save-status')).toHaveAttribute('data-status', 'saved', { timeout: 10_000 });

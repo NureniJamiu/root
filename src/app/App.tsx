@@ -10,8 +10,8 @@
  *     R3.3).
  *   - Render `DeletePrompt` when `state.deletePrompt.nodeId !== null`
  *     (R7.1–7.6).
- *   - Empty-canvas affordance: when the loaded project has no ideas, offer to
- *     create the main idea or load the worked example (R2.1).
+ *   - A new project is simply an empty canvas: ideas are added from the
+ *     header, with N, or by double-clicking the canvas.
  *   - ErrorBoundary and toast surface live in their own modules.
  *
  * Import boundaries (design.md §Layered Dependency Table):
@@ -23,18 +23,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { CanvasView, computeChildPosition, getMeasuredSizes } from '../canvas';
+import { CanvasView, computeChildPosition, findFreePosition, getMeasuredSizes } from '../canvas';
 import type { CanvasViewControls, DragState } from '../canvas';
 import {
   CANVAS_TITLE_MAX,
   canvasActions,
-  rootNode,
   useCanvasStore,
 } from '../data';
 import type { NodeType, UUID } from '../data';
 import {
   AppHeader,
-  EmptyCanvasState,
   NodeInspectorRail,
   StructuralIndexRail,
 } from '../layout';
@@ -53,7 +51,6 @@ import { RouterProvider, RootRouter } from '../routing';
 
 import { ErrorBoundary } from './ErrorBoundary';
 import { ToastSurface } from './Toasts';
-import { buildExampleCanvas } from './exampleCanvas';
 import { useProjects } from './useProjects';
 
 export { ErrorBoundary };
@@ -73,7 +70,8 @@ if (typeof window !== 'undefined' && import.meta.env.DEV) {
  * The concrete callback bundle installed on the toolbar context. Reads
  * the current canvas from the store, delegates to
  * `computeChildPosition` for a non-overlapping position (using the measured
- * card sizes), and hands the result to `canvasActions.addChild`.
+ * card sizes), and hands the result to `canvasActions.addChild`, which also
+ * connects the parent to the new idea.
  *
  * Held at module scope so its identity is stable across re-renders,
  * which avoids re-triggering context consumers on every `App` render.
@@ -90,12 +88,8 @@ const toolbarCallbacks: ToolbarCallbacks = {
 /* AppShell                                                                   */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Default center position for the first root node when created from the
- * empty-canvas affordance. Chosen to place the node near the visual center
- * of a typical viewport.
- */
-const ROOT_INITIAL_POSITION = { x: 400, y: 300 } as const;
+/** Rendered size of a new card, used to centre it on a point. */
+const NEW_CARD_SIZE = { width: 290, height: 140 } as const;
 
 /** Below this width the sidebar and inspector are not shown together. */
 const NARROW_VIEWPORT_QUERY = '(max-width: 1099px)';
@@ -166,9 +160,6 @@ export function AppShell(): JSX.Element {
       },
     });
 
-  // Every idea except the root hangs off a branch, so branches = ideas - 1.
-  const branchCount = Math.max(0, canvas.nodes.length - 1);
-
   const handleDeleteConfirm = useCallback(
     (mode: DeleteMode) => {
       if (deleteNodeId === null) return;
@@ -189,16 +180,16 @@ export function AppShell(): JSX.Element {
     canvasActions.closeEditor();
   }, []);
 
-  /** Create the main idea; with a premise it becomes the idea's title. */
-  const handleCreateRoot = useCallback((premise?: string) => {
-    canvasActions.addRoot(ROOT_INITIAL_POSITION);
-    const root = rootNode(useCanvasStore.getState().canvas);
-    if (root && premise) canvasActions.updateNode(root.id, { title: premise });
-  }, []);
-
-  const handleLoadExample = useCallback(() => {
-    canvasActions.applyCanvas(buildExampleCanvas(useCanvasStore.getState().canvas));
-    setTimeout(() => canvasControlsRef.current?.fitView(), 50);
+  /** Add an unconnected idea in the middle of what is on screen. */
+  const handleAddFreeIdea = useCallback(() => {
+    const { canvas: current } = useCanvasStore.getState();
+    const center = canvasControlsRef.current?.getViewportCenter() ?? { x: 400, y: 300 };
+    const position = findFreePosition(
+      current,
+      { x: center.x - NEW_CARD_SIZE.width / 2, y: center.y - NEW_CARD_SIZE.height / 2 },
+      getMeasuredSizes(),
+    );
+    canvasActions.addNode(position);
   }, []);
 
   // Selecting an idea reveals the inspector. Closing it is left to the
@@ -211,18 +202,17 @@ export function AppShell(): JSX.Element {
     canvasActions.select(null);
   }, []);
 
+  // With an idea selected, Add Idea connects the new card to it; otherwise the
+  // new card stands alone in the middle of the view.
   const addIdeaParent = useMemo(
-    () => canvas.nodes.find((n) => n.id === selectedNodeId) ?? rootNode(canvas),
+    () => canvas.nodes.find((n) => n.id === selectedNodeId) ?? null,
     [canvas, selectedNodeId],
   );
 
   const handleAddIdea = useCallback(() => {
-    if (!addIdeaParent) {
-      handleCreateRoot();
-      return;
-    }
-    toolbarCallbacks.onAddChild(addIdeaParent.id);
-  }, [addIdeaParent, handleCreateRoot]);
+    if (addIdeaParent) toolbarCallbacks.onAddChild(addIdeaParent.id);
+    else handleAddFreeIdea();
+  }, [addIdeaParent, handleAddFreeIdea]);
 
   const navigateTo = useCallback((path: string) => {
     window.history.pushState({}, '', path);
@@ -240,7 +230,7 @@ export function AppShell(): JSX.Element {
 
   const isReady = activeProjectId !== '';
 
-  // Global shortcuts: N starts the first idea; Ctrl/Cmd+Z undoes, Shift+Z / Y redoes.
+  // Global shortcuts: N adds an idea; Ctrl/Cmd+Z undoes, Shift+Z / Y redoes.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
@@ -248,9 +238,9 @@ export function AppShell(): JSX.Element {
         return;
       }
       if ((e.key === 'n' || e.key === 'N') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        if (isReady && useCanvasStore.getState().canvas.nodes.length === 0) {
+        if (isReady) {
           e.preventDefault();
-          handleCreateRoot();
+          handleAddIdea();
         }
         return;
       }
@@ -268,7 +258,7 @@ export function AppShell(): JSX.Element {
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleCreateRoot, isReady]);
+  }, [handleAddIdea, isReady]);
 
   return (
     <ToolbarCallbacksProvider value={toolbarCallbacks}>
@@ -310,13 +300,13 @@ export function AppShell(): JSX.Element {
             titleMaxLength={CANVAS_TITLE_MAX}
             onTitleChange={(title) => canvasActions.setTitle(title)}
             nodeCount={canvas.nodes.length}
-            branchCount={branchCount}
+            connectionCount={canvas.edges.length}
             onAddNode={handleAddIdea}
             addNodeDisabled={!isReady}
             addNodeHint={
               addIdeaParent
-                ? `Add a sub-idea under “${addIdeaParent.title || 'Untitled idea'}”`
-                : 'Create your main idea'
+                ? `Add an idea connected to “${addIdeaParent.title || 'Untitled idea'}”`
+                : 'Add an idea (or double-click the canvas)'
             }
             isSidebarOpen={isProjectsOpen}
             onToggleSidebar={() => setProjectsOpen(!isProjectsOpen)}
@@ -339,11 +329,6 @@ export function AppShell(): JSX.Element {
                 onTogglePan={() => setIsPanActive((prev) => !prev)}
                 highlightType={activeTypeFilter}
               />
-
-              {/* Empty Canvas Affordance (R2.1) */}
-              {isReady && canvas.nodes.length === 0 && (
-                <EmptyCanvasState onCreateRoot={handleCreateRoot} onLoadExample={handleLoadExample} />
-              )}
 
               {/* The projects could not be loaded: nothing can be saved, so say so. */}
               {!isLoading && !isReady && (

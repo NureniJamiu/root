@@ -1,8 +1,8 @@
 /**
  * `CollapseBadge` — the small pill rendered on a collapsed `NodeCard`.
  *
- * The badge shows the count of transitive descendants hidden beneath
- * the node, computed via `descendantCount(canvas, id)` (Requirement 6.5
+ * The badge shows the count of ideas hidden by collapsing the node
+ * (those that hang only from it), computed via `descendantCount(canvas, id)` (Requirement 6.5
  * and design.md §Node UI Layer). It is only rendered when
  * `node.collapsed === true`; the parent `NodeCard` decides visibility.
  */
@@ -32,7 +32,7 @@ export function CollapseBadge({ nodeId }: CollapseBadgeProps): JSX.Element {
         color: '#1b1c1c',
         boxShadow: 'none',
       }}
-      title="Click to expand subtree"
+      title="Click to expand"
       aria-label={`${count} hidden descendant${count === 1 ? '' : 's'}`}
       data-testid="collapse-badge"
     >

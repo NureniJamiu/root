@@ -1,29 +1,19 @@
 /**
- * Unit tests for `canvasActions` dispatch (task 6.2).
+ * Unit tests for `canvasActions` dispatch.
  *
- * These tests pin down store-level behaviours that the pure-mutator property
- * tests intentionally do not cover, because the coupling between a canvas
- * write and the accompanying UI-state change only exists inside the store:
+ * These pin down store-level behaviours that the pure-mutator tests do not
+ * cover, because the coupling between a canvas write and the accompanying
+ * UI-state change only exists inside the store:
  *
- *   1. `canvasActions.addRoot` produces a canvas with one node and, as a
- *      coupled UI-state change, opens the `NodeEditor` on that new root so
- *      the user can start typing a title immediately (R2.4).
- *   2. `canvasActions.addChild(parentId, p)` grows the node list by one and
- *      opens the editor on the *new child*, not on the parent (R3.3). The
- *      "not the parent" clause is the substantive check — a subtle bug in
- *      the `findNewNodeId` diff logic could route focus to the parent.
- *   3. `canvasActions.deleteNodeOnly` on the root of a canvas that has
- *      children is a no-op at the store level: no state change is
- *      committed, so the previous `canvas` reference is preserved (R7.5).
- *      The pure mutator already returns the input canvas unchanged; the
- *      store contract is that the same-reference short-circuit in
- *      `commitCanvasWrite` prevents any redundant `setState`.
+ *   1. `addNode` / `addChild` open the `NodeEditor` on the *new* card, so the
+ *      user can start typing a title immediately.
+ *   2. Connector actions (`connect`, `updateEdge`, `removeEdge`) validate,
+ *      are undoable, and keep the selection consistent.
+ *   3. `moveNodes` commits a multi-card drag as one undo step.
+ *   4. `deleteNodeOnly` clears UI state that pointed at the removed card.
  *
  * `useCanvasStore` is a module-level singleton, so every test resets the
- * store to a clean initial state via `useCanvasStore.setState(...)` before
- * running. Tests never share observable state.
- *
- * Requirements exercised: 2.4, 3.3, 7.5.
+ * store to a clean initial state before running.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -46,7 +36,7 @@ import type { Position, UUID } from '../types';
 function cleanState(): CanvasState {
   return {
     canvas: emptyCanvas(),
-    selection: { nodeId: null },
+    selection: { nodeId: null, edgeId: null },
     editor: { openNodeId: null },
     deletePrompt: { nodeId: null },
     viewport: { x: 0, y: 0, zoom: 1 },
@@ -73,103 +63,135 @@ describe('canvasActions — dispatch', () => {
   });
 
   /* ---------------------------------------------------------------------- */
-  /* R2.4 — addRoot opens the editor on the new root                          */
+  /* addNode opens the editor on the new card                                */
   /* ---------------------------------------------------------------------- */
 
-  it('addRoot commits the new root and opens the editor on it (R2.4)', () => {
-    canvasActions.addRoot(P);
+  it('addNode commits an unconnected card and opens the editor on it', () => {
+    canvasActions.addNode(P);
 
     const state = useCanvasStore.getState();
 
-    // One node added, and it is a root (parentId === null). This is a
-    // sanity check on the mutator wiring; the substantive claim is the
-    // editor coupling below.
     expect(state.canvas.nodes).toHaveLength(1);
-    const root = state.canvas.nodes[0];
-    expect(root?.parentId).toBe(null);
+    expect(state.canvas.edges).toHaveLength(0);
+    expect(state.editor.openNodeId).toBe(state.canvas.nodes[0]?.id);
+  });
 
-    // R2.4: opening the create-root affordance leads directly into the
-    // editor for the freshly created node so the user can begin typing.
-    expect(state.editor.openNodeId).toBe(root?.id);
+  it('addNode works on a canvas that already has cards', () => {
+    canvasActions.addNode(P);
+    canvasActions.addNode({ x: 500, y: 500 });
+    const state = useCanvasStore.getState();
+    expect(state.canvas.nodes).toHaveLength(2);
+    expect(state.canvas.edges).toHaveLength(0);
+    expect(state.editor.openNodeId).toBe(state.canvas.nodes[1]?.id);
   });
 
   /* ---------------------------------------------------------------------- */
-  /* R3.3 — addChild grows the store and opens editor on the CHILD           */
+  /* addChild grows the store, connects, and opens the editor on the CHILD   */
   /* ---------------------------------------------------------------------- */
 
-  it('addChild adds a node and opens the editor on the new child, not the parent (R3.3)', () => {
-    // Setup: add a root so there is a parent to attach to.
-    canvasActions.addRoot(P);
-    const rootId = useCanvasStore.getState().canvas.nodes[0]?.id as
-      | UUID
-      | undefined;
-    // Precondition guard so a regression in `addRoot` produces a clear
-    // failure here rather than a misleading one downstream.
-    expect(rootId).toBeDefined();
-    const parentId = rootId as UUID;
+  it('addChild adds a connected node and opens the editor on the new child, not the parent', () => {
+    canvasActions.addNode(P);
+    const parentId = useCanvasStore.getState().canvas.nodes[0]?.id as UUID;
+    expect(parentId).toBeDefined();
 
-    const beforeCount = useCanvasStore.getState().canvas.nodes.length;
-
-    canvasActions.addChild(parentId, { x: 100, y: 100 });
+    canvasActions.addChild(parentId, { x: 400, y: 0 });
 
     const state = useCanvasStore.getState();
-
-    // Node count grew by exactly one — the mutator did not silently
-    // reject the parentId at its boundary.
-    expect(state.canvas.nodes).toHaveLength(beforeCount + 1);
-
-    // Identify the new child by exclusion. There must be exactly one
-    // node with `parentId === rootId` in this fixture.
-    const child = state.canvas.nodes.find((n) => n.parentId === parentId);
-    expect(child).toBeDefined();
-
-    // R3.3: editor targets the child, not the parent. Both halves of
-    // this assertion matter — a "focus stayed on the root" bug would
-    // pass the first half alone.
-    expect(state.editor.openNodeId).toBe(child?.id);
+    expect(state.canvas.nodes).toHaveLength(2);
+    expect(state.canvas.edges).toHaveLength(1);
+    const childId = state.canvas.nodes.find((n) => n.id !== parentId)?.id;
+    expect(state.canvas.edges[0]).toMatchObject({ source: parentId, target: childId });
+    expect(state.editor.openNodeId).toBe(childId);
     expect(state.editor.openNodeId).not.toBe(parentId);
   });
 
   /* ---------------------------------------------------------------------- */
-  /* R7.5 — deleteNodeOnly on root-with-children is a no-op at the store     */
+  /* Connectors                                                              */
   /* ---------------------------------------------------------------------- */
 
-  it('deleteNodeOnly on root-with-children does not change store state (R7.5)', () => {
-    // Setup: build a root with one child so R7.5's precondition
-    // (root has at least one child) holds.
-    canvasActions.addRoot(P);
-    const rootId = useCanvasStore.getState().canvas.nodes[0]?.id as
-      | UUID
-      | undefined;
-    expect(rootId).toBeDefined();
-    canvasActions.addChild(rootId as UUID, { x: 100, y: 100 });
+  function twoCards(): [UUID, UUID] {
+    canvasActions.addNode(P);
+    canvasActions.addNode({ x: 500, y: 0 });
+    const [a, b] = useCanvasStore.getState().canvas.nodes.map((n) => n.id) as [UUID, UUID];
+    return [a, b];
+  }
 
-    // Snapshot the canvas *reference* before the guarded action. The
-    // store contract for a no-op is that `commitCanvasWrite` observes
-    // `after === before` from the mutator and skips `setState`, so the
-    // canvas reference on the store must be identical afterwards.
-    const canvasBefore = useCanvasStore.getState().canvas;
-    const editorBefore = useCanvasStore.getState().editor;
+  it('connect adds a connector and rejects a self connection without writing', () => {
+    const [a, b] = twoCards();
+    canvasActions.connect({ source: a, target: b, sourceSide: 'right', targetSide: 'left' });
+    expect(useCanvasStore.getState().canvas.edges).toHaveLength(1);
 
-    canvasActions.deleteNodeOnly(rootId as UUID);
+    const before = useCanvasStore.getState().canvas;
+    canvasActions.connect({ source: a, target: a, sourceSide: 'right', targetSide: 'left' });
+    expect(useCanvasStore.getState().canvas).toBe(before);
+  });
+
+  it('updateEdge re-attaches and removeEdge deletes; both are undoable', () => {
+    const [a, b] = twoCards();
+    canvasActions.connect({ source: a, target: b, sourceSide: 'right', targetSide: 'left' });
+    const edgeId = useCanvasStore.getState().canvas.edges[0]!.id;
+
+    canvasActions.updateEdge(edgeId, { source: a, target: b, sourceSide: 'bottom', targetSide: 'top' });
+    expect(useCanvasStore.getState().canvas.edges[0]).toMatchObject({ sourceSide: 'bottom', targetSide: 'top' });
+
+    canvasActions.removeEdge(edgeId);
+    expect(useCanvasStore.getState().canvas.edges).toHaveLength(0);
+
+    canvasActions.undo();
+    expect(useCanvasStore.getState().canvas.edges).toHaveLength(1);
+  });
+
+  it('a removed connector is no longer selected', () => {
+    const [a, b] = twoCards();
+    canvasActions.connect({ source: a, target: b, sourceSide: 'right', targetSide: 'left' });
+    const edgeId = useCanvasStore.getState().canvas.edges[0]!.id;
+
+    canvasActions.selectEdge(edgeId);
+    expect(useCanvasStore.getState().selection).toEqual({ nodeId: null, edgeId });
+
+    canvasActions.removeEdge(edgeId);
+    expect(useCanvasStore.getState().selection.edgeId).toBeNull();
+  });
+
+  it('selecting a card deselects the connector and the other way round', () => {
+    const [a, b] = twoCards();
+    canvasActions.connect({ source: a, target: b, sourceSide: 'right', targetSide: 'left' });
+    const edgeId = useCanvasStore.getState().canvas.edges[0]!.id;
+
+    canvasActions.selectEdge(edgeId);
+    canvasActions.select(a);
+    expect(useCanvasStore.getState().selection).toEqual({ nodeId: a, edgeId: null });
+    canvasActions.selectEdge(edgeId);
+    expect(useCanvasStore.getState().selection).toEqual({ nodeId: null, edgeId });
+  });
+
+  it('moveNodes commits several positions as one undo step', () => {
+    const [a, b] = twoCards();
+    canvasActions.moveNodes(new Map([[a, { x: 10, y: 10 }], [b, { x: 20, y: 20 }]]));
+    const nodes = useCanvasStore.getState().canvas.nodes;
+    expect(nodes.find((n) => n.id === a)?.position).toEqual({ x: 10, y: 10 });
+    expect(nodes.find((n) => n.id === b)?.position).toEqual({ x: 20, y: 20 });
+
+    canvasActions.undo();
+    expect(useCanvasStore.getState().canvas.nodes.find((n) => n.id === a)?.position).toEqual(P);
+  });
+
+  /* ---------------------------------------------------------------------- */
+  /* deleteNodeOnly keeps the cards it was connected to                      */
+  /* ---------------------------------------------------------------------- */
+
+  it('deleteNodeOnly removes the card and its connectors and clears an open editor on it', () => {
+    canvasActions.addNode(P);
+    const rootId = useCanvasStore.getState().canvas.nodes[0]!.id;
+    canvasActions.addChild(rootId, { x: 400, y: 0 });
+    const childId = useCanvasStore.getState().canvas.nodes[1]!.id;
+    canvasActions.openEditor(rootId);
+
+    canvasActions.deleteNodeOnly(rootId);
 
     const state = useCanvasStore.getState();
-
-    // Same reference proves no write occurred; deep equality alone
-    // would also pass if the store had committed a structurally
-    // identical clone, which would still be a bug (spurious re-render).
-    expect(state.canvas).toBe(canvasBefore);
-
-    // Belt-and-braces value checks: the root is still there with its
-    // child still parented to it.
-    expect(state.canvas.nodes).toHaveLength(2);
-    expect(state.canvas.nodes.find((n) => n.id === rootId)?.parentId).toBe(null);
-    expect(
-      state.canvas.nodes.find((n) => n.parentId === rootId),
-    ).toBeDefined();
-
-    // Coupled UI-state must also be untouched: a no-op canvas write
-    // must not clear the editor that `addChild` opened on the child.
-    expect(state.editor).toBe(editorBefore);
+    expect(state.canvas.nodes.map((n) => n.id)).toEqual([childId]);
+    expect(state.canvas.edges).toEqual([]);
+    expect(state.editor.openNodeId).toBeNull();
   });
 });

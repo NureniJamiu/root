@@ -13,7 +13,7 @@ import type Database from 'better-sqlite3';
 import { z } from 'zod';
 
 import { CANVAS_TITLE_MAX } from '../data/limits';
-import { canvasSchema } from '../data/schema';
+import { canvasSchema, migrateLegacyCanvas } from '../data/schema';
 import type { Canvas } from '../data/types';
 import { IMAGE_REF_DATA_URL } from './image-ref';
 
@@ -102,7 +102,7 @@ function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.output
 }
 
 function blankCanvas(id: string, title: string, now: string): Canvas {
-  return { id, title, nodes: [], updatedAt: now };
+  return { id, title, nodes: [], edges: [], updatedAt: now };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -181,7 +181,7 @@ export function createProjectStore(db: Database.Database) {
   function hydrate(projectId: string, row: ProjectRow): Canvas {
     let parsed: Canvas;
     try {
-      parsed = JSON.parse(row.canvas) as Canvas;
+      parsed = migrateLegacyCanvas(JSON.parse(row.canvas)) as Canvas;
     } catch {
       return blankCanvas(row.id, row.title, row.updatedAt);
     }

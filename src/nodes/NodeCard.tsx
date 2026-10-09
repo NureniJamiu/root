@@ -4,9 +4,14 @@
  * Registered as the single `'research'` custom node type on `<ReactFlow>`
  * by `canvas/CanvasView`.
  *
- * Horizontal tree layout:
- * - Target handle on Left edge center (Position.Left)
- * - Source handle on Right edge center (Position.Right)
+ * Connection handles:
+ * - Every side (top, right, bottom, left) has a handle, so a connector can be
+ *   dragged out of any side and dropped on any side of another card.
+ * - Each side carries a source and a target handle at the same spot. Only the
+ *   source handle starts a drag; both accept a drop. They are hidden until the
+ *   card is hovered or selected, or a connector is being dragged (see the
+ *   `.rf-handle` rules in `app/index.css`).
+ * - A card takes any number of connectors.
  *
  * Visual hierarchy mirrors DESIGN.md and attached visual guide:
  * - Top colored taxonomy accent bar (3px)
@@ -14,15 +19,15 @@
  * - Classification badge
  * - Scholarly Serif typography for titles and evidentiary notes
  * - Microscopy plate image preview with title/caption overlay
- * - Branch / child stats and collapsed subtree indicators
+ * - Connection count and collapsed-branch indicator
  */
 
-import { memo } from 'react';
+import { Fragment, memo } from 'react';
 import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
 import { formatNodeLabel, nodeOrdinal, useCanvasStore } from '../data';
-import type { Node, UUID } from '../data';
+import type { Node, Side, UUID } from '../data';
 
 import { CollapseBadge } from './CollapseBadge';
 import { HoverToolbar } from './HoverToolbar';
@@ -51,8 +56,8 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
   const node = useCanvasStore(selectNode(data.nodeId));
   // Primitive selectors: the card re-renders only when its own numbers change,
   // not on every edit to any other idea.
-  const childCount = useCanvasStore(
-    (s) => s.canvas.nodes.reduce((n, c) => (c.parentId === data.nodeId ? n + 1 : n), 0),
+  const connectionCount = useCanvasStore(
+    (s) => s.canvas.edges.reduce((n, e) => (e.source === data.nodeId || e.target === data.nodeId ? n + 1 : n), 0),
   );
   const ordinal = useCanvasStore((s) => nodeOrdinal(s.canvas, data.nodeId));
 
@@ -112,63 +117,11 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
             dx: {data.dx && data.dx >= 0 ? `+${data.dx}` : data.dx ?? 0}px, dy:{' '}
             {data.dy && data.dy >= 0 ? `+${data.dy}` : data.dy ?? 0}px
           </span>
-          <span className="text-[#a0c4ff]">snaps to 20px</span>
+          <span className="text-[#a0c4ff]">Shift snaps</span>
         </div>
       )}
 
-      {/* Target handles: Incoming edges on all 4 sides */}
-      <Handle
-        id="target-left"
-        type="target"
-        position={RFPosition.Left}
-        isConnectable={true}
-        isConnectableStart={true}
-        isConnectableEnd={true}
-        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-        } z-30`}
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
-        data-testid="handle-target-left"
-      />
-      <Handle
-        id="target-right"
-        type="target"
-        position={RFPosition.Right}
-        isConnectable={true}
-        isConnectableStart={true}
-        isConnectableEnd={true}
-        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-        } z-30`}
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
-        data-testid="handle-target-right"
-      />
-      <Handle
-        id="target-top"
-        type="target"
-        position={RFPosition.Top}
-        isConnectable={true}
-        isConnectableStart={true}
-        isConnectableEnd={true}
-        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-        } z-30`}
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
-        data-testid="handle-target-top"
-      />
-      <Handle
-        id="target-bottom"
-        type="target"
-        position={RFPosition.Bottom}
-        isConnectable={true}
-        isConnectableStart={true}
-        isConnectableEnd={true}
-        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-        } z-30`}
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
-        data-testid="handle-target-bottom"
-      />
+      <SideHandles />
 
       {/* Top 3px colored accent bar */}
       <div
@@ -181,8 +134,8 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         }}
       />
 
-      {/* Inner Card Body with nodrag so typing and clicking do not drag the node */}
-      <div className="p-3 flex flex-col gap-2 nodrag">
+      {/* Card body. The whole card is a drag surface; the toolbar buttons stop their own mousedown. */}
+      <div className="p-3 flex flex-col gap-2">
         <Header node={node} isConclusion={isConclusion} />
 
         <BodyPreview body={node.body} isConclusion={isConclusion} />
@@ -208,66 +161,51 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
             <CollapseBadge nodeId={node.id} />
           ) : (
             <span>
-              {childCount > 0 ? `${childCount} ${childCount === 1 ? 'sub-idea' : 'sub-ideas'}` : ''}
+              {connectionCount > 0
+                ? `${connectionCount} ${connectionCount === 1 ? 'connection' : 'connections'}`
+                : ''}
             </span>
           )}
         </div>
       </div>
-
-      {/* Source handles: Outgoing edges on all 4 sides */}
-      <Handle
-        id="source-right"
-        type="source"
-        position={RFPosition.Right}
-        isConnectable={true}
-        isConnectableStart={true}
-        isConnectableEnd={true}
-        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-        } z-20`}
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
-        data-testid="handle-source-right"
-      />
-      <Handle
-        id="source-left"
-        type="source"
-        position={RFPosition.Left}
-        isConnectable={true}
-        isConnectableStart={true}
-        isConnectableEnd={true}
-        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-        } z-20`}
-        style={{ top: '50%', transform: 'translateY(-50%)' }}
-        data-testid="handle-source-left"
-      />
-      <Handle
-        id="source-top"
-        type="source"
-        position={RFPosition.Top}
-        isConnectable={true}
-        isConnectableStart={true}
-        isConnectableEnd={true}
-        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-        } z-20`}
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
-        data-testid="handle-source-top"
-      />
-      <Handle
-        id="source-bottom"
-        type="source"
-        position={RFPosition.Bottom}
-        isConnectable={true}
-        isConnectableStart={true}
-        isConnectableEnd={true}
-        className={`w-3 h-3 !bg-[#ffffff] hover:!bg-[#0051c3] !border-[1.5px] !border-[#0051c3] rounded-full transition-all duration-150 cursor-crosshair ${
-          selected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
-        } z-20`}
-        style={{ left: '50%', transform: 'translateX(-50%)' }}
-        data-testid="handle-source-bottom"
-      />
     </div>
+  );
+}
+
+const SIDES: ReadonlyArray<readonly [Side, RFPosition]> = [
+  ['top', RFPosition.Top],
+  ['right', RFPosition.Right],
+  ['bottom', RFPosition.Bottom],
+  ['left', RFPosition.Left],
+];
+
+/** Source and target handles on all four sides. Styled by `.rf-handle` in `app/index.css`. */
+function SideHandles(): JSX.Element {
+  return (
+    <>
+      {SIDES.map(([side, position]) => (
+        <Fragment key={side}>
+          <Handle
+            id={`target-${side}`}
+            type="target"
+            position={position}
+            isConnectableStart={false}
+            isConnectableEnd
+            className={`rf-handle rf-handle-${side}`}
+            data-testid={`handle-target-${side}`}
+          />
+          <Handle
+            id={`source-${side}`}
+            type="source"
+            position={position}
+            isConnectableStart
+            isConnectableEnd
+            className={`rf-handle rf-handle-${side} rf-handle-source`}
+            data-testid={`handle-source-${side}`}
+          />
+        </Fragment>
+      ))}
+    </>
   );
 }
 

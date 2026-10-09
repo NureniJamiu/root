@@ -119,7 +119,7 @@ describe('Batch Fixes Verification', () => {
       <AppHeader
         title="My Canvas"
         nodeCount={5}
-        branchCount={2}
+        connectionCount={2}
         onAddNode={onAddNode}
         isSidebarOpen={true}
         onToggleSidebar={onToggleSidebar}
@@ -153,7 +153,7 @@ describe('Batch Fixes Verification', () => {
       <AppHeader
         title="My Canvas"
         nodeCount={5}
-        branchCount={2}
+        connectionCount={2}
         onAddNode={onAddNode}
         isSidebarOpen={false}
         onToggleSidebar={onToggleSidebar}
@@ -170,7 +170,7 @@ describe('Batch Fixes Verification', () => {
     const onTogglePan = vi.fn();
     useCanvasStore.setState({
       canvas: emptyCanvas(),
-      selection: { nodeId: null },
+      selection: { nodeId: null, edgeId: null },
       editor: { openNodeId: null },
       deletePrompt: { nodeId: null },
       viewport: { x: 0, y: 0, zoom: 1 },
@@ -189,7 +189,7 @@ describe('Batch Fixes Verification', () => {
   it('CanvasView does not contain any coordinate labels (COORD:)', () => {
     useCanvasStore.setState({
       canvas: emptyCanvas(),
-      selection: { nodeId: null },
+      selection: { nodeId: null, edgeId: null },
       editor: { openNodeId: null },
       deletePrompt: { nodeId: null },
       viewport: { x: 123.4, y: 567.8, zoom: 1.5 },

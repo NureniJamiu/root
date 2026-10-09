@@ -13,15 +13,12 @@
  *   - Zod schemas         (from `./schema`)  — canvasSchema, nodeSchema,
  *                                              nodeTypeSchema, positionSchema,
  *                                              imageEntrySchema
- *   - Pure mutators       (from `./mutators`) — emptyCanvas, addRoot,
- *                                              addChild, updateNode,
- *                                              addImage, removeImage,
- *                                              moveNode, setCollapsed,
- *                                              deleteNodeOnly, deleteSubtree,
- *                                              NodePatch
- *   - Tree utilities      (from `./tree`)    — childrenIndex, visibleNodeIds,
+ *   - Pure mutators       (from `./mutators`) — emptyCanvas, addNode,
+ *                                              addChild, connect, updateEdge,
+ *                                              removeEdge, updateNode, ...
+ *   - Graph utilities     (from `./graph`)   — visibleNodeIds,
  *                                              descendantCount, subtreeIds,
- *                                              hasCycle, rootNode
+ *                                              computeFacingSides, ...
  *   - Serialization       (from `./serialize`) — serializeCanvas, parseCanvas,
  *                                              ParseCanvasResult
  *
@@ -39,11 +36,13 @@
  *                                                    SaveErrorDetail
  */
 
-export type { Canvas, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
+export type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
 
 export {
   canvasSchema,
+  edgeSchema,
   imageEntrySchema,
+  migrateLegacyCanvas,
   nodeSchema,
   nodeTypeSchema,
   positionSchema,
@@ -53,33 +52,42 @@ export {
 export {
   addChild,
   addImage,
-  addRoot,
+  addNode,
+  autoRouteEdge,
+  connect,
   deleteNodeOnly,
   deleteSubtree,
   emptyCanvas,
   expandSubtree,
   moveNode,
+  moveNodes,
+  removeEdge,
   removeImage,
-  reparentChild,
   setCanvasTitle,
   setCollapsed,
-  updateConnection,
+  updateEdge,
   updateNode,
 } from './mutators';
-export type { ConnectionPatch, NodePatch } from './mutators';
+export type { ConnectorEnds, NodePatch } from './mutators';
 
 export {
-  childrenIndex,
+  computeFacingSides,
+  connectionsOf,
   descendantCount,
+  downstreamIds,
+  edgeKey,
+  exclusiveDownstreamIds,
   formatNodeLabel,
-  hasCycle,
+  incomingIndex,
+  isDuplicateEdge,
   nodeLabel,
   nodeOrdinal,
   nodeOrdinals,
-  rootNode,
+  outgoingIndex,
+  resolveEdgeSides,
   subtreeIds,
   visibleNodeIds,
-} from './tree';
+} from './graph';
 
 export {
   CANVAS_TITLE_MAX,

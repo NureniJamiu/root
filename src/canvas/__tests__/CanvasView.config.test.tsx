@@ -68,7 +68,7 @@ class ResizeObserverStub {
 function cleanState(): CanvasState {
   return {
     canvas: emptyCanvas(),
-    selection: { nodeId: null },
+    selection: { nodeId: null, edgeId: null },
     editor: { openNodeId: null },
     deletePrompt: { nodeId: null },
     viewport: { x: 0, y: 0, zoom: 1 },

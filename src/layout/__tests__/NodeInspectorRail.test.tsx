@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { addChild, addImage, addRoot, emptyCanvas, updateNode } from '../../data/mutators';
+import { addChild, addImage, addNode, emptyCanvas, updateNode } from '../../data/mutators';
 import { canvasActions, useCanvasStore } from '../../data/store';
 import type { Canvas, NodeType } from '../../data';
 import { formatDataUrlSize, formatRelativeTime } from '../formatTime';
@@ -16,7 +16,7 @@ interface Built {
 
 /** root → a → (b, c); every non-root node has the given type. */
 function build(types: NodeType[] = ['finding', 'question', 'conclusion']): Built {
-  let c = addRoot({ ...emptyCanvas(), title: 'T' }, { position: { x: 0, y: 0 } });
+  let c = addNode({ ...emptyCanvas(), title: 'T' }, { position: { x: 0, y: 0 } });
   const root = c.nodes[0]!.id;
   c = addChild(c, root, { position: { x: 1, y: 1 } });
   const a = c.nodes[1]!.id;
@@ -131,29 +131,77 @@ describe('NodeInspectorRail shows real data', () => {
     expect(useCanvasStore.getState().canvas.nodes.find((n) => n.id === ids[1])!.images).toHaveLength(0);
   });
 
-  it("'Connect under' never offers the idea's own branch, and labels are unique", () => {
+  it("'Connect to' offers every other idea, and labels are unique", () => {
     const { canvas, ids } = build();
     const [root, a, b, c] = ids;
     show(canvas, a!);
     render(<NodeInspectorRail />);
 
-    const select = screen.getByTestId('reconnect-parent-select') as HTMLSelectElement;
-    const offered = Array.from(select.options).map((o) => o.value);
-    expect(offered).toEqual([root]); // not itself, nor its children b and c
-    expect(offered).not.toContain(b);
-    expect(offered).not.toContain(c);
+    const select = screen.getByTestId('connect-to-select') as HTMLSelectElement;
+    const offered = Array.from(select.options).map((o) => o.value).filter(Boolean);
+    expect(offered.sort()).toEqual([root, b, c].sort()); // anything but itself
   });
 
-  it('labels many ideas distinctly in the Connect under list', () => {
-    let c = addRoot(emptyCanvas(), { position: { x: 0, y: 0 } });
+  it("'Connect to' adds a connector from the selected idea to the chosen one", () => {
+    const { canvas, ids } = build();
+    const [root, a] = ids;
+    show(canvas, root!);
+    render(<NodeInspectorRail />);
+
+    const before = useCanvasStore.getState().canvas.edges.length;
+    fireEvent.change(screen.getByTestId('connect-to-select'), { target: { value: ids[3] } });
+
+    const after = useCanvasStore.getState().canvas;
+    expect(after.edges).toHaveLength(before + 1);
+    expect(after.edges[after.edges.length - 1]).toMatchObject({ source: root, target: ids[3] });
+    expect(a).toBeDefined();
+  });
+
+  it('lists every connector on the selected idea, in and out, and removes one on request', () => {
+    const { canvas, ids } = build(); // root -> a -> (b, c)
+    const [root, a, b, c] = ids;
+    show(canvas, a!);
+    render(<NodeInspectorRail />);
+
+    const panel = within(screen.getByTestId('node-inspector-connections'));
+    expect(panel.getByText('3 TOTAL')).toBeInTheDocument();
+    expect(panel.getAllByText(/^IN/)).toHaveLength(1);
+    expect(panel.getAllByText(/^OUT/)).toHaveLength(2);
+
+    const toB = useCanvasStore.getState().canvas.edges.find((e) => e.source === a && e.target === b)!;
+    fireEvent.click(screen.getByTestId(`connection-remove-${toB.id}`));
+
+    const edges = useCanvasStore.getState().canvas.edges;
+    expect(edges.some((e) => e.id === toB.id)).toBe(false);
+    expect(edges).toHaveLength(2);
+    expect([root, c]).toBeDefined();
+  });
+
+  it('shows the connector panel when a connector is selected, with editable sides and a remove button', () => {
+    const { canvas, ids } = build();
+    show(canvas, null);
+    const edge = canvas.edges.find((e) => e.source === ids[1] && e.target === ids[2])!;
+    canvasActions.selectEdge(edge.id);
+    render(<NodeInspectorRail />);
+
+    expect(screen.getByTestId('connector-panel')).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('connector-sourceSide'), { target: { value: 'top' } });
+    expect(useCanvasStore.getState().canvas.edges.find((e) => e.id === edge.id)).toMatchObject({ sourceSide: 'top' });
+
+    fireEvent.click(screen.getByTestId('btn-remove-connector'));
+    expect(useCanvasStore.getState().canvas.edges.some((e) => e.id === edge.id)).toBe(false);
+  });
+
+  it('labels many ideas distinctly in the Connect to list', () => {
+    let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     const root = c.nodes[0]!.id;
     for (let i = 0; i < 40; i++) c = addChild(c, root, { position: { x: i, y: i } });
     const last = c.nodes[c.nodes.length - 1]!.id;
     show(c, last);
     render(<NodeInspectorRail />);
 
-    const select = screen.getByTestId('reconnect-parent-select') as HTMLSelectElement;
-    const labels = Array.from(select.options).map((o) => o.textContent!.trim().split(' ')[0]);
+    const select = screen.getByTestId('connect-to-select') as HTMLSelectElement;
+    const labels = Array.from(select.options).slice(1).map((o) => o.textContent!.trim().split(' ')[0]);
     expect(new Set(labels).size).toBe(labels.length);
   });
 

@@ -21,6 +21,7 @@ export {
   SIBLING_GAP,
   computeChildPosition,
   computeTreeLayout,
+  findFreePosition,
 } from './placement';
 
 export { getMeasuredSizes } from './measuredSizes';
@@ -28,5 +29,4 @@ export type { NodeSize, NodeSizes } from './measuredSizes';
 
 export { CanvasView } from './CanvasView';
 export type { CanvasViewProps, CanvasViewProbeProps, CanvasViewControls, DragState } from './CanvasView';
-export { determineReconnect, determineReparent } from './reconnect';
-export type { ReparentResolution } from './reconnect';
+export { connectionToEnds, nearestSide } from './reconnect';

@@ -105,10 +105,8 @@ describe('Feature: root-mvp, Property 5: Non-overlap', () => {
             `candidate (${pos.x},${pos.y}) overlaps parent (${parent.position.x},${parent.position.y})`,
           ).toBe(false);
 
-          // 2. The candidate must not overlap any existing direct sibling.
-          const siblings = canvas.nodes.filter(
-            (n) => n.parentId === parentId,
-          );
+          // 2. The candidate must not overlap any other card on the canvas.
+          const siblings = canvas.nodes.filter((n) => n.id !== parentId);
           for (const sibling of siblings) {
             const siblingBox = bboxAt(sibling.position);
             expect(
