@@ -1,0 +1,521 @@
+/*
+ * Public landing page motion and textures. Scoped with `lp-` so nothing
+ * here reaches the app. Every animation has a still state under
+ * prefers-reduced-motion at the bottom of this file.
+ */
+
+.lp-page {
+  --lp-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --lp-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  overflow-x: clip;
+}
+
+/* Drafting grids */
+.lp-grid {
+  background-image:
+    linear-gradient(to right, #ebebeb 1px, transparent 1px),
+    linear-gradient(to bottom, #ebebeb 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.lp-grid-soft {
+  background-image: radial-gradient(#dcdde3 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+.lp-grid-hero {
+  background-image:
+    linear-gradient(to right, rgba(27, 28, 28, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(27, 28, 28, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 30%, transparent 80%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, #000 30%, transparent 80%);
+}
+
+.lp-grid-dark {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, #000 20%, transparent 75%);
+}
+
+/* The logo's coral-to-cobalt sweep, used for progress lines. */
+.lp-gradient-bar {
+  background: linear-gradient(90deg, #de5052, #0051c3);
+}
+.lp-gradient-bar-vertical {
+  background: linear-gradient(180deg, #de5052, #0051c3);
+}
+
+.lp-rail-pad {
+  padding-left: max(1.5rem, calc((100vw - 72rem) / 2 + 2rem));
+  padding-right: max(1.5rem, calc((100vw - 72rem) / 2 + 2rem));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Scroll reveals (Reveal.tsx)                                                */
+/* -------------------------------------------------------------------------- */
+
+.lp-reveal {
+  transition:
+    opacity 900ms var(--lp-ease),
+    transform 900ms var(--lp-ease),
+    clip-path 1100ms var(--lp-ease),
+    filter 900ms var(--lp-ease);
+  transition-delay: var(--lp-delay, 0ms);
+}
+.lp-reveal--rise { opacity: 0; transform: translateY(36px); }
+.lp-reveal--fade { opacity: 0; }
+.lp-reveal--scale { opacity: 0; transform: scale(0.94); filter: blur(6px); }
+.lp-reveal--left { opacity: 0; transform: translateX(-48px); }
+.lp-reveal--right { opacity: 0; transform: translateX(48px); }
+.lp-reveal--mask { clip-path: inset(0 0 100% 0); transform: translateY(24px); }
+
+.lp-reveal.is-shown {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  clip-path: inset(0 0 0 0);
+}
+
+/* Headline lines that rise out of a mask on load. */
+.lp-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+}
+.lp-line > span {
+  display: inline-block;
+  animation: lp-line-up 1100ms var(--lp-ease) both;
+  animation-delay: var(--lp-delay, 0ms);
+}
+@keyframes lp-line-up {
+  from { transform: translateY(105%); }
+  to { transform: none; }
+}
+
+.lp-fade-up {
+  animation: lp-fade-up 900ms var(--lp-ease) both;
+  animation-delay: var(--lp-delay, 0ms);
+}
+@keyframes lp-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hero                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/* Idea chips that drift around the headline. */
+.lp-float {
+  animation: lp-float 7s ease-in-out infinite;
+  animation-delay: var(--lp-float-delay, 0s);
+}
+@keyframes lp-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -10px; }
+}
+
+.lp-scroll-cue {
+  animation: lp-scroll-cue 2.2s var(--lp-ease) infinite;
+}
+@keyframes lp-scroll-cue {
+  0% { transform: scaleY(0); transform-origin: top; }
+  45% { transform: scaleY(1); transform-origin: top; }
+  55% { transform: scaleY(1); transform-origin: bottom; }
+  100% { transform: scaleY(0); transform-origin: bottom; }
+}
+
+
+/* Hero stage: an ink wash in the logo's coral and cobalt, with paper grain. */
+.lp-wash {
+  background: linear-gradient(160deg, #e9edf6 0%, #dfe6f4 45%, #e8e3ea 100%);
+  isolation: isolate;
+}
+.lp-wash-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  will-change: transform;
+}
+.lp-wash-blob > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  animation: lp-drift 24s ease-in-out infinite alternate;
+  animation-delay: var(--lp-drift-delay, 0s);
+}
+@keyframes lp-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(6%, -8%, 0) scale(1.12); }
+  100% { transform: translate3d(-8%, 6%, 0) scale(0.94); }
+}
+.lp-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.12 0 0 0 0 0.2 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.32;
+  mix-blend-mode: multiply;
+}
+.lp-wash-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 85%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 85%);
+}
+
+/* Connectors drawn across the wash on load. */
+.lp-wash-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lp-draw 1800ms var(--lp-ease) both;
+  animation-delay: var(--lp-delay, 0ms);
+}
+@keyframes lp-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* The hairline under the hero copy draws from the left. */
+.lp-rule {
+  transform-origin: left;
+  animation: lp-rule 1400ms var(--lp-ease) both;
+  animation-delay: var(--lp-delay, 0ms);
+}
+@keyframes lp-rule {
+  from { transform: scaleX(0); }
+  to { transform: none; }
+}
+
+.lp-arrow-box {
+  transition: transform 220ms var(--lp-ease);
+}
+.group:hover .lp-arrow-box {
+  transform: translateX(3px);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Product film                                                               */
+/* -------------------------------------------------------------------------- */
+
+.lp-film-frame {
+  transform-origin: 50% 0;
+  will-change: transform;
+}
+
+.lp-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 0.95em;
+  margin-left: 1px;
+  vertical-align: -0.1em;
+  background: #0051c3;
+}
+
+.lp-caption {
+  animation: lp-caption-in 500ms var(--lp-ease) both;
+}
+@keyframes lp-caption-in {
+  from { opacity: 0; transform: translateY(6px); filter: blur(3px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Scroll story                                                               */
+/* -------------------------------------------------------------------------- */
+
+.lp-step {
+  transition: opacity 500ms var(--lp-ease), transform 600ms var(--lp-ease), filter 500ms var(--lp-ease);
+}
+.lp-step[data-state='next'] { opacity: 0; transform: translateY(28px); filter: blur(4px); pointer-events: none; }
+.lp-step[data-state='past'] { opacity: 0; transform: translateY(-28px); filter: blur(4px); pointer-events: none; }
+.lp-step[data-state='active'] { opacity: 1; transform: none; filter: none; }
+
+/* -------------------------------------------------------------------------- */
+/* Use case rail                                                              */
+/* -------------------------------------------------------------------------- */
+
+.lp-case {
+  transition: box-shadow 400ms var(--lp-ease);
+  box-shadow: 0 10px 24px -18px rgba(17, 17, 18, 0.35);
+}
+.lp-hanger {
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.is-near .lp-case {
+  box-shadow: 0 30px 60px -30px rgba(17, 17, 18, 0.45);
+}
+.lp-dark .lp-case {
+  border-color: #2a2a2c;
+  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.7);
+}
+.lp-dark .is-near .lp-case {
+  box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.lp-sketch-line {
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 1200ms var(--lp-ease);
+}
+.is-near .lp-sketch-line {
+  stroke-dashoffset: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Type cards                                                                 */
+/* -------------------------------------------------------------------------- */
+
+.lp-type-card {
+  transition: transform 300ms var(--lp-ease-spring), border-color 200ms ease-out, background-color 200ms ease-out;
+}
+.lp-type-card:hover {
+  transform: translateY(-6px);
+}
+.lp-type-card .lp-type-bar {
+  transform: scaleX(0.18);
+  transform-origin: left;
+  transition: transform 500ms var(--lp-ease);
+}
+.lp-type-card:hover .lp-type-bar,
+.is-shown .lp-type-card .lp-type-bar {
+  transform: scaleX(1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Header                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.lp-header {
+  transition: background-color 300ms ease-out, border-color 300ms ease-out, padding 300ms var(--lp-ease, ease-out);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Idea types (IdeaTypes.tsx)                                                 */
+/* -------------------------------------------------------------------------- */
+
+.lp-bleed-right {
+  margin-right: -1.5rem;
+}
+@media (min-width: 768px) {
+  .lp-bleed-right {
+    margin-right: calc(-1 * max(2rem, (100vw - 72rem) / 2 + 2rem));
+  }
+}
+
+/* Idea type stack: each card pins a step lower than the last and turns about
+   its top-right corner, so the pile fans out to the left. */
+.lp-kind {
+  transform-origin: 100% 0;
+  transform: rotate(var(--tilt, 0deg));
+}
+@media (min-width: 1024px) and (min-height: 640px) {
+  /* Doubled class so the gap wins over the Tailwind gap utilities. */
+  .lp-stack.lp-stack {
+    --stack-top: max(84px, 50vh - 300px);
+    row-gap: 14vh;
+    padding-bottom: 30vh;
+  }
+  .lp-stack-card {
+    position: sticky;
+    top: calc(var(--stack-top) + var(--i) * 28px);
+  }
+  .lp-stack-card + .lp-stack-card .lp-kind {
+    box-shadow:
+      0 -1px 0 rgba(27, 28, 28, 0.03),
+      0 -18px 40px -22px rgba(27, 28, 28, 0.22);
+  }
+}
+.lp-kind-stage {
+  -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+}
+.lp-kind .lp-pop {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 600ms ease-out,
+    transform 700ms var(--lp-ease);
+  transition-delay: calc(var(--i, 0) * 110ms + 150ms);
+}
+.lp-kind[data-in='true'] .lp-pop {
+  opacity: 1;
+  transform: none;
+}
+.lp-kind-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 900ms var(--lp-ease);
+  transition-delay: calc(var(--i, 0) * 120ms + 100ms);
+}
+.lp-kind[data-in='true'] .lp-kind-line {
+  stroke-dashoffset: 0;
+}
+.lp-kind-path {
+  transform: translateY(-50%) scaleX(0);
+  transition: transform 1600ms var(--lp-ease) 250ms;
+}
+.lp-kind[data-in='true'] .lp-kind-path {
+  transform: translateY(-50%) scaleX(1);
+}
+.lp-march {
+  animation: lp-march 1.4s linear infinite;
+}
+@keyframes lp-march {
+  to { stroke-dashoffset: -16; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Navbar logo (LogoMascot.tsx)                                               */
+/* -------------------------------------------------------------------------- */
+
+.lp-logo .lp-logo-look {
+  animation: lp-logo-look 11s ease-in-out infinite;
+}
+@keyframes lp-logo-look {
+  0%, 18% { transform: translate(0, 0); }
+  22%, 34% { transform: translate(-3px, 0.5px); }
+  38%, 52% { transform: translate(3px, -1.5px); }
+  56%, 100% { transform: translate(0, 0); }
+}
+.lp-logo .lp-logo-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lp-logo-blink 5.2s ease-in-out infinite;
+}
+@keyframes lp-logo-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+.lp-logo .lp-logo-mouth {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: lp-logo-smile 11s ease-in-out infinite;
+}
+@keyframes lp-logo-smile {
+  0%, 30%, 70%, 100% { transform: scale(1, 1); }
+  42%, 56% { transform: scale(1.08, 1.45); }
+}
+/* A wink and a grin when you hover the logo. */
+a:hover > .lp-logo .lp-logo-wink,
+.lp-logo:hover .lp-logo-wink {
+  animation: lp-logo-wink 600ms ease-in-out;
+}
+@keyframes lp-logo-wink {
+  0%, 100% { transform: scaleY(1); }
+  40%, 60% { transform: scaleY(0.1); }
+}
+a:hover > .lp-logo .lp-logo-mouth,
+.lp-logo:hover .lp-logo-mouth {
+  animation: none;
+  transform: scale(1.1, 1.5);
+  transition: transform 300ms var(--lp-ease, ease);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Footer (SiteFooter.tsx)                                                    */
+/* -------------------------------------------------------------------------- */
+
+.lp-foot-link {
+  background: linear-gradient(90deg, #de5052, #0051c3) no-repeat 0 100% / 0 1px;
+  transition: background-size 380ms var(--lp-ease);
+}
+.lp-foot-link:hover,
+.lp-foot-link:focus-visible {
+  background-size: 100% 1px;
+}
+.lp-foot-pulse {
+  animation: lp-foot-pulse 2.4s ease-in-out infinite;
+}
+@keyframes lp-foot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 122, 76, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(45, 122, 76, 0); }
+}
+.lp-wordmark .lp-wordmark-link {
+  transform: scaleX(0);
+  transition: transform 1100ms var(--lp-ease) 200ms;
+}
+.lp-wordmark .lp-wordmark-link-late {
+  transition-delay: 650ms;
+}
+.lp-wordmark[data-in='true'] .lp-wordmark-link {
+  transform: scaleX(1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reduced motion: everything lands in its finished state.                    */
+/* -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-reveal,
+  .lp-reveal--rise,
+  .lp-reveal--fade,
+  .lp-reveal--scale,
+  .lp-reveal--left,
+  .lp-reveal--right,
+  .lp-reveal--mask {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    clip-path: none;
+    transition: none;
+  }
+  .lp-line > span,
+  .lp-fade-up,
+  .lp-float,
+  .lp-scroll-cue,
+  .lp-caption,
+  .lp-wash-blob > span,
+  .lp-rule {
+    animation: none;
+  }
+  .lp-wash-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .lp-march,
+  .lp-foot-pulse,
+  .lp-logo .lp-logo-look,
+  .lp-logo .lp-logo-blink,
+  .lp-logo .lp-logo-mouth,
+  .lp-logo:hover .lp-logo-wink,
+  a:hover > .lp-logo .lp-logo-wink {
+    animation: none;
+  }
+  .lp-wordmark .lp-wordmark-link {
+    transform: none;
+    transition: none;
+  }
+  .lp-kind .lp-pop {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .lp-kind .lp-kind-line {
+    stroke-dashoffset: 0;
+    transition: none;
+  }
+  .lp-kind .lp-kind-path {
+    transform: translateY(-50%);
+    transition: none;
+  }
+  .lp-step,
+  .lp-sketch-line,
+  .lp-type-card,
+  .lp-type-card .lp-type-bar,
+  .lp-header {
+    transition: none;
+  }
+  .lp-sketch-line {
+    stroke-dashoffset: 0;
+  }
+  .lp-type-card:hover {
+    transform: none;
+  }
+  .lp-type-card .lp-type-bar {
+    transform: none;
+  }
+}

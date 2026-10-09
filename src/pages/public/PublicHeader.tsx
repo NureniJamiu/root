@@ -1,62 +1,85 @@
-import { useRouter } from '../../routing';
-import { RootLogo } from '../../layout';
-import { Button } from '../../ui';
+import { useEffect, useRef } from 'react';
 
-export function PublicHeader(): JSX.Element {
+import { useRouter } from '../../routing';
+import type { AppRoute } from '../../routing/routes';
+import { Button } from '../../ui';
+import { AnimatedLogo } from './landing/LogoMascot';
+import './landing/landing.css';
+
+const NAV: readonly { label: string; to: AppRoute }[] = [
+  { label: 'OVERVIEW', to: '/' },
+  { label: 'ABOUT', to: '/about' },
+  { label: 'PRICING', to: '/pricing' },
+];
+
+/**
+ * Sticky public header. It sits flat on the page at the top, then picks up
+ * a paper backdrop and hairline once the page scrolls, with a thin
+ * coral-to-cobalt line along its bottom edge showing how far down the page
+ * the reader is.
+ */
+/** `wide` lines the header up with the landing page's full-width hero. */
+export function PublicHeader({ wide = false }: { readonly wide?: boolean } = {}): JSX.Element {
   const { navigate, pathname } = useRouter();
+  const headerRef = useRef<HTMLElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let frame = 0;
+    const update = (): void => {
+      frame = 0;
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - window.innerHeight;
+      const y = window.scrollY;
+      headerRef.current?.toggleAttribute('data-scrolled', y > 8);
+      if (barRef.current) barRef.current.style.transform = `scaleX(${max > 0 ? Math.min(1, y / max) : 0})`;
+    };
+    const schedule = (): void => {
+      if (frame === 0) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (frame !== 0) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  const go = (to: AppRoute) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(to);
+  };
 
   return (
-    <header className="w-full border-b border-[#ebebeb] bg-[#ffffff] py-4 px-6 md:px-8 shrink-0">
-      <div className="max-w-6xl mx-auto flex items-center justify-between">
+    <header
+      ref={headerRef}
+      className={`lp-header group sticky top-0 z-50 w-full border-b border-transparent bg-[#fbf9f8]/0 py-4 ${wide ? 'px-5 md:px-10' : 'px-6 md:px-8'} shrink-0 data-[scrolled]:py-2.5 data-[scrolled]:bg-[#fbf9f8]/85 data-[scrolled]:border-[#ebebeb] data-[scrolled]:backdrop-blur-md`}
+    >
+      <div className={`${wide ? 'max-w-[1400px]' : 'max-w-6xl'} mx-auto flex items-center justify-between`}>
         <div className="flex items-center gap-8">
           <a
             href="/"
-            onClick={(e) => {
-              e.preventDefault();
-              navigate('/');
-            }}
+            onClick={go('/')}
             className="cursor-pointer hover:opacity-85 transition-opacity py-1 flex items-center"
             title="Root"
           >
-            <RootLogo className="h-10 w-auto min-w-[90px]" />
+            <AnimatedLogo className="h-10 w-auto min-w-[90px] transition-[height] duration-300 group-data-[scrolled]:h-8" />
           </a>
           <nav className="hidden md:flex items-center gap-6 font-mono font-medium text-xs uppercase tracking-wider text-[#737785]">
-            <a
-              href="/"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/');
-              }}
-              className={`hover:text-[#000000] transition-colors py-1 cursor-pointer uppercase ${
-                pathname === '/' ? 'text-[#000000]' : ''
-              }`}
-            >
-              OVERVIEW
-            </a>
-            <a
-              href="/about"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/about');
-              }}
-              className={`hover:text-[#000000] transition-colors py-1 cursor-pointer uppercase ${
-                pathname === '/about' ? 'text-[#000000]' : ''
-              }`}
-            >
-              ABOUT
-            </a>
-            <a
-              href="/pricing"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate('/pricing');
-              }}
-              className={`hover:text-[#000000] transition-colors py-1 cursor-pointer uppercase ${
-                pathname === '/pricing' ? 'text-[#000000]' : ''
-              }`}
-            >
-              PRICING
-            </a>
+            {NAV.map((item) => (
+              <a
+                key={item.to}
+                href={item.to}
+                onClick={go(item.to)}
+                className={`relative hover:text-[#000000] transition-colors py-1 cursor-pointer uppercase after:absolute after:left-0 after:-bottom-0.5 after:h-px after:w-full after:bg-[#000000] after:origin-left after:transition-transform after:duration-300 ${
+                  pathname === item.to ? 'text-[#000000] after:scale-x-100' : 'after:scale-x-0 hover:after:scale-x-100'
+                }`}
+              >
+                {item.label}
+              </a>
+            ))}
           </nav>
         </div>
 
@@ -79,6 +102,13 @@ export function PublicHeader(): JSX.Element {
           </Button>
         </div>
       </div>
+
+      <div
+        ref={barRef}
+        className="absolute left-0 right-0 -bottom-px h-[2px] lp-gradient-bar origin-left"
+        style={{ transform: 'scaleX(0)' }}
+        aria-hidden="true"
+      />
     </header>
   );
 }
