@@ -30,6 +30,8 @@ import {
 export interface ConnectorEdgeData {
   readonly color: string;
   readonly dashed: boolean;
+  /** Set while the card at either end is animating in or out. */
+  readonly opacity?: number;
 }
 
 /** How far above the middle of the curve the remove button sits, so clicking (or double-clicking) the curve itself never hits it. */
@@ -81,7 +83,13 @@ function ConnectorEdgeImpl(props: EdgeProps<ConnectorEdgeData>): JSX.Element {
   const dotRadius = selected ? EDGE_DOT_RADIUS + 2.5 : active ? EDGE_DOT_RADIUS + 1.5 : EDGE_DOT_RADIUS;
 
   return (
-    <g onMouseEnter={show} onMouseLeave={hide} data-testid={`connector-${id}`} data-selected={selected ? 'true' : 'false'}>
+    <g
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      style={data?.opacity !== undefined ? { opacity: data.opacity } : undefined}
+      data-testid={`connector-${id}`}
+      data-selected={selected ? 'true' : 'false'}
+    >
       {active && (
         <path d={path} fill="none" stroke={color} strokeWidth={10} strokeOpacity={0.16} strokeLinecap="round" />
       )}
@@ -95,8 +103,8 @@ function ConnectorEdgeImpl(props: EdgeProps<ConnectorEdgeData>): JSX.Element {
           ...(data?.dashed ? { strokeDasharray: EDGE_DASH } : {}),
         }}
       />
-      <circle cx={sourceX} cy={sourceY} r={dotRadius} fill={color} stroke="#ffffff" strokeWidth={1.5} pointerEvents="none" />
-      <circle cx={targetX} cy={targetY} r={dotRadius} fill={color} stroke="#ffffff" strokeWidth={1.5} pointerEvents="none" />
+      <circle cx={sourceX} cy={sourceY} r={dotRadius} fill={color} stroke="rgb(var(--panel))" strokeWidth={1.5} pointerEvents="none" />
+      <circle cx={targetX} cy={targetY} r={dotRadius} fill={color} stroke="rgb(var(--panel))" strokeWidth={1.5} pointerEvents="none" />
 
       {active && (
         <EdgeLabelRenderer>
@@ -120,7 +128,7 @@ function ConnectorEdgeImpl(props: EdgeProps<ConnectorEdgeData>): JSX.Element {
                 e.stopPropagation();
                 canvasActions.removeEdge(id);
               }}
-              className="inline-flex items-center justify-center rounded-full bg-white text-[#404040] hover:bg-[#de5052] hover:text-white hover:border-[#de5052] transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center rounded-full bg-panel text-ink-read hover:bg-question-fill hover:text-white hover:border-question transition-colors cursor-pointer"
               style={{ width: 20, height: 20, border: `1px solid ${color}` }}
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">

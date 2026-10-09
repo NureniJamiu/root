@@ -12,10 +12,10 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function T
   return (
     <input
       ref={ref}
-      className={`w-full bg-[#ffffff] text-[#000000] text-[13px] leading-[20px] font-mono placeholder:text-[#595959] rounded-[2px] border transition-colors duration-150 outline-none px-3 py-2 ${
+      className={`w-full bg-panel text-ink-strong text-[13px] leading-[20px] font-mono placeholder:text-ink-3 rounded-[2px] border transition-colors duration-150 outline-none px-3 py-2 ${
         hasError
-          ? 'border-[#de5052] focus:border-[#de5052]'
-          : 'border-[#c3c6d6] hover:border-[#737785] focus:border-[#000000]'
+          ? 'border-question focus:border-question'
+          : 'border-rule-strong hover:border-muted focus:border-ink-strong'
       } ${className}`}
       style={{
         boxShadow: 'none',

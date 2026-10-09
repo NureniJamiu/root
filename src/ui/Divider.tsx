@@ -8,7 +8,7 @@ export function Divider({ label, className = '', style, ...rest }: DividerProps)
   if (!label) {
     return (
       <div
-        className={`w-full h-px bg-[#ebebeb] ${className}`}
+        className={`w-full h-px bg-rule ${className}`}
         style={style}
         {...rest}
       />
@@ -22,9 +22,9 @@ export function Divider({ label, className = '', style, ...rest }: DividerProps)
       {...rest}
     >
       <div className="absolute inset-0 flex items-center">
-        <div className="w-full border-t border-[#ebebeb]" />
+        <div className="w-full border-t border-rule" />
       </div>
-      <div className="relative px-3 bg-[#ffffff] font-mono text-[9px] uppercase tracking-[0.08em] text-[#737785] select-none">
+      <div className="relative px-3 bg-panel font-mono text-[9px] uppercase tracking-[0.08em] text-muted select-none">
         {label}
       </div>
     </div>

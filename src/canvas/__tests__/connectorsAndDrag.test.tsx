@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyCanvas, addNode } from '../../data/mutators';
 import { useCanvasStore } from '../../data/store';
@@ -99,10 +99,11 @@ describe('Card handles, dragging badge and inspector telemetry', () => {
     });
   });
 
-  describe('NodeInspectorRail classification switching and live drag telemetry', () => {
-    it('allows one-click classification type switching', () => {
-      const canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
+  describe('NodeInspectorRail type display and live drag telemetry', () => {
+    it('shows the selected idea\'s type in the read-only inspector', () => {
+      let canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
       const rootId = canvas.nodes[0]!.id;
+      canvas = { ...canvas, nodes: canvas.nodes.map((n) => ({ ...n, type: 'question' as const })) };
       useCanvasStore.setState({
         canvas,
         selection: { nodeId: rootId, edgeId: null },
@@ -110,17 +111,7 @@ describe('Card handles, dragging badge and inspector telemetry', () => {
 
       render(<NodeInspectorRail />);
 
-      // Switch to finding
-      const findingBtn = screen.getByRole('button', { name: 'Finding' });
-      fireEvent.click(findingBtn);
-
-      expect(useCanvasStore.getState().canvas.nodes[0]!.type).toBe('finding');
-
-      // Switch to question
-      const questionBtn = screen.getByRole('button', { name: 'Question' });
-      fireEvent.click(questionBtn);
-
-      expect(useCanvasStore.getState().canvas.nodes[0]!.type).toBe('question');
+      expect(screen.getByTestId('inspector-type')).toHaveTextContent('Question');
     });
 
     it('displays live coordinates, delta and snapping telemetry when dragging', () => {
@@ -145,8 +136,6 @@ describe('Card handles, dragging badge and inspector telemetry', () => {
 
       expect(screen.getByText('X: 535 Y: 170')).toBeInTheDocument();
       expect(screen.getByText('+85 / -40')).toBeInTheDocument();
-      expect(screen.getByText('Off (hold Shift)')).toBeInTheDocument();
-      expect(screen.getByText(/Moving idea/)).toBeInTheDocument();
     });
   });
 });

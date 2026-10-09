@@ -94,7 +94,7 @@ const TYPE_ORDER: readonly NodeType[] = [
  * for the drop-zone-rejected border flash. Uses color.surface.strong
  * as the single "alert/action" accent in the new palette.
  */
-const SECONDARY = '#de5052'; // warning accent
+const SECONDARY = 'var(--color-semantic-question)'; // warning accent, follows the theme
 
 /**
  * How long the drop-zone border flashes when a non-image payload is
@@ -111,13 +111,13 @@ const TYPE_LABEL: { readonly [K in NodeType]: string } = {
 };
 
 const FIELD_LABEL =
-  'font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[#595959]';
+  'font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink-3';
 
 const FIELD_INPUT =
-  'w-full bg-[#ffffff] text-[#1b1c1c] border border-[#c3c6d6] rounded-[3px] outline-none placeholder:text-[#a3a6b4] transition-[border-color,box-shadow] duration-150 hover:border-[#9299b3] focus:border-[#0051c3] focus:shadow-[0_0_0_3px_rgba(0,81,195,0.12)]';
+  'w-full bg-panel text-ink border border-rule-strong rounded-[3px] outline-none placeholder:text-faint transition-[border-color,box-shadow] duration-150 hover:border-faint focus:border-topic focus:shadow-[0_0_0_3px_rgb(var(--topic)/0.12)]';
 
 const KBD =
-  'inline-flex items-center px-1 h-4 mr-1 rounded-[2px] border border-[#d9d9de] bg-[#ffffff] text-[9.5px] text-[#404040]';
+  'inline-flex items-center px-1 h-4 mr-1 rounded-[2px] border border-rule-2 bg-panel text-[9.5px] text-ink-read';
 
 /** Shortcut hint for the save key: ⌘ on Apple platforms, Ctrl elsewhere. */
 const MOD_KEY =
@@ -394,7 +394,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
 
   // Drop zone border: solid text.tertiary normally, surface.strong during a flash.
   const dropZoneBorder = useMemo(() => {
-    return dropFlash ? `1.5px solid ${SECONDARY}` : '1.5px dashed #c3c6d6'; // outline-variant
+    return dropFlash ? `1.5px solid ${SECONDARY}` : '1.5px dashed rgb(var(--rule-strong))'; // outline-variant
   }, [dropFlash]);
 
   /* ------------------------------------------------------------------ */
@@ -420,22 +420,22 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
       aria-label={isNew ? 'New idea' : 'Edit idea'}
     >
       <div
-        className="root-modal-panel flex flex-col w-[560px] max-w-full max-h-[90vh] bg-[#ffffff] text-[#1b1c1c] border border-[#d9d9de] rounded-[4px] overflow-hidden"
+        className="root-modal-panel flex flex-col w-[560px] max-w-full max-h-[90vh] bg-panel text-ink border border-rule-2 rounded-[4px] overflow-hidden"
         data-testid="node-editor"
         onPaste={onPaste}
       >
         {/* Header ------------------------------------------------------- */}
-        <div className="relative flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-[#ebebeb]">
+        <div className="relative flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-rule">
           <span
             className="absolute left-0 top-0 h-[3px] w-full transition-colors duration-200"
             style={{ background: accent }}
             aria-hidden="true"
           />
           <div className="flex flex-col gap-1 min-w-0">
-            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[#737785]">
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-muted">
               {isNew ? 'New idea' : 'Edit idea'} · {typeLabel}
             </span>
-            <h2 className="font-serif text-[22px] leading-[28px] font-normal text-[#000000] truncate">
+            <h2 className="font-serif text-[22px] leading-[28px] font-normal text-ink-strong truncate">
               {draft.title.trim() || (isNew ? 'Untitled idea' : 'Untitled')}
             </h2>
           </div>
@@ -444,7 +444,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
             onClick={cancel}
             aria-label="Close without saving"
             title="Close without saving (Esc)"
-            className="shrink-0 w-8 h-8 -mr-2 inline-flex items-center justify-center rounded-[2px] text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
+            className="shrink-0 w-8 h-8 -mr-2 inline-flex items-center justify-center rounded-[2px] text-muted hover:text-ink-strong hover:bg-sunken transition-colors cursor-pointer"
             data-testid="node-editor-dismiss"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -477,7 +477,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
           <div className="flex flex-col gap-1.5">
             <span className={FIELD_LABEL}>Card type</span>
             <div
-              className="grid grid-cols-4 gap-1 p-1 bg-[#f5f3f3] rounded-[3px]"
+              className="grid grid-cols-4 gap-1 p-1 bg-sunken rounded-[3px]"
               role="group"
               aria-label="Card type"
               data-testid="node-editor-type-buttons"
@@ -493,8 +493,8 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
                     aria-pressed={isSelected}
                     className={`h-8 inline-flex items-center justify-center gap-1.5 rounded-[2px] border font-mono text-[11px] transition-all duration-150 cursor-pointer ${
                       isSelected
-                        ? 'bg-[#ffffff] text-[#000000]'
-                        : 'border-transparent text-[#595959] hover:text-[#000000] hover:bg-[#ffffff]/60'
+                        ? 'bg-panel text-ink-strong'
+                        : 'border-transparent text-ink-3 hover:text-ink-strong hover:bg-panel/60'
                     }`}
                     style={isSelected ? { borderColor: style.border } : undefined}
                     data-testid={`node-editor-type-${t}`}
@@ -517,7 +517,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
               <span className={FIELD_LABEL}>Notes &amp; details</span>
               <span
                 className="font-mono text-[10px] tabular-nums"
-                style={{ color: counterWarn ? SECONDARY : '#737785' }}
+                style={{ color: counterWarn ? SECONDARY : 'rgb(var(--muted))' }}
                 data-testid="node-editor-body-counter"
               >
                 {bodyLength}/{BODY_MAX}
@@ -543,21 +543,21 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragEnter={onDragOver}
-              className="flex flex-row items-center justify-center gap-3 px-4 py-4 rounded-[3px] bg-[#fbfbfc] transition-colors"
+              className="flex flex-row items-center justify-center gap-3 px-4 py-4 rounded-[3px] bg-panel-2 transition-colors"
               style={{ border: dropZoneBorder }}
               data-testid="node-editor-drop-zone"
               data-flashing={dropFlash ? 'true' : 'false'}
             >
-              <svg className="w-5 h-5 text-[#9299b3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+              <svg className="w-5 h-5 text-faint shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <path d="m21 15-5-5L5 21" />
               </svg>
-              <span className="font-serif text-[13px] text-[#595959]">Drop or paste images, or</span>
+              <span className="font-serif text-[13px] text-ink-3">Drop or paste images, or</span>
               <button
                 type="button"
                 onClick={openFilePicker}
-                className="h-7 px-3 font-mono text-[11px] text-[#1b1c1c] bg-[#ffffff] border border-[#c3c6d6] rounded-[2px] hover:border-[#000000] transition-colors cursor-pointer"
+                className="h-7 px-3 font-mono text-[11px] text-ink bg-panel border border-rule-strong rounded-[2px] hover:border-ink-strong transition-colors cursor-pointer"
                 data-testid="node-editor-pick-file"
               >
                 Choose files…
@@ -589,7 +589,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
                 {draft.images.map((img) => (
                   <div
                     key={img.id}
-                    className="group relative rounded-[3px] border border-[#ebebeb] bg-[#ffffff] p-0.5"
+                    className="group relative rounded-[3px] border border-rule bg-panel p-0.5"
                   >
                     <img
                       src={img.dataUrl}
@@ -600,7 +600,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
                       type="button"
                       onClick={() => onRemoveImage(img.id)}
                       aria-label="Remove image"
-                      className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-[#000000]/70 text-[#ffffff] text-[10px] opacity-80 group-hover:opacity-100 hover:bg-[#ba1a1a] transition-all cursor-pointer"
+                      className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/70 text-white text-[10px] opacity-80 group-hover:opacity-100 hover:bg-danger-fill transition-all cursor-pointer"
                       data-testid={`node-editor-remove-image-${img.id}`}
                     >
                       ✕
@@ -613,8 +613,8 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
         </div>
 
         {/* Footer ------------------------------------------------------- */}
-        <div className="flex flex-row items-center justify-between gap-3 px-6 py-3.5 border-t border-[#ebebeb] bg-[#fbfbfc]">
-          <span className="hidden sm:inline-flex items-center gap-3 font-mono text-[10px] text-[#737785]">
+        <div className="flex flex-row items-center justify-between gap-3 px-6 py-3.5 border-t border-rule bg-panel-2">
+          <span className="hidden sm:inline-flex items-center gap-3 font-mono text-[10px] text-muted">
             <span><kbd className={KBD}>Esc</kbd> cancel</span>
             <span><kbd className={KBD}>{MOD_KEY}↵</kbd> save</span>
           </span>

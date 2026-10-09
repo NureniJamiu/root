@@ -16,57 +16,93 @@ import type { Config } from 'tailwindcss';
  *   motion.duration.*   = transition duration scale
  *   font.size.*         = typography scale
  */
+/** A colour backed by a theme token, with Tailwind opacity support. */
+function tok(name: string): string {
+  return `rgb(var(--${name}) / <alpha-value>)`;
+}
+
 const config: Config = {
+  // Dark mode follows the `.dark` class that theme/theme.ts puts on <html>.
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
-    // Reset the built-in Tailwind palettes so only DESIGN.md tokens are
-    // usable via utility classes. Any color reference outside this map is
-    // a compile-time error surface (missing utility class).
+    // Reset the built-in Tailwind palettes so only theme tokens are usable
+    // via utility classes.
     colors: {
       transparent: 'transparent',
       current: 'currentColor',
-      // Text palette (DESIGN.md)
+      // Theme tokens (theme/tokens.css). Each resolves to a CSS variable that
+      // `.dark` redefines, so one class covers both themes.
+      paper: tok('paper'),
+      canvas: tok('canvas'),
+      panel: { DEFAULT: tok('panel'), 2: tok('panel-2') },
+      subtle: tok('subtle'),
+      sunken: { DEFAULT: tok('sunken'), 2: tok('sunken-2'), 3: tok('sunken-3') },
+      ink: {
+        DEFAULT: tok('ink'),
+        strong: tok('ink-strong'),
+        read: tok('ink-read'),
+        2: tok('ink-2'),
+        3: tok('ink-3'),
+      },
+      muted: tok('muted'),
+      faint: tok('faint'),
+      rule: { DEFAULT: tok('rule'), 2: tok('rule-2'), strong: tok('rule-strong') },
+      topic: { DEFAULT: tok('topic'), strong: tok('topic-strong'), soft: tok('topic-soft'), fill: tok('accent') },
+      finding: { DEFAULT: tok('finding'), fill: tok('finding-fill') },
+      question: { DEFAULT: tok('question'), fill: tok('question-fill') },
+      conclusion: { DEFAULT: tok('conclusion'), fill: tok('conclusion-fill') },
+      accent: { DEFAULT: tok('accent'), strong: tok('accent-strong'), deep: tok('accent-deep') },
+      'on-accent': tok('on-accent'),
+      danger: {
+        DEFAULT: tok('danger'),
+        fill: tok('danger-fill'),
+        strong: tok('danger-strong'),
+        soft: tok('danger-soft'),
+      },
+      inverse: tok('inverse'),
+      'on-inverse': tok('on-inverse'),
+      'inverse-accent': tok('inverse-accent'),
+      stage: tok('stage'),
+      // DESIGN.md names, kept for existing references
       text: {
-        primary: '#000000',   // obsidian
-        secondary: '#404040', // primary reading ink
-        tertiary: '#595959',  // annotation / muted
-        inverse: '#ffffff',
-        reading: '#404040',
-        muted: '#595959',
+        primary: tok('ink-strong'),
+        secondary: tok('ink-read'),
+        tertiary: tok('ink-3'),
+        inverse: tok('on-inverse'),
+        reading: tok('ink-read'),
+        muted: tok('ink-3'),
       },
-      // Surface palette (DESIGN.md)
       surface: {
-        DEFAULT: '#fbf9f8',
-        canvas: '#f9f9fb',
-        base: '#000000',
-        muted: '#f5f3f3',
-        raised: '#ffffff',
-        lowest: '#ffffff',
-        low: '#f5f3f3',
-        container: '#f0eded',
-        high: '#eae8e7',
-        highest: '#e4e2e1',
-        strong: '#0051c3',
+        DEFAULT: tok('paper'),
+        canvas: tok('canvas'),
+        base: tok('inverse'),
+        muted: tok('sunken'),
+        raised: tok('panel'),
+        lowest: tok('panel'),
+        low: tok('sunken'),
+        container: tok('sunken-2'),
+        high: tok('sunken-3'),
+        highest: tok('sunken-3'),
+        strong: tok('accent'),
       },
-      // Hairlines & borders (DESIGN.md)
       border: {
-        DEFAULT: '#ebebeb',
-        rule: '#ebebeb',
-        outline: '#737785',
-        variant: '#c3c6d6',
+        DEFAULT: tok('rule'),
+        rule: tok('rule'),
+        outline: tok('muted'),
+        variant: tok('rule-strong'),
       },
-      // Semantic research nodes (DESIGN.md)
       semantic: {
-        topic: '#0051c3',
-        finding: '#2d7a4c',
-        question: '#de5052',
-        conclusion: '#521010',
+        topic: tok('topic'),
+        finding: tok('finding'),
+        question: tok('question'),
+        conclusion: tok('conclusion'),
       },
       primary: {
-        DEFAULT: '#003b93',
-        container: '#0051c3',
+        DEFAULT: tok('accent-strong'),
+        container: tok('accent'),
       },
-      // Convenience aliases
+      // Fixed colours that do not change with the theme
       black: '#000000',
       white: '#ffffff',
     },

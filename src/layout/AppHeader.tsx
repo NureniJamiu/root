@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { NodeType } from '../data';
-import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Kbd } from '../ui/Kbd';
+import { ThemeToggle } from '../ui/ThemeToggle';
 import { RootLogo } from './Logo';
 import { PanelLeftIcon, PanelRightIcon } from './panelIcons';
 
@@ -32,6 +32,14 @@ const TYPE_LABELS: Record<NodeType, string> = {
   finding: 'Finding',
   question: 'Question',
   conclusion: 'Conclusion',
+};
+
+/** The colour of each type, shown as a dot beside the highlight dropdown. */
+const TYPE_COLORS: Record<NodeType, string> = {
+  topic: 'rgb(var(--topic))',
+  finding: 'rgb(var(--finding))',
+  question: 'rgb(var(--question))',
+  conclusion: 'rgb(var(--conclusion))',
 };
 
 const GUIDE_ITEMS: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
@@ -99,7 +107,7 @@ export function AppHeader({
   };
 
   return (
-    <header className="h-12 w-full bg-[#ffffff] border-b border-[#ebebeb] flex items-center justify-between gap-4 pl-2 pr-2 shrink-0 select-none z-30">
+    <header className="h-12 w-full bg-panel border-b border-rule flex items-center justify-between gap-4 pl-2 pr-2 shrink-0 select-none z-30">
       {/* Left: sidebar affordance (only while collapsed) + project title */}
       <div className="flex items-center gap-2 min-w-0">
         {!isSidebarOpen && onToggleSidebar && (
@@ -107,7 +115,7 @@ export function AppHeader({
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="w-7 h-7 inline-flex items-center justify-center rounded-[2px] text-[#737785] hover:text-[#000000] hover:bg-[#f0eded] transition-colors cursor-pointer shrink-0"
+              className="w-7 h-7 inline-flex items-center justify-center rounded-[2px] text-muted hover:text-ink-strong hover:bg-sunken-2 transition-colors cursor-pointer shrink-0"
               title="Expand sidebar"
               aria-label="Expand sidebar"
               aria-expanded={false}
@@ -124,7 +132,7 @@ export function AppHeader({
             >
               <RootLogo className="h-7 w-auto" />
             </button>
-            <div className="h-4 w-px bg-[#ebebeb] mx-1 shrink-0" />
+            <div className="h-4 w-px bg-rule mx-1 shrink-0" />
           </>
         )}
 
@@ -145,20 +153,20 @@ export function AppHeader({
               autoFocus
               maxLength={titleMaxLength}
               aria-label="Project title"
-              className="font-serif text-[17px] font-medium text-[#000000] border-b border-[#000000] bg-transparent outline-none px-1 py-0.5 min-w-[220px]"
+              className="font-serif text-[17px] font-medium text-ink-strong border-b border-ink-strong bg-transparent outline-none px-1 py-0.5 min-w-[220px]"
             />
           ) : (
             <button
               type="button"
               onClick={() => setIsEditingTitle(true)}
-              className="group flex items-center gap-1.5 min-w-0 cursor-text py-1 px-1.5 rounded-[2px] hover:bg-[#f5f3f3] transition-colors"
+              className="group flex items-center gap-1.5 min-w-0 cursor-text py-1 px-1.5 rounded-[2px] hover:bg-sunken transition-colors"
               title="Rename project"
             >
-              <span className="font-serif text-[17px] font-medium text-[#000000] tracking-tight truncate">
+              <span className="font-serif text-[17px] font-medium text-ink-strong tracking-tight truncate">
                 {title || 'Untitled Project'}
               </span>
               <svg
-                className="w-3 h-3 shrink-0 text-[#737785] opacity-0 group-hover:opacity-100 transition-opacity"
+                className="w-3 h-3 shrink-0 text-muted opacity-0 group-hover:opacity-100 transition-opacity"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -169,7 +177,7 @@ export function AppHeader({
               </svg>
             </button>
           )}
-          <span className="ml-2 font-mono text-[10px] text-[#737785] tracking-wide whitespace-nowrap shrink-0">
+          <span className="ml-2 font-mono text-[10px] text-muted tracking-wide whitespace-nowrap shrink-0">
             {nodeCount} {nodeCount === 1 ? 'idea' : 'ideas'} · {connectionCount}{' '}
             {connectionCount === 1 ? 'connection' : 'connections'}
           </span>
@@ -179,35 +187,47 @@ export function AppHeader({
       {/* Right: type highlight, help, primary action, inspector toggle */}
       <div className="flex items-center gap-2 shrink-0">
         {onSelectTypeFilter && (
-          <div className="flex items-center gap-1" role="group" aria-label="Highlight ideas by type">
-            <span className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-[#737785] mr-1">Highlight</span>
-            {(Object.keys(TYPE_LABELS) as NodeType[]).map((type) => {
-              const isActive = activeTypeFilter === type;
-              const isDimmed = activeTypeFilter != null && !isActive;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onSelectTypeFilter(isActive ? null : type)}
-                  aria-pressed={isActive}
-                  className="cursor-pointer rounded-[2px]"
-                  data-testid={`filter-${type}`}
-                >
-                  <Badge
-                    variant={type}
-                    className={`transition-opacity ${isActive ? 'ring-1 ring-offset-1 ring-[#000000]' : ''} ${
-                      isDimmed ? 'opacity-40 hover:opacity-80' : 'hover:opacity-100'
-                    }`}
-                  >
+          <label className="relative flex items-center gap-2" data-testid="type-filter">
+            <span className="relative inline-flex items-center">
+              <span
+                className="pointer-events-none absolute left-2.5 w-2 h-2 rounded-full"
+                style={{
+                  background: activeTypeFilter ? TYPE_COLORS[activeTypeFilter] : 'transparent',
+                  border: activeTypeFilter ? 'none' : '1px solid rgb(var(--rule-strong))',
+                }}
+                aria-hidden="true"
+              />
+              <select
+                value={activeTypeFilter ?? ''}
+                onChange={(e) => onSelectTypeFilter(e.target.value === '' ? null : (e.target.value as NodeType))}
+                aria-label="Highlight ideas by type"
+                className="h-8 appearance-none rounded-[4px] border border-rule-2 bg-panel pl-6 pr-7 font-mono text-[11px] text-ink hover:border-ink focus:outline-none focus-visible:border-topic focus-visible:ring-1 focus-visible:ring-topic transition-colors cursor-pointer"
+                data-testid="type-filter-select"
+              >
+                <option value="">All</option>
+                {(Object.keys(TYPE_LABELS) as NodeType[]).map((type) => (
+                  <option key={type} value={type}>
                     {TYPE_LABELS[type]}
-                  </Badge>
-                </button>
-              );
-            })}
-          </div>
+                  </option>
+                ))}
+              </select>
+              <svg
+                className="pointer-events-none absolute right-2 w-3 h-3 text-muted"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+          </label>
         )}
 
-        <div className="h-4 w-px bg-[#ebebeb]" />
+        <ThemeToggle />
+
+        <div className="h-4 w-px bg-rule" />
 
         <div className="relative" ref={guideRef}>
           <Button
@@ -215,7 +235,7 @@ export function AppHeader({
             variant="ghost"
             onClick={() => setIsGuideOpen((v) => !v)}
             aria-expanded={isGuideOpen}
-            className={`text-[11px] px-2 ${isGuideOpen ? 'bg-[#f0eded] text-[#000000]' : ''}`}
+            className={`text-[11px] px-2 ${isGuideOpen ? 'bg-sunken-2 text-ink-strong' : ''}`}
             icon={
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -229,22 +249,22 @@ export function AppHeader({
           </Button>
           {isGuideOpen && (
             <div
-              className="absolute right-0 top-[calc(100%+6px)] w-[280px] bg-[#ffffff] border border-[#c3c6d6] rounded-[2px] p-3 z-50"
+              className="absolute right-0 top-[calc(100%+6px)] w-[280px] bg-panel border border-rule-strong rounded-[2px] p-3 z-50"
               role="dialog"
               aria-label="Canvas guide"
               data-testid="guide-popover"
             >
-              <p className="font-serif text-[13px] leading-[19px] text-[#404040] m-0 mb-3">
+              <p className="font-serif text-[13px] leading-[19px] text-ink-read m-0 mb-3">
                 Hover an idea to add a connected idea, edit or collapse it. Drag from a dot on any side of a card to any side of another card (or drop on the card itself) to connect them. A card can have as many connectors as you like.
               </p>
-              <p className="font-serif text-[13px] leading-[19px] text-[#404040] m-0 mb-3">
+              <p className="font-serif text-[13px] leading-[19px] text-ink-read m-0 mb-3">
                 Click a connector to select it, then press Delete or use its ✕ button to remove it. With a connector selected, drag either end to re-attach it (dropped on empty canvas, it goes back). A side you pick stays put; double-click a connector to let it follow the facing sides again. A dashed connector leads to a Question.
               </p>
               <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
                 {GUIDE_ITEMS.map((item) => (
                   <li key={item.label} className="flex items-center justify-between gap-3">
-                    <span className="font-serif text-[13px] text-[#1b1c1c]">{item.label}</span>
-                    <span className="flex items-center gap-1 shrink-0">
+                    <span className="font-serif text-[13px] text-ink">{item.label}</span>
+                    <span className="flex items-center gap-1 shrink-0 capitalize">
                       {item.keys.map((k) => (
                         <Kbd key={k}>{k}</Kbd>
                       ))}
@@ -262,9 +282,9 @@ export function AppHeader({
           onClick={onAddNode}
           disabled={addNodeDisabled}
           title={addNodeHint}
-          className="text-[11px] px-3"
+          className="h-9 px-4 text-[9.5px] uppercase"
           icon={
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -276,15 +296,14 @@ export function AppHeader({
 
         {onToggleInspector && (
           <>
-            <div className="h-4 w-px bg-[#ebebeb]" />
+            <div className="h-4 w-px bg-rule" />
             <button
               type="button"
               onClick={onToggleInspector}
-              className={`w-7 h-7 inline-flex items-center justify-center rounded-[2px] transition-colors cursor-pointer ${
-                isInspectorOpen
-                  ? 'text-[#000000] bg-[#f0eded]'
-                  : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
-              }`}
+              className={`w-7 h-7 inline-flex items-center justify-center rounded-[2px] transition-colors cursor-pointer ${isInspectorOpen
+                ? 'text-ink-strong bg-sunken-2'
+                : 'text-muted hover:text-ink-strong hover:bg-sunken'
+                }`}
               title={isInspectorOpen ? 'Hide inspector' : 'Show inspector'}
               aria-label={isInspectorOpen ? 'Hide inspector' : 'Show inspector'}
               aria-expanded={isInspectorOpen}

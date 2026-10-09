@@ -1,13 +1,14 @@
 /**
- * `CollapseBadge` — the small pill rendered on a collapsed `NodeCard`.
+ * `CollapseBadge` — the small pill rendered on a card that hides some of
+ * what hangs from it: collapsed, or revealing its connected ideas one at a
+ * time.
  *
- * The badge shows the count of ideas hidden by collapsing the node
- * (those that hang only from it), computed via `descendantCount(canvas, id)` (Requirement 6.5
- * and design.md §Node UI Layer). It is only rendered when
- * `node.collapsed === true`; the parent `NodeCard` decides visibility.
+ * The badge shows how many of the ideas that hang only from the node are
+ * hidden right now (`hiddenDescendantCount`, Requirement 6.5). Clicking it
+ * shows every connected idea. The parent `NodeCard` decides visibility.
  */
 
-import { canvasActions, descendantCount, useCanvasStore } from '../data';
+import { canvasActions, hiddenDescendantCount, useCanvasStore } from '../data';
 import type { UUID } from '../data';
 
 import { BranchIcon } from './icons';
@@ -17,7 +18,7 @@ export interface CollapseBadgeProps {
 }
 
 export function CollapseBadge({ nodeId }: CollapseBadgeProps): JSX.Element {
-  const count = useCanvasStore((s) => descendantCount(s.canvas, nodeId));
+  const count = useCanvasStore((s) => hiddenDescendantCount(s.canvas, nodeId));
   return (
     <button
       type="button"
@@ -25,11 +26,11 @@ export function CollapseBadge({ nodeId }: CollapseBadgeProps): JSX.Element {
         e.stopPropagation();
         canvasActions.setCollapsed(nodeId, false);
       }}
-      className="inline-flex items-center gap-1 font-mono text-[9px] font-medium leading-[12px] px-1.5 py-0.5 rounded-[2px] select-none hover:bg-[#eae8e7] hover:border-[#1b1c1c] transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1 font-mono text-[9px] font-medium leading-[12px] px-1.5 py-0.5 rounded-[2px] select-none hover:bg-sunken-2 hover:border-ink transition-colors cursor-pointer"
       style={{
-        border: '1px solid #c3c6d6',
-        background: '#f5f3f3',
-        color: '#1b1c1c',
+        border: '1px solid rgb(var(--rule-strong))',
+        background: 'rgb(var(--sunken))',
+        color: 'rgb(var(--ink))',
         boxShadow: 'none',
       }}
       title="Click to expand"

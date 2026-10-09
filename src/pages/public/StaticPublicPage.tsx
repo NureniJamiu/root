@@ -11,12 +11,12 @@ export function StaticPublicPage({ title, subtitle }: StaticPublicPageProps): JS
   const { navigate } = useRouter();
 
   return (
-    <div className="min-h-screen bg-[#fbf9f8] flex flex-col text-[#1b1c1c]">
+    <div className="min-h-screen bg-paper flex flex-col text-ink">
       <PublicHeader />
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 max-w-2xl mx-auto text-center">
-        <h1 className="text-3xl font-serif text-[#1b1c1c] mb-4">{title}</h1>
-        <p className="text-[#434653] font-serif mb-8">{subtitle}</p>
+        <h1 className="text-3xl font-serif text-ink mb-4">{title}</h1>
+        <p className="text-ink-2 font-serif mb-8">{subtitle}</p>
 
         <Button
           variant="secondary"

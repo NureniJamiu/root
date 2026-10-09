@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:full": "concurrently \"npm run dev\" \"npm run auth-server\"",
+    "dev:full": "concurrently \"npm run dev\" \"npm run auth-server:watch\"",
     "auth-server": "npx tsx --env-file=.env server.ts",
+    "auth-server:watch": "npx tsx watch --env-file=.env server.ts",
     "auth:migrate": "npx tsx migrate.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

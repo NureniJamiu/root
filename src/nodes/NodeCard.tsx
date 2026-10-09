@@ -26,7 +26,7 @@ import { Fragment, memo } from 'react';
 import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
-import { formatNodeLabel, nodeOrdinal, useCanvasStore } from '../data';
+import { formatNodeLabel, hasHiddenChildren, hiddenDescendantCount, nodeOrdinal, useCanvasStore } from '../data';
 import type { Node, Side, UUID } from '../data';
 
 import { CollapseBadge } from './CollapseBadge';
@@ -60,6 +60,10 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
     (s) => s.canvas.edges.reduce((n, e) => (e.source === data.nodeId || e.target === data.nodeId ? n + 1 : n), 0),
   );
   const ordinal = useCanvasStore((s) => nodeOrdinal(s.canvas, data.nodeId));
+  // Collapsed, or partway through revealing its connected ideas one at a time.
+  const showsHiddenBadge = useCanvasStore(
+    (s) => hasHiddenChildren(s.canvas, data.nodeId) && hiddenDescendantCount(s.canvas, data.nodeId) > 0,
+  );
 
   // Transiently deleted node guard
   if (node === undefined) return null;
@@ -77,19 +81,19 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
   // Top accent bar color: always the idea's type, so selection is carried by the border alone
   const topAccentColor =
     node.type === 'topic'
-      ? '#0051c3'
+      ? 'rgb(var(--topic))'
       : node.type === 'finding'
-      ? '#2d7a4c'
+      ? 'rgb(var(--finding))'
       : node.type === 'question'
-      ? '#de5052'
-      : '#521010';
+      ? 'rgb(var(--question))'
+      : 'rgb(var(--conclusion))';
 
   return (
     <div
       className="group relative transition-shadow duration-150"
       style={{
         border: `${borderWidth}px solid ${borderColor}`,
-        background: '#ffffff',
+        background: 'rgb(var(--panel))',
         color: style.text,
         borderRadius: 2,
         boxShadow: 'none',
@@ -103,14 +107,18 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
       data-node-type={node.type}
       data-selected={selected ? 'true' : 'false'}
     >
+      {/* Actions float above the top-right corner on hover (hidden while dragging,
+          where the drag badge takes that spot). */}
+      {!isDragging && <HoverToolbar node={node} />}
+
       {/* Real-time dragging coordinate delta badge */}
       {isDragging && (
         <div
           className="absolute -top-7 right-0 z-30 font-mono text-[9px] px-2 py-0.5 rounded-[2px] flex items-center gap-2 pointer-events-none whitespace-nowrap"
           style={{
-            background: '#002566',
-            color: '#ffffff',
-            border: '1px solid #0051c3',
+            background: 'rgb(var(--accent-deep))',
+            color: 'rgb(var(--on-accent))',
+            border: '1px solid rgb(var(--topic))',
           }}
         >
           <span>
@@ -142,7 +150,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
 
         {/* Image / Asset preview */}
         {node.images.length > 0 && (
-          <div className="relative w-full h-[115px] bg-[#000000] rounded-[2px] overflow-hidden border border-[#ebebeb] flex items-center justify-center my-0.5">
+          <div className="relative w-full h-[115px] bg-black rounded-[2px] overflow-hidden border border-rule flex items-center justify-center my-0.5">
             <img
               src={node.images[0]?.dataUrl}
               alt="Attached Visual"
@@ -155,9 +163,9 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         )}
 
         {/* Card Footer: Metadata, Branch Stats, and Clean Collapsed Badge */}
-        <div className="flex items-center justify-between pt-1.5 border-t border-[#ebebeb] font-mono text-[9px] text-[#737785] tracking-wide select-none">
+        <div className="flex items-center justify-between pt-1.5 border-t border-rule font-mono text-[9px] text-muted tracking-wide select-none">
           <span>{shortId}</span>
-          {node.collapsed ? (
+          {node.collapsed || showsHiddenBadge ? (
             <CollapseBadge nodeId={node.id} />
           ) : (
             <span>
@@ -224,12 +232,11 @@ interface HeaderProps {
 function Header({ node, isConclusion }: HeaderProps): JSX.Element {
   return (
     <div className="flex flex-col gap-1.5">
-      {/* Upper metadata row: Type Pill, Status Pill & Actions */}
+      {/* Upper metadata row: Type Pill */}
       <div className="flex flex-row items-center justify-between gap-1">
         <div className="flex items-center gap-1.5">
           <TypeBadge type={node.type} />
         </div>
-        <HoverToolbar node={node} />
       </div>
 
       {/* Title */}
@@ -239,7 +246,7 @@ function Header({ node, isConclusion }: HeaderProps): JSX.Element {
         style={{
           fontSize: '16.5px',
           fontWeight: 500,
-          color: '#000000',
+          color: 'rgb(var(--ink-strong))',
           letterSpacing: '-0.01em',
           wordBreak: 'break-word',
         }}
@@ -261,27 +268,27 @@ function Header({ node, isConclusion }: HeaderProps): JSX.Element {
 const BADGE_CONFIG = {
   topic: {
     label: 'TOPIC',
-    border: '#0051c3',
-    bg: 'rgba(0, 81, 195, 0.08)',
-    color: '#0051c3',
+    border: 'rgb(var(--topic))',
+    bg: 'rgb(var(--topic) / 0.08)',
+    color: 'rgb(var(--topic))',
   },
   finding: {
     label: 'FINDING',
-    border: '#2d7a4c',
-    bg: 'rgba(45, 122, 76, 0.1)',
-    color: '#2d7a4c',
+    border: 'rgb(var(--finding))',
+    bg: 'rgb(var(--finding) / 0.1)',
+    color: 'rgb(var(--finding))',
   },
   question: {
     label: 'QUESTION',
-    border: '#de5052',
-    bg: 'rgba(222, 80, 82, 0.08)',
-    color: '#de5052',
+    border: 'rgb(var(--question))',
+    bg: 'rgb(var(--question) / 0.08)',
+    color: 'rgb(var(--question))',
   },
   conclusion: {
     label: 'CONCLUSION',
-    border: '#521010',
-    bg: 'rgba(82, 16, 16, 0.08)',
-    color: '#521010',
+    border: 'rgb(var(--conclusion))',
+    bg: 'rgb(var(--conclusion) / 0.08)',
+    color: 'rgb(var(--conclusion))',
   },
 } as const;
 
@@ -333,7 +340,7 @@ function BodyPreview({ body, isConclusion }: BodyPreviewProps): JSX.Element | nu
       data-testid="node-body-preview"
       style={{
         fontSize: '13px',
-        color: '#404040',
+        color: 'rgb(var(--ink-read))',
         // Clamp to three lines at a word boundary instead of cutting mid-word.
         display: '-webkit-box',
         WebkitLineClamp: 3,

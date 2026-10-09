@@ -5,46 +5,50 @@
  * collapsing would make a branch blink out. This hook compares what is on
  * screen now with the previous render and:
  *
- *   - marks ideas that just appeared (expand, a walkthrough step, undo) with
- *     `node-entering`, plus the offset back to the idea they hang from, so the
- *     card grows out of its parent into place;
- *   - keeps ideas that were just hidden (collapse, walkthrough Back) on screen
- *     for one short exit animation, marked `node-leaving`, sliding back into
- *     their parent while their connectors fade.
+ *   - glides ideas that just appeared (expand, a reveal, a walkthrough step,
+ *     undo) out from the idea they hang from into place, fading in;
+ *   - keeps ideas that were just hidden on screen for one short exit, gliding
+ *     back into their parent while fading out.
  *
- * React Flow measures a card's connection dots when it first renders, which
- * is mid-animation for an entering card, so they are measured again once
- * the card has landed.
+ * Card and connector move as one: the card's real position is animated
+ * frame by frame, so React Flow redraws its connectors attached to it on
+ * every frame, and the connector's opacity follows the same clock as the
+ * card's. Nothing lags behind.
  *
  * Opening a project, and users who ask for reduced motion, get no animation.
- * The animations themselves live in `app/index.css`.
  */
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
-import { useUpdateNodeInternals } from 'reactflow';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Edge as RFEdge, Node as RFNode } from 'reactflow';
 
 import type { Canvas, Position, UUID } from '../data';
 
-export const ENTER_MS = 420;
-export const LEAVE_MS = 240;
+import type { ConnectorEdgeData } from './ConnectorEdge';
 
-interface Motion {
-  /** Ideas animating in, with the offset from their final spot to their parent. */
-  readonly entering: ReadonlyMap<UUID, Position>;
-  readonly enteringEdges: ReadonlySet<string>;
-  /** Ideas animating out (no longer shown), with the offset to their parent. */
-  readonly leaving: ReadonlyMap<UUID, { node: RFNode; offset: Position }>;
-  readonly leavingEdges: readonly RFEdge[];
+export const ENTER_MS = 380;
+export const LEAVE_MS = 260;
+
+const easeOut = (t: number): number => 1 - (1 - t) ** 3;
+const easeIn = (t: number): number => t ** 3;
+
+interface Flight {
+  readonly kind: 'enter' | 'leave';
+  readonly from: Position;
+  readonly to: Position;
+  readonly start: number;
+  /** For a leaving idea, the last node React Flow was given for it. */
+  readonly node?: RFNode;
 }
 
-const still: Motion = {
-  entering: new Map(),
-  enteringEdges: new Set(),
-  leaving: new Map(),
-  leavingEdges: [],
-};
+interface Motion {
+  readonly flights: ReadonlyMap<UUID, Flight>;
+  /** Connectors of a leaving idea, kept until it has gone. */
+  readonly leavingEdges: ReadonlyMap<string, { edge: RFEdge; start: number }>;
+  /** Connectors that just appeared between ideas that were already shown. */
+  readonly fadingInEdges: ReadonlyMap<string, number>;
+}
+
+const still: Motion = { flights: new Map(), leavingEdges: new Map(), fadingInEdges: new Map() };
 
 interface Snapshot {
   readonly canvasId: string;
@@ -56,37 +60,39 @@ function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 }
 
-/** Offset from `id` to the shown idea it hangs from, scaled down a little. */
-function offsetToParent(canvas: Canvas, id: UUID, shown: (id: UUID) => boolean): Position {
-  const pos = new Map(canvas.nodes.map((n) => [n.id, n.position]));
-  const self = pos.get(id);
-  const parentEdge = canvas.edges.find((e) => e.target === id && shown(e.source));
-  const parent = parentEdge ? pos.get(parentEdge.source) : undefined;
-  if (!self || !parent) return { x: 0, y: 0 };
-  return { x: Math.round((parent.x - self.x) * 0.85), y: Math.round((parent.y - self.y) * 0.85) };
+const clock = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+/** Where the idea `id` hangs from: the position of a shown idea connected to it. */
+function parentPosition(canvas: Canvas, id: UUID, shown: (id: UUID) => boolean): Position | null {
+  const edge = canvas.edges.find((e) => e.target === id && shown(e.source));
+  if (!edge) return null;
+  return canvas.nodes.find((n) => n.id === edge.source)?.position ?? null;
 }
 
-function withOffset(node: RFNode, className: string, offset: Position): RFNode {
-  return {
-    ...node,
-    className: node.className ? `${node.className} ${className}` : className,
-    style: {
-      ...node.style,
-      '--branch-dx': `${offset.x}px`,
-      '--branch-dy': `${offset.y}px`,
-    } as CSSProperties,
-  };
+function lerp(a: Position, b: Position, t: number): Position {
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+
+/** 0 → 1 progress of a flight at `now`, already eased, plus its opacity. */
+function progress(f: Flight, now: number): { t: number; opacity: number; done: boolean } {
+  const ms = f.kind === 'enter' ? ENTER_MS : LEAVE_MS;
+  const raw = Math.min(1, Math.max(0, (now - f.start) / ms));
+  const t = f.kind === 'enter' ? easeOut(raw) : easeIn(raw);
+  return { t, opacity: f.kind === 'enter' ? t : 1 - t, done: raw >= 1 };
+}
+
+function withOpacity(edge: RFEdge<ConnectorEdgeData>, opacity: number): RFEdge<ConnectorEdgeData> {
+  return { ...edge, data: { ...(edge.data as ConnectorEdgeData), opacity } };
 }
 
 export function useBranchMotion(
   canvas: Canvas,
   nodes: RFNode[],
-  edges: RFEdge[],
-): { nodes: RFNode[]; edges: RFEdge[] } {
+  edges: RFEdge<ConnectorEdgeData>[],
+): { nodes: RFNode[]; edges: RFEdge<ConnectorEdgeData>[] } {
   const [motion, setMotion] = useState<Motion>(still);
+  const [now, setNow] = useState(clock);
   const previous = useRef<Snapshot | null>(null);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const updateNodeInternals = useUpdateNodeInternals();
 
   useLayoutEffect(() => {
     const prev = previous.current;
@@ -94,76 +100,95 @@ export function useBranchMotion(
     previous.current = { canvasId: canvas.id, nodes: shownNow, edges };
     if (prev === null || prev.canvasId !== canvas.id || prefersReducedMotion()) return;
 
+    const start = clock();
     const exists = new Set(canvas.nodes.map((n) => n.id));
-    const entering = new Map<UUID, Position>();
-    for (const id of shownNow.keys()) {
-      if (!prev.nodes.has(id)) entering.set(id, offsetToParent(canvas, id, (p) => shownNow.has(p)));
+    const flights = new Map<UUID, Flight>();
+    for (const [id, node] of shownNow) {
+      if (prev.nodes.has(id)) continue;
+      const from = parentPosition(canvas, id, (p) => shownNow.has(p) && p !== id) ?? node.position;
+      flights.set(id, { kind: 'enter', from, to: node.position, start });
     }
-    const leaving = new Map<UUID, { node: RFNode; offset: Position }>();
     for (const [id, node] of prev.nodes) {
       // Hidden, not deleted: deleted ideas just go.
       if (shownNow.has(id) || !exists.has(id)) continue;
-      leaving.set(id, { node, offset: offsetToParent(canvas, id, (p) => shownNow.has(p)) });
+      const to = parentPosition(canvas, id, (p) => shownNow.has(p)) ?? node.position;
+      flights.set(id, { kind: 'leave', from: node.position, to, start, node });
     }
-    if (entering.size === 0 && leaving.size === 0) return;
 
     const prevEdgeIds = new Set(prev.edges.map((e) => e.id));
     const edgeIds = new Set(edges.map((e) => e.id));
-    const enteringEdges = new Set(edges.filter((e) => !prevEdgeIds.has(e.id)).map((e) => e.id));
-    const leavingEdges = prev.edges.filter(
-      (e) => !edgeIds.has(e.id) && (leaving.has(e.source) || leaving.has(e.target)) &&
-        (shownNow.has(e.source) || leaving.has(e.source)) && (shownNow.has(e.target) || leaving.has(e.target)),
-    );
+    const leavingEdges = new Map<string, { edge: RFEdge; start: number }>();
+    for (const e of prev.edges) {
+      if (edgeIds.has(e.id)) continue;
+      const leavingEnd = flights.get(e.source)?.kind === 'leave' || flights.get(e.target)?.kind === 'leave';
+      const endsKept = (id: UUID) => shownNow.has(id) || flights.get(id)?.kind === 'leave';
+      if (leavingEnd && endsKept(e.source) && endsKept(e.target)) leavingEdges.set(e.id, { edge: e, start });
+    }
+    // Connectors whose ends were both already on screen (a new connection, undo).
+    const fadingInEdges = new Map<string, number>();
+    for (const e of edges) {
+      if (prevEdgeIds.has(e.id) || flights.has(e.source) || flights.has(e.target)) continue;
+      fadingInEdges.set(e.id, start);
+    }
+    if (flights.size === 0 && fadingInEdges.size === 0) return;
 
     setMotion((m) => ({
-      entering: new Map([...m.entering, ...entering]),
-      enteringEdges: new Set([...m.enteringEdges, ...enteringEdges]),
-      leaving: new Map([...[...m.leaving].filter(([id]) => !shownNow.has(id)), ...leaving]),
-      leavingEdges: [...m.leavingEdges.filter((e) => !edgeIds.has(e.id)), ...leavingEdges],
+      flights: new Map([...[...m.flights].filter(([id]) => !flights.has(id)), ...flights]),
+      leavingEdges: new Map([...[...m.leavingEdges].filter(([id]) => !edgeIds.has(id)), ...leavingEdges]),
+      fadingInEdges: new Map([...m.fadingInEdges, ...fadingInEdges]),
     }));
+    setNow(start);
+  }, [canvas, nodes, edges]);
 
-    const settle = (ms: number, apply: (m: Motion) => Motion) => {
-      timers.current.push(setTimeout(() => setMotion(apply), ms));
+  // One clock for every card and connector in flight.
+  const active = motion.flights.size > 0 || motion.fadingInEdges.size > 0;
+  useEffect(() => {
+    if (!active) return;
+    let frame = 0;
+    const tick = () => {
+      const t = clock();
+      setNow(t);
+      setMotion((m) => {
+        const flights = new Map([...m.flights].filter(([, f]) => !progress(f, t).done));
+        const leavingEdges = new Map([...m.leavingEdges].filter(([, e]) => t - e.start < LEAVE_MS));
+        const fadingInEdges = new Map([...m.fadingInEdges].filter(([, s]) => t - s < ENTER_MS));
+        const changed =
+          flights.size !== m.flights.size ||
+          leavingEdges.size !== m.leavingEdges.size ||
+          fadingInEdges.size !== m.fadingInEdges.size;
+        return changed ? { flights, leavingEdges, fadingInEdges } : m;
+      });
+      frame = requestAnimationFrame(tick);
     };
-    if (entering.size > 0 || enteringEdges.size > 0) {
-      settle(ENTER_MS + 40, (m) => ({
-        ...m,
-        entering: new Map([...m.entering].filter(([id]) => !entering.has(id))),
-        enteringEdges: new Set([...m.enteringEdges].filter((id) => !enteringEdges.has(id))),
-      }));
-      // Re-measure the connection dots now that the cards sit in place.
-      timers.current.push(setTimeout(() => updateNodeInternals([...entering.keys()]), ENTER_MS + 60));
-    }
-    if (leaving.size > 0) {
-      const leavingEdgeIds = new Set(leavingEdges.map((e) => e.id));
-      settle(LEAVE_MS + 20, (m) => ({
-        ...m,
-        leaving: new Map([...m.leaving].filter(([id]) => !leaving.has(id))),
-        leavingEdges: m.leavingEdges.filter((e) => !leavingEdgeIds.has(e.id)),
-      }));
-    }
-  }, [canvas, nodes, edges, updateNodeInternals]);
-
-  useLayoutEffect(() => {
-    const pending = timers.current;
-    return () => pending.forEach(clearTimeout);
-  }, []);
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [active]);
 
   return useMemo(() => {
-    const idle =
-      motion.entering.size === 0 &&
-      motion.enteringEdges.size === 0 &&
-      motion.leaving.size === 0 &&
-      motion.leavingEdges.length === 0;
-    if (idle) return { nodes, edges };
+    if (!active && motion.leavingEdges.size === 0) return { nodes, edges };
+
+    const opacityOf = new Map<UUID, number>();
     const outNodes = nodes.map((n) => {
-      const offset = motion.entering.get(n.id);
-      return offset ? withOffset(n, 'node-entering', offset) : n;
+      const f = motion.flights.get(n.id);
+      if (!f || f.kind !== 'enter') return n;
+      const p = progress(f, now);
+      opacityOf.set(n.id, p.opacity);
+      return {
+        ...n,
+        position: lerp(f.from, f.to, p.t),
+        className: n.className ? `${n.className} node-in-flight` : 'node-in-flight',
+        style: { ...n.style, opacity: p.opacity },
+      };
     });
-    for (const [id, { node, offset }] of motion.leaving) {
-      if (nodes.some((n) => n.id === id)) continue;
+    for (const [id, f] of motion.flights) {
+      if (f.kind !== 'leave' || !f.node || nodes.some((n) => n.id === id)) continue;
+      const p = progress(f, now);
+      opacityOf.set(id, p.opacity);
       outNodes.push({
-        ...withOffset(node, 'node-leaving', offset),
+        ...f.node,
+        position: lerp(f.from, f.to, p.t),
+        className: f.node.className ? `${f.node.className} node-in-flight` : 'node-in-flight',
+        style: { ...f.node.style, opacity: p.opacity },
         selected: false,
         draggable: false,
         selectable: false,
@@ -171,13 +196,30 @@ export function useBranchMotion(
         focusable: false,
       });
     }
-    const outEdges = edges.map((e) =>
-      motion.enteringEdges.has(e.id) ? { ...e, className: `${e.className ?? ''} edge-entering`.trim() } : e,
-    );
-    for (const e of motion.leavingEdges) {
-      if (edges.some((x) => x.id === e.id)) continue;
-      outEdges.push({ ...e, className: `${e.className ?? ''} edge-leaving`.trim(), selected: false, reconnectable: false });
+
+    // A connector is exactly as faded as the card in flight at either end.
+    const edgeOpacity = (e: RFEdge): number | undefined => {
+      const a = opacityOf.get(e.source);
+      const b = opacityOf.get(e.target);
+      if (a === undefined && b === undefined) return undefined;
+      return Math.min(a ?? 1, b ?? 1);
+    };
+    const outEdges = edges.map((e) => {
+      const fromCard = edgeOpacity(e);
+      if (fromCard !== undefined) return withOpacity(e, fromCard);
+      const fadeStart = motion.fadingInEdges.get(e.id);
+      if (fadeStart !== undefined) return withOpacity(e, easeOut(Math.min(1, (now - fadeStart) / ENTER_MS)));
+      return e;
+    });
+    for (const [id, { edge }] of motion.leavingEdges) {
+      if (edges.some((x) => x.id === id)) continue;
+      outEdges.push({
+        ...withOpacity(edge as RFEdge<ConnectorEdgeData>, edgeOpacity(edge) ?? 0),
+        selected: false,
+        reconnectable: false,
+        className: `${edge.className ?? ''} edge-in-flight`.trim(),
+      });
     }
     return { nodes: outNodes, edges: outEdges };
-  }, [motion, nodes, edges]);
+  }, [active, motion, nodes, edges, now]);
 }

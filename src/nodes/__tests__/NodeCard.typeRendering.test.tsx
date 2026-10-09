@@ -96,24 +96,6 @@ function makeProps(nodeId: string, selected = false) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Color helpers                                                              */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Convert a 6-digit hex color string (e.g. `"#0051c3"`) to the
- * `"rgb(r, g, b)"` format that jsdom uses when reading back `style.borderColor`.
- * jsdom always normalises inline hex color values to rgb, so we must compare
- * against the rgb form rather than the hex literal.
- */
-function hexToRgb(hex: string): string {
-  const clean = hex.replace('#', '');
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-/* -------------------------------------------------------------------------- */
 /* Tests                                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -148,14 +130,9 @@ describe('NodeCard — type rendering', () => {
 
       const card = screen.getByTestId(`node-card-${nodeId}`);
 
-      // NodeCard sets the border as a full shorthand: "1px solid #xxxxxx".
-      // jsdom normalises hex color values in inline styles to the rgb(r, g, b)
-      // form, so `card.style.borderColor` will be "rgb(…)" rather than the
-      // original hex. Convert the expected hex to rgb before comparing.
-      const expectedHex = typeStyles[type].border;
-      const expectedRgb = hexToRgb(expectedHex);
-
-      expect(card.style.borderColor).toBe(expectedRgb);
+      // NodeCard sets the border as a full shorthand ("1px solid <colour>"),
+      // where the colour is a theme token such as `rgb(var(--topic))`.
+      expect(card.style.border).toContain(typeStyles[type].border);
     });
   }
 });

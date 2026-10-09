@@ -62,6 +62,12 @@ import { NODE_HEIGHT, computeTreeLayout, findFreePosition } from './placement';
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 2.5;
 
+/**
+ * Fitting the view never zooms in past 100%: one or two cards would
+ * otherwise fill the screen at 250% and push new ideas out of sight.
+ */
+const FIT_VIEW_OPTIONS = { duration: 200, padding: 0.25, maxZoom: 1 } as const;
+
 /** Grid used while Shift is held. */
 const SNAP_GRID: [number, number] = [20, 20];
 
@@ -174,7 +180,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, [reactFlow]);
 
   const handleFitView = useCallback(() => {
-    reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+    reactFlow?.fitView?.(FIT_VIEW_OPTIONS);
   }, [reactFlow]);
 
   const handleCenterSelected = useCallback(() => {
@@ -188,7 +194,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
         { duration: 200, zoom: 1 },
       );
     } else {
-      reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+      reactFlow?.fitView?.(FIT_VIEW_OPTIONS);
     }
   }, [reactFlow]);
 
@@ -558,7 +564,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     const current = useCanvasStore.getState().canvas;
     canvasActions.applyCanvas(computeTreeLayout(current, getMeasuredSizes()));
     setTimeout(() => {
-      reactFlow?.fitView?.({ duration: 200, padding: 0.25 });
+      reactFlow?.fitView?.(FIT_VIEW_OPTIONS);
     }, 50);
   }, [reactFlow]);
 
@@ -705,7 +711,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       style={{
         width: '100%',
         height: '100%',
-        background: '#f9f9fb',
+        background: 'rgb(var(--canvas))',
       }}
       data-testid="canvas-view"
       data-min-zoom={MIN_ZOOM}
@@ -769,20 +775,20 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
           proOptions={{ hideAttribution: true }}
         >
           {/* Two dot layers: a fine grid and a sparser, stronger one every 100px. */}
-          <Background id="minor" variant={BackgroundVariant.Dots} gap={20} size={1.6} color="#b4b9cb" />
-          <Background id="major" variant={BackgroundVariant.Dots} gap={100} size={2.6} color="#9299b3" />
+          <Background id="minor" variant={BackgroundVariant.Dots} gap={20} size={1.6} color="rgb(var(--dot))" />
+          <Background id="major" variant={BackgroundVariant.Dots} gap={100} size={2.6} color="rgb(var(--dot-major))" />
         </ReactFlow>
 
         <WalkthroughBar onRevealed={handleRevealed} />
 
         {/* Canvas toolbar — the single home for viewport controls */}
         <div
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-[#ffffff] border border-[#ebebeb] rounded-[2px] p-1"
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-panel border border-rule rounded-[2px] p-1"
           role="toolbar"
           aria-label="Canvas controls"
           data-testid="canvas-hud"
         >
-          <div className="flex items-center gap-0.5 bg-[#f5f3f3] rounded-[2px] p-0.5" role="group" aria-label="Interaction mode">
+          <div className="flex items-center gap-0.5 bg-sunken rounded-[2px] p-0.5" role="group" aria-label="Interaction mode">
             <ToolbarModeButton
               label="Select & edit"
               isActive={!isPanActive}
@@ -816,7 +822,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
           <button
             type="button"
             onClick={handleResetZoom}
-            className="h-7 min-w-[48px] px-1 font-mono text-[10.5px] text-[#1b1c1c] rounded-[2px] hover:bg-[#f5f3f3] transition-colors cursor-pointer tabular-nums"
+            className="h-7 min-w-[48px] px-1 font-mono text-[10.5px] text-ink rounded-[2px] hover:bg-sunken transition-colors cursor-pointer tabular-nums"
             title="Reset zoom to 100%"
             data-testid="zoom-percent"
           >
@@ -878,7 +884,7 @@ function ToolbarIconButton({ label, onClick, testId, children }: ToolbarButtonBa
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="w-7 h-7 inline-flex items-center justify-center rounded-[2px] text-[#404040] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
+      className="w-7 h-7 inline-flex items-center justify-center rounded-[2px] text-ink-read hover:text-ink-strong hover:bg-sunken transition-colors cursor-pointer"
       data-testid={testId}
     >
       {children}
@@ -902,8 +908,8 @@ function ToolbarModeButton({
       title={label}
       className={`w-7 h-6 inline-flex items-center justify-center rounded-[2px] border transition-colors cursor-pointer ${
         isActive
-          ? 'bg-[#ffffff] text-[#000000] border-[#ebebeb]'
-          : 'border-transparent text-[#737785] hover:text-[#000000]'
+          ? 'bg-panel text-ink-strong border-rule'
+          : 'border-transparent text-muted hover:text-ink-strong'
       }`}
       data-testid={testId}
     >
@@ -913,7 +919,7 @@ function ToolbarModeButton({
 }
 
 function ToolbarDivider(): JSX.Element {
-  return <div className="w-px h-4 bg-[#ebebeb] mx-1" aria-hidden="true" />;
+  return <div className="w-px h-4 bg-rule mx-1" aria-hidden="true" />;
 }
 
 /**

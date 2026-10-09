@@ -35,7 +35,7 @@ export function RegisterPage(): JSX.Element {
     <AuthLayout title="Create Account" subtitle="Start organizing your ideas and creative projects">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block text-xs font-mono uppercase text-[#737785] mb-1.5">
+          <label className="block text-xs font-mono uppercase text-muted mb-1.5">
             Full Name
           </label>
           <input
@@ -43,12 +43,12 @@ export function RegisterPage(): JSX.Element {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Alex Morgan"
-            className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
+            className="w-full text-sm bg-panel text-ink placeholder:text-faint border border-rule-2 px-3 py-2 rounded-sm focus:border-ink-strong outline-none font-sans"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-mono uppercase text-[#737785] mb-1.5">
+          <label className="block text-xs font-mono uppercase text-muted mb-1.5">
             Email Address
           </label>
           <input
@@ -56,12 +56,12 @@ export function RegisterPage(): JSX.Element {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
+            className="w-full text-sm bg-panel text-ink placeholder:text-faint border border-rule-2 px-3 py-2 rounded-sm focus:border-ink-strong outline-none font-sans"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-mono uppercase text-[#737785] mb-1.5">
+          <label className="block text-xs font-mono uppercase text-muted mb-1.5">
             Password
           </label>
           <input
@@ -69,12 +69,12 @@ export function RegisterPage(): JSX.Element {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
+            className="w-full text-sm bg-panel text-ink placeholder:text-faint border border-rule-2 px-3 py-2 rounded-sm focus:border-ink-strong outline-none font-sans"
           />
         </div>
 
         {error && (
-          <p className="text-xs text-red-600 font-mono">{error}</p>
+          <p className="text-xs text-danger font-mono">{error}</p>
         )}
 
         <Button
@@ -86,12 +86,12 @@ export function RegisterPage(): JSX.Element {
           Create Account
         </Button>
 
-        <div className="text-center pt-2 border-t border-[#f5f3f3]">
-          <span className="text-xs text-[#737785]">Already registered? </span>
+        <div className="text-center pt-2 border-t border-sunken">
+          <span className="text-xs text-muted">Already registered? </span>
           <button
             type="button"
             onClick={() => navigate('/auth/login')}
-            className="text-xs font-mono text-[#0051c3] hover:underline ml-1"
+            className="text-xs font-mono text-topic hover:underline ml-1"
           >
             Sign in
           </button>

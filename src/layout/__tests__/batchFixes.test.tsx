@@ -52,7 +52,7 @@ describe('Batch Fixes Verification', () => {
     const newProjectBtn = screen.getByTestId('btn-new-project');
     expect(newProjectBtn).toBeInTheDocument();
     // Verify blue background styling
-    expect(newProjectBtn.className).toContain('bg-[#0051c3]');
+    expect(newProjectBtn.className).toContain('bg-accent');
 
     fireEvent.click(newProjectBtn);
     expect(handleNewProject).toHaveBeenCalledTimes(1);
@@ -137,7 +137,7 @@ describe('Batch Fixes Verification', () => {
     fireEvent.click(screen.getByTestId('btn-toggle-inspector'));
     expect(onToggleInspector).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTestId('filter-question'));
+    fireEvent.change(screen.getByTestId('type-filter-select'), { target: { value: 'question' } });
     expect(onSelectTypeFilter).toHaveBeenCalledWith('question');
 
     fireEvent.click(screen.getByTestId('btn-add-idea'));

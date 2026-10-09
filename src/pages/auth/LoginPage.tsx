@@ -27,7 +27,7 @@ export function LoginPage(): JSX.Element {
     <AuthLayout title="Sign In" subtitle="Sign in to access your projects and ideas">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
-          <label className="block text-xs font-mono uppercase text-[#737785] mb-1.5">
+          <label className="block text-xs font-mono uppercase text-muted mb-1.5">
             Email Address
           </label>
           <input
@@ -35,17 +35,17 @@ export function LoginPage(): JSX.Element {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
+            className="w-full text-sm bg-panel text-ink placeholder:text-faint border border-rule-2 px-3 py-2 rounded-sm focus:border-ink-strong outline-none font-sans"
           />
         </div>
 
         <div>
           <div className="flex justify-between items-center mb-1.5">
-            <label className="block text-xs font-mono uppercase text-[#737785]">Password</label>
+            <label className="block text-xs font-mono uppercase text-muted">Password</label>
             <button
               type="button"
               onClick={() => navigate('/auth/forgot-password')}
-              className="text-[11px] font-mono text-[#0051c3] hover:underline"
+              className="text-[11px] font-mono text-topic hover:underline"
             >
               Forgot?
             </button>
@@ -55,12 +55,12 @@ export function LoginPage(): JSX.Element {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full text-sm border border-[#ebebeb] px-3 py-2 rounded-sm focus:border-[#000000] outline-none font-sans"
+            className="w-full text-sm bg-panel text-ink placeholder:text-faint border border-rule-2 px-3 py-2 rounded-sm focus:border-ink-strong outline-none font-sans"
           />
         </div>
 
         {error && (
-          <p className="text-xs text-red-600 font-mono">{error}</p>
+          <p className="text-xs text-danger font-mono">{error}</p>
         )}
 
         <Button
@@ -72,12 +72,12 @@ export function LoginPage(): JSX.Element {
           Sign In
         </Button>
 
-        <div className="text-center pt-2 border-t border-[#f5f3f3]">
-          <span className="text-xs text-[#737785]">Need an account? </span>
+        <div className="text-center pt-2 border-t border-sunken">
+          <span className="text-xs text-muted">Need an account? </span>
           <button
             type="button"
             onClick={() => navigate('/auth/register')}
-            className="text-xs font-mono text-[#0051c3] hover:underline ml-1"
+            className="text-xs font-mono text-topic hover:underline ml-1"
           >
             Create one
           </button>
