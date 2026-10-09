@@ -327,24 +327,22 @@ export function AppShell(): JSX.Element {
     }
   });
 
-  const toggleProjects = useCallback(() => {
-    setIsProjectsOpen((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(UI_PROJECTS_OPEN_KEY, String(next));
-      } catch {}
-      return next;
-    });
+  const setProjectsOpen = useCallback((next: boolean) => {
+    setIsProjectsOpen(next);
+    try {
+      localStorage.setItem(UI_PROJECTS_OPEN_KEY, String(next));
+    } catch {
+      /* preference is best-effort */
+    }
   }, []);
 
-  const toggleInspector = useCallback(() => {
-    setIsInspectorOpen((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(UI_INSPECTOR_OPEN_KEY, String(next));
-      } catch {}
-      return next;
-    });
+  const setInspectorOpen = useCallback((next: boolean) => {
+    setIsInspectorOpen(next);
+    try {
+      localStorage.setItem(UI_INSPECTOR_OPEN_KEY, String(next));
+    } catch {
+      /* preference is best-effort */
+    }
   }, []);
 
   const [isPanActive, setIsPanActive] = useState(false);
@@ -724,46 +722,41 @@ export function AppShell(): JSX.Element {
     }, 0);
   }, []);
 
-  // When a node is selected, ensure the node inspector slides open
+  // Selecting an idea reveals the inspector. Closing it is left to the
+  // header toggle so the pane never disappears out from under the user.
   const handleNodeSelect = useCallback(() => {
-    setIsInspectorOpen(true);
-  }, []);
+    setInspectorOpen(true);
+  }, [setInspectorOpen]);
 
-  // When clicking on empty canvas pane, close the inspector
   const handleCanvasPaneClick = useCallback(() => {
-    setIsInspectorOpen(false);
     canvasActions.select(null);
   }, []);
 
-  // Clicking anywhere outside the canvas (if not on a node or another node) closes the inspector
-  useEffect(() => {
-    function handleGlobalPointerDown(e: MouseEvent) {
-      if (!isInspectorOpen) return;
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
+  const selectedNodeId = useCanvasStore((s) => s.selection.nodeId);
+  const addIdeaParent =
+    canvas.nodes.find((n) => n.id === selectedNodeId) ?? canvas.nodes.find((n) => n.parentId === null);
 
-      // If clicking inside the node inspector rail, keep open
-      if (target.closest('[data-testid="node-inspector-rail"]')) return;
-      // If clicking a node card or interactive element on a node, keep open
-      if (target.closest('.react-flow__node') || target.closest('[data-testid^="node-card-"]')) return;
-      // If clicking buttons that toggle/open inspector or dialogs, keep open
-      if (
-        target.closest('[data-testid="btn-toggle-inspector"]') ||
-        target.closest('[data-testid="btn-open-inspector"]') ||
-        target.closest('[data-testid="node-editor"]') ||
-        target.closest('[data-testid="delete-prompt"]')
-      ) {
-        return;
-      }
-
-      // Otherwise, close inspector pane
-      setIsInspectorOpen(false);
-      canvasActions.select(null);
+  const handleAddIdea = useCallback(() => {
+    if (!addIdeaParent) {
+      handleCreateRoot();
+      return;
     }
+    toolbarCallbacks.onAddChild(addIdeaParent.id);
+  }, [addIdeaParent, handleCreateRoot]);
 
-    window.addEventListener('pointerdown', handleGlobalPointerDown);
-    return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
-  }, [isInspectorOpen]);
+  const navigateTo = useCallback((path: string) => {
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await auth?.signOut();
+    } catch (_err) {
+      /* ignore */
+    }
+    navigateTo('/auth/login');
+  }, [auth, navigateTo]);
 
   // Global shortcut: press 'N' or 'n' to create root node when canvas has no nodes
   useEffect(() => {
@@ -786,7 +779,7 @@ export function AppShell(): JSX.Element {
     <ToolbarCallbacksProvider value={toolbarCallbacks}>
       <div
         id="root-app"
-        className="w-screen h-screen flex flex-col bg-[#f9f9fb] overflow-hidden select-none"
+        className="w-screen h-screen flex bg-[#f9f9fb] overflow-hidden select-none"
         style={{
           width: '100vw',
           height: '100vh',
@@ -794,155 +787,86 @@ export function AppShell(): JSX.Element {
           overflow: 'hidden',
         }}
       >
-        {/* Top App Header */}
-        <AppHeader
-          title={canvas.title || 'Root — Untitled Project'}
-          onTitleChange={(title) => {
-            const currentCanvas = useCanvasStore.getState().canvas;
-            useCanvasStore.setState({ canvas: { ...currentCanvas, title } });
-          }}
-          nodeCount={canvas.nodes.length}
-          branchCount={branchCount}
-          zoomPercent={canvasControls?.zoomPercent ?? 100}
-          onZoomIn={() => canvasControls?.zoomIn()}
-          onZoomOut={() => canvasControls?.zoomOut()}
-          onFitView={() => canvasControls?.fitView()}
-          onCenterRoot={() => canvasControls?.centerRoot()}
-          onAutoLayout={() => canvasControls?.autoLayout?.()}
-          onAddNode={() => {
-            if (canvas.nodes.length === 0) {
-              handleCreateRoot();
-            } else {
-              const root = canvas.nodes[0];
-              if (root) toolbarCallbacks.onAddChild(root.id);
+        {/* Left: Projects sidebar — full height, owns brand + account */}
+        <div
+          className={`h-full transition-[width,opacity] duration-200 ease-out shrink-0 overflow-hidden ${
+            isProjectsOpen ? 'w-[264px] opacity-100' : 'w-0 opacity-0 pointer-events-none'
+          }`}
+          aria-hidden={!isProjectsOpen}
+        >
+          <StructuralIndexRail
+            nodeCount={canvas.nodes.length}
+            isOpen={isProjectsOpen}
+            onClose={() => setProjectsOpen(false)}
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelectProject={handleSelectProject}
+            onNewProject={handleNewProject}
+            onDeleteProject={handleDeleteProject}
+            onNavigateHome={() => navigateTo('/')}
+            user={auth?.user ?? null}
+            onSignOut={handleSignOut}
+          />
+        </div>
+
+        {/* Right: workbench column (header above canvas + inspector) */}
+        <div className="flex-1 min-w-0 h-full flex flex-col">
+          <AppHeader
+            title={canvas.title || 'Untitled Project'}
+            onTitleChange={(title) => {
+              const currentCanvas = useCanvasStore.getState().canvas;
+              useCanvasStore.setState({ canvas: { ...currentCanvas, title } });
+            }}
+            nodeCount={canvas.nodes.length}
+            branchCount={branchCount}
+            onAddNode={handleAddIdea}
+            addNodeHint={
+              addIdeaParent
+                ? `Add a sub-idea under “${addIdeaParent.title || 'Untitled idea'}”`
+                : 'Create your main idea'
             }
-          }}
-          isPanActive={isPanActive}
-          onTogglePan={() => setIsPanActive((prev) => !prev)}
-          isSidebarOpen={isProjectsOpen}
-          onToggleSidebar={toggleProjects}
-          isInspectorOpen={isInspectorOpen}
-          onToggleInspector={toggleInspector}
-          activeTypeFilter={activeTypeFilter}
-          onSelectTypeFilter={setActiveTypeFilter}
-          onNavigateHome={() => {
-            if (typeof window !== 'undefined') {
-              window.history.pushState({}, '', '/');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }
-          }}
-          onSignOut={async () => {
-            try {
-              await auth?.signOut();
-            } catch (_err) {
-              /* ignore */
-            }
-            if (typeof window !== 'undefined') {
-              window.history.pushState({}, '', '/auth/login');
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            }
-          }}
-        />
+            isSidebarOpen={isProjectsOpen}
+            onToggleSidebar={() => setProjectsOpen(!isProjectsOpen)}
+            isInspectorOpen={isInspectorOpen}
+            onToggleInspector={() => setInspectorOpen(!isInspectorOpen)}
+            activeTypeFilter={activeTypeFilter}
+            onSelectTypeFilter={setActiveTypeFilter}
+            onNavigateHome={() => navigateTo('/')}
+          />
 
-        {/* 3-Pane Workbench Body */}
-        <div className="flex-1 w-full flex overflow-hidden relative">
-          {/* Left: Projects Rail (280px) with slide transition */}
-          <div
-            className={`h-full transition-all duration-300 ease-in-out shrink-0 overflow-hidden ${
-              isProjectsOpen
-                ? 'w-[280px] translate-x-0 opacity-100'
-                : 'w-0 -translate-x-full opacity-0 pointer-events-none'
-            }`}
-          >
-            <StructuralIndexRail
-              nodeCount={canvas.nodes.length}
-              isOpen={isProjectsOpen}
-              onClose={() => {
-                setIsProjectsOpen(false);
-                try {
-                  localStorage.setItem(UI_PROJECTS_OPEN_KEY, 'false');
-                } catch {}
-              }}
-              projects={projects}
-              activeProjectId={activeProjectId}
-              onSelectProject={handleSelectProject}
-              onNewProject={handleNewProject}
-              onDeleteProject={handleDeleteProject}
-            />
-          </div>
+          <div className="flex-1 min-h-0 w-full flex overflow-hidden relative">
+            {/* Center: Canvas Viewport */}
+            <div className="flex-1 min-w-0 h-full relative overflow-hidden">
+              <CanvasView
+                onControlsReady={setCanvasControls}
+                onNodeSelect={handleNodeSelect}
+                onPaneClick={handleCanvasPaneClick}
+                onDragChange={setDragInfo}
+                isPanActive={isPanActive}
+                onTogglePan={() => setIsPanActive((prev) => !prev)}
+                highlightType={activeTypeFilter}
+              />
 
-          {/* Center: Canvas Viewport */}
-          <div className="flex-1 h-full relative overflow-hidden">
-            {/* If Projects sidebar is closed, provide a dock toggle button at top-left of canvas */}
-            {!isProjectsOpen && (
-              <button
-                type="button"
-                onClick={() => setIsProjectsOpen(true)}
-                className="absolute top-3 left-3 z-20 p-1.5 bg-[#ffffff] border border-[#ebebeb] hover:border-[#000000] rounded-[2px] shadow-sm text-[#737785] hover:text-[#000000] transition-all cursor-pointer"
-                title="Open Projects Sidebar"
-                aria-label="Open Projects Sidebar"
-                data-testid="btn-open-projects"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M9 3v18" />
-                  <path d="m14 9-3 3 3 3" />
-                </svg>
-              </button>
-            )}
+              {/* Empty Canvas Affordance (R2.1) */}
+              {canvas.nodes.length === 0 && (
+                <EmptyCanvasState onCreateRoot={handleCreateRoot} />
+              )}
+            </div>
 
-            {/* If Node Inspector is closed, provide a dock toggle button at top-right of canvas */}
-            {!isInspectorOpen && (
-              <button
-                type="button"
-                onClick={() => setIsInspectorOpen(true)}
-                className="absolute top-3 right-3 z-20 p-1.5 bg-[#ffffff] border border-[#ebebeb] hover:border-[#000000] rounded-[2px] shadow-sm text-[#737785] hover:text-[#000000] transition-all cursor-pointer"
-                title="Open Node Inspector"
-                aria-label="Open Node Inspector"
-                data-testid="btn-open-inspector"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M15 3v18" />
-                  <path d="m10 15 3-3-3-3" />
-                </svg>
-              </button>
-            )}
-
-            <CanvasView
-              onControlsReady={setCanvasControls}
-              onNodeSelect={handleNodeSelect}
-              onPaneClick={handleCanvasPaneClick}
-              onDragChange={setDragInfo}
-              isPanActive={isPanActive}
-            />
-
-            {/* Empty Canvas Affordance (R2.1) */}
-            {canvas.nodes.length === 0 && (
-              <EmptyCanvasState onCreateRoot={handleCreateRoot} />
-            )}
-          </div>
-
-          {/* Right: Node Inspector Rail (360px) with slide transition */}
-          <div
-            className={`h-full transition-all duration-300 ease-in-out shrink-0 overflow-hidden ${
-              isInspectorOpen
-                ? 'w-[360px] translate-x-0 opacity-100'
-                : 'w-0 translate-x-full opacity-0 pointer-events-none'
-            }`}
-          >
-            <NodeInspectorRail
-              isOpen={isInspectorOpen}
-              onClose={() => {
-                setIsInspectorOpen(false);
-                try {
-                  localStorage.setItem(UI_INSPECTOR_OPEN_KEY, 'false');
-                } catch {}
-              }}
-              onOpenEditor={(id) => canvasActions.openEditor(id)}
-              onAddChild={(id) => toolbarCallbacks.onAddChild(id)}
-              dragInfo={dragInfo}
-            />
+            {/* Right: Node Inspector Rail (360px) */}
+            <div
+              className={`h-full transition-[width,opacity] duration-200 ease-out shrink-0 overflow-hidden ${
+                isInspectorOpen ? 'w-[360px] opacity-100' : 'w-0 opacity-0 pointer-events-none'
+              }`}
+              aria-hidden={!isInspectorOpen}
+            >
+              <NodeInspectorRail
+                isOpen={isInspectorOpen}
+                onOpenEditor={(id) => canvasActions.openEditor(id)}
+                onAddChild={(id) => toolbarCallbacks.onAddChild(id)}
+                dragInfo={dragInfo}
+              />
+            </div>
           </div>
         </div>
 

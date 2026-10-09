@@ -1,58 +1,82 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NodeType } from '../data';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Kbd } from '../ui/Kbd';
 import { RootLogo } from './Logo';
+import { PanelLeftIcon, PanelRightIcon } from './panelIcons';
 
 export interface AppHeaderProps {
   readonly title: string;
   readonly onTitleChange?: (newTitle: string) => void;
   readonly nodeCount: number;
   readonly branchCount: number;
-  readonly zoomPercent: number;
-  readonly onZoomIn: () => void;
-  readonly onZoomOut: () => void;
-  readonly onFitView: () => void;
-  readonly onCenterRoot: () => void;
-  readonly onAutoLayout?: () => void;
   readonly onAddNode: () => void;
-  readonly isPanActive?: boolean;
-  readonly onTogglePan?: () => void;
+  /** Tooltip for the Add Idea button, e.g. which idea the new card will branch from. */
+  readonly addNodeHint?: string;
   readonly isSidebarOpen?: boolean;
   readonly onToggleSidebar?: () => void;
   readonly isInspectorOpen?: boolean;
   readonly onToggleInspector?: () => void;
   readonly activeTypeFilter?: NodeType | null;
   readonly onSelectTypeFilter?: (type: NodeType | null) => void;
-  readonly onSignOut?: () => void;
   readonly onNavigateHome?: () => void;
 }
+
+const TYPE_LABELS: Record<NodeType, string> = {
+  topic: 'Topic',
+  finding: 'Finding',
+  question: 'Question',
+  conclusion: 'Conclusion',
+};
+
+const GUIDE_ITEMS: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
+  { keys: ['Space', 'Drag'], label: 'Pan the canvas' },
+  { keys: ['Scroll'], label: 'Zoom in and out' },
+  { keys: ['Del'], label: 'Delete the selected idea' },
+  { keys: ['N'], label: 'Start the first idea on an empty canvas' },
+];
 
 export function AppHeader({
   title,
   onTitleChange,
   nodeCount,
   branchCount,
-  zoomPercent,
-  onZoomIn,
-  onZoomOut,
-  onFitView,
-  onCenterRoot,
-  onAutoLayout,
   onAddNode,
-  isPanActive = false,
-  onTogglePan,
+  addNodeHint,
   isSidebarOpen = true,
   onToggleSidebar,
   isInspectorOpen = true,
   onToggleInspector,
   activeTypeFilter,
   onSelectTypeFilter,
-  onSignOut,
   onNavigateHome,
 }: AppHeaderProps): JSX.Element {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const guideRef = useRef<HTMLDivElement>(null);
+
+  // Keep the draft in step with the active project (e.g. after switching projects).
+  useEffect(() => {
+    if (!isEditingTitle) setTitleDraft(title);
+  }, [title, isEditingTitle]);
+
+  useEffect(() => {
+    if (!isGuideOpen) return;
+    function handlePointerDown(e: PointerEvent) {
+      if (!guideRef.current?.contains(e.target as globalThis.Node)) setIsGuideOpen(false);
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setIsGuideOpen(false);
+    }
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isGuideOpen]);
 
   const handleTitleSubmit = () => {
     setIsEditingTitle(false);
@@ -64,42 +88,36 @@ export function AppHeader({
   };
 
   return (
-    <header
-      className="h-14 w-full bg-[#ffffff] border-b border-[#ebebeb] flex items-center justify-between px-3 shrink-0 select-none z-30"
-      style={{ boxShadow: 'none' }}
-    >
-      {/* Left: Brand Mark & Title */}
-      <div className="flex items-center gap-2.5">
-        {onToggleSidebar && (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className={`p-1.5 rounded-[2px] transition-colors cursor-pointer ${
-              isSidebarOpen ? 'text-[#000000] bg-[#f0eded]' : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
-            }`}
-            title={isSidebarOpen ? 'Collapse Projects sidebar' : 'Expand Projects sidebar'}
-            aria-label="Toggle Projects sidebar"
-            data-testid="btn-toggle-sidebar"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect width="18" height="18" x="3" y="3" rx="2" />
-              <path d="M9 3v18" />
-              <path d="m14 9-3 3 3 3" />
-            </svg>
-          </button>
+    <header className="h-12 w-full bg-[#ffffff] border-b border-[#ebebeb] flex items-center justify-between gap-4 pl-2 pr-2 shrink-0 select-none z-30">
+      {/* Left: sidebar affordance (only while collapsed) + project title */}
+      <div className="flex items-center gap-2 min-w-0">
+        {!isSidebarOpen && onToggleSidebar && (
+          <>
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="w-7 h-7 inline-flex items-center justify-center rounded-[2px] text-[#737785] hover:text-[#000000] hover:bg-[#f0eded] transition-colors cursor-pointer shrink-0"
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+              aria-expanded={false}
+              data-testid="btn-toggle-sidebar"
+            >
+              <PanelLeftIcon className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onNavigateHome}
+              disabled={!onNavigateHome}
+              className="flex items-center hover:opacity-80 transition-opacity cursor-pointer disabled:cursor-default shrink-0"
+              title={onNavigateHome ? 'Back to home' : undefined}
+            >
+              <RootLogo className="h-7 w-auto" />
+            </button>
+            <div className="h-4 w-px bg-[#ebebeb] mx-1 shrink-0" />
+          </>
         )}
 
-        <div
-          className={`flex items-center gap-2 py-2 ${onNavigateHome ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-          onClick={onNavigateHome}
-          title={onNavigateHome ? 'Return to Home' : undefined}
-        >
-          <RootLogo className="h-10 w-auto min-w-[90px]" />
-        </div>
-
-        {/* Project title shifted far more to the right */}
-        <div className="ml-10 flex items-center">
-          <div className="h-4 w-px bg-[#ebebeb] mr-3" />
+        <div className={`flex items-center min-w-0 ${isSidebarOpen ? 'pl-2' : ''}`}>
           {isEditingTitle ? (
             <input
               type="text"
@@ -114,19 +132,21 @@ export function AppHeader({
                 }
               }}
               autoFocus
-              className="font-serif text-[15px] font-medium text-[#000000] border-b border-[#000000] bg-transparent outline-none px-1 py-0.5"
+              aria-label="Project title"
+              className="font-serif text-[17px] font-medium text-[#000000] border-b border-[#000000] bg-transparent outline-none px-1 py-0.5 min-w-[220px]"
             />
           ) : (
-            <div
+            <button
+              type="button"
               onClick={() => setIsEditingTitle(true)}
-              className="group flex items-center gap-1.5 cursor-pointer py-1 px-1.5 rounded-[2px] hover:bg-[#f5f3f3] transition-colors"
-              title="Click to edit canvas title"
+              className="group flex items-center gap-1.5 min-w-0 cursor-text py-1 px-1.5 rounded-[2px] hover:bg-[#f5f3f3] transition-colors"
+              title="Rename project"
             >
-              <span className="font-serif text-[15px] font-medium text-[#000000] tracking-tight">
-                {title || 'Root — Untitled Project'}
+              <span className="font-serif text-[17px] font-medium text-[#000000] tracking-tight truncate">
+                {title || 'Untitled Project'}
               </span>
               <svg
-                className="w-3 h-3 text-[#737785] opacity-50 group-hover:opacity-100 transition-opacity"
+                className="w-3 h-3 shrink-0 text-[#737785] opacity-0 group-hover:opacity-100 transition-opacity"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -135,239 +155,129 @@ export function AppHeader({
                 <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
                 <path d="m15 5 4 4" />
               </svg>
+            </button>
+          )}
+          <span className="ml-2 font-mono text-[10px] text-[#737785] tracking-wide whitespace-nowrap shrink-0">
+            {nodeCount} {nodeCount === 1 ? 'idea' : 'ideas'} · {branchCount}{' '}
+            {branchCount === 1 ? 'branch' : 'branches'}
+          </span>
+        </div>
+      </div>
+
+      {/* Right: type highlight, help, primary action, inspector toggle */}
+      <div className="flex items-center gap-2 shrink-0">
+        {onSelectTypeFilter && (
+          <div className="flex items-center gap-1" role="group" aria-label="Highlight ideas by type">
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-[#737785] mr-1">Highlight</span>
+            {(Object.keys(TYPE_LABELS) as NodeType[]).map((type) => {
+              const isActive = activeTypeFilter === type;
+              const isDimmed = activeTypeFilter != null && !isActive;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => onSelectTypeFilter(isActive ? null : type)}
+                  aria-pressed={isActive}
+                  className="cursor-pointer rounded-[2px]"
+                  data-testid={`filter-${type}`}
+                >
+                  <Badge
+                    variant={type}
+                    className={`transition-opacity ${isActive ? 'ring-1 ring-offset-1 ring-[#000000]' : ''} ${
+                      isDimmed ? 'opacity-40 hover:opacity-80' : 'hover:opacity-100'
+                    }`}
+                  >
+                    {TYPE_LABELS[type]}
+                  </Badge>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="h-4 w-px bg-[#ebebeb]" />
+
+        <div className="relative" ref={guideRef}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsGuideOpen((v) => !v)}
+            aria-expanded={isGuideOpen}
+            className={`text-[11px] px-2 ${isGuideOpen ? 'bg-[#f0eded] text-[#000000]' : ''}`}
+            icon={
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            }
+            data-testid="btn-guide"
+          >
+            Guide
+          </Button>
+          {isGuideOpen && (
+            <div
+              className="absolute right-0 top-[calc(100%+6px)] w-[280px] bg-[#ffffff] border border-[#c3c6d6] rounded-[2px] p-3 z-50"
+              role="dialog"
+              aria-label="Canvas guide"
+              data-testid="guide-popover"
+            >
+              <p className="font-serif text-[13px] leading-[19px] text-[#404040] m-0 mb-3">
+                Hover an idea to branch, edit or collapse it. Drag from a card&apos;s edge dot to another card to connect them.
+              </p>
+              <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
+                {GUIDE_ITEMS.map((item) => (
+                  <li key={item.label} className="flex items-center justify-between gap-3">
+                    <span className="font-serif text-[13px] text-[#1b1c1c]">{item.label}</span>
+                    <span className="flex items-center gap-1 shrink-0">
+                      {item.keys.map((k) => (
+                        <Kbd key={k}>{k}</Kbd>
+                      ))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Center: Canvas Viewport & Zoom Controls */}
-      <div className="flex items-center gap-1.5 bg-[#ffffff] p-0.5">
-        {/* Zoom Stepper */}
-        <div className="inline-flex items-center border border-[#ebebeb] rounded-[2px] bg-[#ffffff] h-7">
-          <button
-            type="button"
-            onClick={onZoomOut}
-            aria-label="Zoom out"
-            title="Zoom out"
-            className="w-6 h-full flex items-center justify-center font-mono text-[13px] text-[#404040] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
-          >
-            −
-          </button>
-          <span className="font-mono text-[10px] text-[#1b1c1c] px-2 min-w-[42px] text-center font-medium border-x border-[#ebebeb]">
-            {Math.round(zoomPercent)}%
-          </span>
-          <button
-            type="button"
-            onClick={onZoomIn}
-            aria-label="Zoom in"
-            title="Zoom in"
-            className="w-6 h-full flex items-center justify-center font-mono text-[13px] text-[#404040] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
-          >
-            +
-          </button>
-        </div>
-
-        {/* Pan Mode indicator/toggle */}
-        <Button
-          size="sm"
-          variant={isPanActive ? 'primary' : 'secondary'}
-          onClick={onTogglePan}
-          className={`h-7 text-[10px] font-mono transition-colors ${
-            isPanActive ? 'bg-[#000000] text-[#ffffff] border-[#000000]' : ''
-          }`}
-          icon={
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5" />
-              <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-              <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-            </svg>
-          }
-          data-testid="btn-pan"
-        >
-          {isPanActive ? 'Panning' : 'Pan'}
-        </Button>
-
-        {/* Fit View */}
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onFitView}
-          className="h-7 text-[10px] font-mono"
-          icon={
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-              <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-              <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-              <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
-            </svg>
-          }
-          data-testid="btn-fit"
-        >
-          Fit
-        </Button>
-
-        {/* Root Focus */}
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onCenterRoot}
-          className="h-7 text-[10px] font-mono"
-          icon={
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <circle cx="12" cy="12" r="8" />
-              <line x1="12" y1="2" x2="12" y2="4" />
-              <line x1="12" y1="20" x2="12" y2="22" />
-              <line x1="2" y1="12" x2="4" y2="12" />
-              <line x1="20" y1="12" x2="22" y2="12" />
-            </svg>
-          }
-          data-testid="btn-root"
-        >
-          Root
-        </Button>
-
-        {/* Tree Auto Layout */}
-        {onAutoLayout && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={onAutoLayout}
-            className="h-7 text-[10px] font-mono"
-            icon={
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="6" height="5" rx="1" />
-                <rect x="15" y="16" width="6" height="5" rx="1" />
-                <rect x="3" y="16" width="6" height="5" rx="1" />
-                <path d="M6 8v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8" />
-                <path d="M12 14v2" />
-              </svg>
-            }
-            data-testid="btn-auto-layout"
-          >
-            Auto Layout
-          </Button>
-        )}
-      </div>
-
-      {/* Right: Stats, Taxonomy Filter Chips & Actions */}
-      <div className="flex items-center gap-2">
-        {/* Count summary */}
-        <div className="font-mono text-[10px] tracking-wide text-[#595959] pr-1">
-          <span className="text-[#000000] font-medium">{nodeCount}</span> {nodeCount === 1 ? 'Idea' : 'Ideas'} ·{' '}
-          <span className="text-[#000000] font-medium">{branchCount}</span> {branchCount === 1 ? 'Branch' : 'Branches'}
-        </div>
-
-        <div className="h-4 w-px bg-[#ebebeb]" />
-
-        {/* Semantic filter chips */}
-        <div className="flex items-center gap-1">
-          {(['topic', 'finding', 'question', 'conclusion'] as const).map((type) => {
-            const isActive = activeTypeFilter === type;
-            const labels: Record<NodeType, string> = {
-              topic: 'Topic',
-              finding: 'Finding',
-              question: 'Question',
-              conclusion: 'Conclusion',
-            };
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => onSelectTypeFilter?.(isActive ? null : type)}
-                className="cursor-pointer"
-              >
-                <Badge
-                  variant={type}
-                  className={`transition-all ${
-                    isActive ? 'ring-1 ring-[#000000] font-bold' : 'opacity-85 hover:opacity-100'
-                  }`}
-                >
-                  {labels[type]}
-                </Badge>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="h-4 w-px bg-[#ebebeb]" />
-
-        {/* + Add Idea action */}
         <Button
           size="sm"
           variant="primary"
           onClick={onAddNode}
-          className="text-[11px] font-mono px-3"
+          title={addNodeHint}
+          className="text-[11px] px-3"
           icon={
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="16" />
-              <line x1="8" y1="12" x2="16" y2="12" />
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           }
+          data-testid="btn-add-idea"
         >
           Add Idea
         </Button>
 
-        {/* Guide button */}
-        <Button
-          size="sm"
-          variant="secondary"
-          className="text-[10px] font-mono px-3"
-          icon={
-            <svg className="w-3 h-3 text-[#595959]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          }
-        >
-          Guide
-        </Button>
-
-        {/* Inspector toggle button */}
         {onToggleInspector && (
-          <button
-            type="button"
-            onClick={onToggleInspector}
-            className={`p-1.5 rounded-[2px] transition-colors cursor-pointer ${
-              isInspectorOpen ? 'text-[#000000] bg-[#f0eded]' : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
-            }`}
-            title={isInspectorOpen ? 'Hide Details' : 'Show Details'}
-            aria-label="Toggle Inspector"
-            data-testid="btn-toggle-inspector"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect width="18" height="18" x="3" y="3" rx="2" />
-              <path d="M15 3v18" />
-              <path d="m10 15 3-3-3-3" />
-            </svg>
-          </button>
-        )}
-
-        {/* User avatar & Sign Out */}
-        <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-full bg-[#0051c3] text-[#ffffff] flex items-center justify-center shrink-0 font-mono text-[11px] font-medium select-none"
-            title="Your Profile"
-          >
-            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </div>
-          {onSignOut && (
+          <>
+            <div className="h-4 w-px bg-[#ebebeb]" />
             <button
               type="button"
-              onClick={onSignOut}
-              className="px-2 py-1 text-[11px] font-mono text-[#737785] hover:text-[#ba1a1a] transition-colors"
-              title="Sign Out"
+              onClick={onToggleInspector}
+              className={`w-7 h-7 inline-flex items-center justify-center rounded-[2px] transition-colors cursor-pointer ${
+                isInspectorOpen
+                  ? 'text-[#000000] bg-[#f0eded]'
+                  : 'text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3]'
+              }`}
+              title={isInspectorOpen ? 'Hide inspector' : 'Show inspector'}
+              aria-label={isInspectorOpen ? 'Hide inspector' : 'Show inspector'}
+              aria-expanded={isInspectorOpen}
+              data-testid="btn-toggle-inspector"
             >
-              Sign out
+              <PanelRightIcon className="w-4 h-4" />
             </button>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </header>
   );

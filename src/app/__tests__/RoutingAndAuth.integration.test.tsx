@@ -106,7 +106,8 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    // AppHeader workbench title should be visible
-    expect(screen.getByText(/Root — Untitled Project/i)).toBeInTheDocument();
+    // AppHeader workbench title and the signed-in profile should be visible
+    expect(screen.getByText(/Untitled Project/i)).toBeInTheDocument();
+    expect(screen.getByTestId('rail-user-profile')).toHaveTextContent('test@root.app');
   });
 });
