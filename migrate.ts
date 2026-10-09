@@ -1,10 +1,13 @@
 /**
- * migrate.ts — creates Better Auth and Project tables in auth.db
+ * migrate.ts — creates Better Auth and Project tables in the SQLite database
  * Usage: npx tsx migrate.ts
  */
 import Database from 'better-sqlite3';
+import { DB_PATH, ensureDbDirectory } from './src/lib/db-path';
+import { ensureProjectSchema } from './src/lib/project-store';
 
-const db = new Database('./auth.db');
+ensureDbDirectory();
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
 db.exec(`
@@ -53,18 +56,8 @@ db.exec(`
     "createdAt"  TEXT,
     "updatedAt"  TEXT
   );
-
-  CREATE TABLE IF NOT EXISTS "project" (
-    "id"          TEXT PRIMARY KEY NOT NULL,
-    "userId"      TEXT NOT NULL,
-    "title"       TEXT NOT NULL,
-    "canvas"      TEXT NOT NULL,
-    "nodeCount"   INTEGER NOT NULL DEFAULT 0,
-    "createdAt"   TEXT NOT NULL,
-    "updatedAt"   TEXT NOT NULL
-  );
-
-  CREATE INDEX IF NOT EXISTS "idx_project_userId_updatedAt" ON "project" ("userId", "updatedAt" DESC);
 `);
 
-console.log('✅  Migration complete — auth.db tables created including project table.');
+ensureProjectSchema(db);
+
+console.log(`✅  Migration complete — tables created in ${DB_PATH}.`);

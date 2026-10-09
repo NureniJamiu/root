@@ -15,6 +15,8 @@
 
 import { z } from 'zod';
 
+import { CANVAS_TITLE_MAX, NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
+
 /* -------------------------------------------------------------------------- */
 /* Primitive schemas                                                          */
 /* -------------------------------------------------------------------------- */
@@ -46,8 +48,8 @@ export const sideSchema = z.enum(['top', 'right', 'bottom', 'left']);
 export const nodeSchema = z.object({
   id: z.string().uuid(),
   parentId: z.string().uuid().nullable(),
-  title: z.string().max(200),
-  body: z.string().max(20_000),
+  title: z.string().max(NODE_TITLE_MAX),
+  body: z.string().max(NODE_BODY_MAX),
   images: z.array(imageEntrySchema),
   type: nodeTypeSchema,
   position: positionSchema,
@@ -67,7 +69,7 @@ export const nodeSchema = z.object({
 export const canvasSchema = z
   .object({
     id: z.string().uuid(),
-    title: z.string().max(200),
+    title: z.string().max(CANVAS_TITLE_MAX),
     nodes: z.array(nodeSchema),
     updatedAt: z.string().datetime(),
   })

@@ -1,25 +1,35 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+import { expect, test } from './fixtures';
+
+interface StoredNode {
+  id: string;
+  parentId: string | null;
+  sourceSide?: string;
+  targetSide?: string;
+  sourcePinned?: boolean;
+  targetPinned?: boolean;
+  position: { x: number; y: number };
+}
+
+interface CanvasStoreHandle {
+  getState(): {
+    canvas: { nodes: StoredNode[] };
+    selection: { nodeId: string | null };
+  };
+  setState(partial: Record<string, unknown>): void;
+}
+
 
 declare global {
   interface Window {
-    __ROOT_CANVAS_STORE__: any;
-    __ROOT_CANVAS_ACTIONS__: any;
+    __ROOT_CANVAS_STORE__: CanvasStoreHandle;
     __ROOT_INITIALIZED__?: boolean;
   }
 }
 
 export const NODE_A_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 export const NODE_B_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-
-async function loginAndGoToDashboard(page: Page) {
-  await page.goto('/auth/login');
-  await page.fill('input[type="email"]', 'e2e@example.com');
-  await page.fill('input[type="password"]', 'password123!');
-  await page.click('button[type="submit"]');
-  await page.waitForURL('**/dashboard');
-  await expect(page.locator('[data-testid="canvas-view"]')).toBeVisible();
-  await page.waitForFunction(() => (window as any).__ROOT_INITIALIZED__ === true, { timeout: 10000 });
-}
 
 async function setupTwoNodes(
   page: Page,
@@ -79,11 +89,8 @@ async function setupTwoNodes(
 test.describe.configure({ mode: 'serial' });
 
 test.describe('E2E: Node Canvas Connectors and Interactions', () => {
-  test.beforeEach(async ({ page }) => {
-    await loginAndGoToDashboard(page);
-  });
 
-  test('1. Connect A\'s right side to B\'s left side. Exactly one line exists, attached to those sides.', async ({ page }) => {
+  test('1. Connect A\'s right side to B\'s left side. Exactly one line exists, attached to those sides.', async ({ dashboard: page }) => {
     await setupTwoNodes(page, { x: 80, y: 200 }, { x: 420, y: 200 }, false);
 
     const cardA = page.locator(`[data-testid="node-card-${NODE_A_ID}"]`);
@@ -114,15 +121,15 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
     // Verify attached sides in store
     const childNode = await page.evaluate(({ NODE_B_ID }) => {
       const store = window.__ROOT_CANVAS_STORE__;
-      return store.getState().canvas.nodes.find((n: any) => n.id === NODE_B_ID);
+      return store.getState().canvas.nodes.find((n: StoredNode) => n.id === NODE_B_ID);
     }, { NODE_B_ID });
 
-    expect(childNode.parentId).toBe(NODE_A_ID);
-    expect(childNode.sourceSide ?? 'right').toBe('right');
-    expect(childNode.targetSide ?? 'left').toBe('left');
+    expect(childNode!.parentId).toBe(NODE_A_ID);
+    expect(childNode!.sourceSide ?? 'right').toBe('right');
+    expect(childNode!.targetSide ?? 'left').toBe('left');
   });
 
-  test('2. Move that line\'s end to B\'s top side. It is now attached to the top and still there after other interactions.', async ({ page }) => {
+  test('2. Move that line\'s end to B\'s top side. It is now attached to the top and still there after other interactions.', async ({ dashboard: page }) => {
     await setupTwoNodes(page, { x: 80, y: 200 }, { x: 420, y: 200 }, true, {
       sourceSide: 'right',
       targetSide: 'left',
@@ -152,10 +159,10 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
     // Assert it is now attached to top and pinned
     const childAfterMove = await page.evaluate(({ NODE_B_ID }) => {
       const store = window.__ROOT_CANVAS_STORE__;
-      return store.getState().canvas.nodes.find((n: any) => n.id === NODE_B_ID);
+      return store.getState().canvas.nodes.find((n: StoredNode) => n.id === NODE_B_ID);
     }, { NODE_B_ID });
-    expect(childAfterMove.targetSide).toBe('top');
-    expect(childAfterMove.targetPinned).toBe(true);
+    expect(childAfterMove!.targetSide).toBe('top');
+    expect(childAfterMove!.targetPinned).toBe(true);
 
     // Perform another interaction: click empty canvas pane and select node A
     await page.locator('.react-flow__pane').click({ position: { x: 50, y: 50 } });
@@ -164,13 +171,13 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
     // Assert it is still attached to the top
     const childAfterOtherInteractions = await page.evaluate(({ NODE_B_ID }) => {
       const store = window.__ROOT_CANVAS_STORE__;
-      return store.getState().canvas.nodes.find((n: any) => n.id === NODE_B_ID);
+      return store.getState().canvas.nodes.find((n: StoredNode) => n.id === NODE_B_ID);
     }, { NODE_B_ID });
-    expect(childAfterOtherInteractions.targetSide).toBe('top');
-    expect(childAfterOtherInteractions.targetPinned).toBe(true);
+    expect(childAfterOtherInteractions!.targetSide).toBe('top');
+    expect(childAfterOtherInteractions!.targetPinned).toBe(true);
   });
 
-  test('3. Drop the line\'s end on empty canvas. It returns to its previous side.', async ({ page }) => {
+  test('3. Drop the line\'s end on empty canvas. It returns to its previous side.', async ({ dashboard: page }) => {
     await setupTwoNodes(page, { x: 80, y: 200 }, { x: 420, y: 200 }, true, {
       sourceSide: 'right',
       targetSide: 'left',
@@ -199,13 +206,13 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
 
     const childNode = await page.evaluate(({ NODE_B_ID }) => {
       const store = window.__ROOT_CANVAS_STORE__;
-      return store.getState().canvas.nodes.find((n: any) => n.id === NODE_B_ID);
+      return store.getState().canvas.nodes.find((n: StoredNode) => n.id === NODE_B_ID);
     }, { NODE_B_ID });
-    expect(childNode.parentId).toBe(NODE_A_ID);
-    expect(childNode.targetSide ?? 'left').toBe('left');
+    expect(childNode!.parentId).toBe(NODE_A_ID);
+    expect(childNode!.targetSide ?? 'left').toBe('left');
   });
 
-  test('4. Click a node. The details panel shows that node\'s data and inner click/typing does not drag.', async ({ page }) => {
+  test('4. Click a node. The details panel shows that node\'s data and inner click/typing does not drag.', async ({ dashboard: page }) => {
     await setupTwoNodes(page, { x: 80, y: 200 }, { x: 420, y: 200 }, true);
 
     const cardB = page.locator(`[data-testid="node-card-${NODE_B_ID}"]`);
@@ -235,7 +242,7 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
     expect(Math.round(posAfter!.y)).toBe(Math.round(posBefore!.y));
   });
 
-  test('5. Run auto-layout. Nothing overlaps and all connections remain.', async ({ page }) => {
+  test('5. Run auto-layout. Nothing overlaps and all connections remain.', async ({ dashboard: page }) => {
     // Put nodes overlapping initially
     await setupTwoNodes(page, { x: 80, y: 150 }, { x: 100, y: 160 }, true);
 
@@ -251,7 +258,7 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
       const c = store.getState().canvas;
       return {
         nodes: c.nodes,
-        edgeCount: c.nodes.filter((n: any) => n.parentId !== null).length,
+        edgeCount: c.nodes.filter((n: StoredNode) => n.parentId !== null).length,
       };
     });
 
@@ -269,7 +276,7 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
     expect(nodes[1].targetSide).toBe('top');
   });
 
-  test('6. Connect A and B with B to the right of A. Drag B to below A. Connector leaves A bottom and enters B top.', async ({ page }) => {
+  test('6. Connect A and B with B to the right of A. Drag B to below A. Connector leaves A bottom and enters B top.', async ({ dashboard: page }) => {
     await setupTwoNodes(page, { x: 80, y: 120 }, { x: 420, y: 120 }, true, {
       sourceSide: 'right',
       targetSide: 'left',
@@ -296,17 +303,17 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
     // Check updated connector sides
     const childNode = await page.evaluate(({ NODE_B_ID }) => {
       const store = window.__ROOT_CANVAS_STORE__;
-      return store.getState().canvas.nodes.find((n: any) => n.id === NODE_B_ID);
+      return store.getState().canvas.nodes.find((n: StoredNode) => n.id === NODE_B_ID);
     }, { NODE_B_ID });
 
     // Position should be below A
-    expect(childNode.position.y).toBeGreaterThan(300);
+    expect(childNode!.position.y).toBeGreaterThan(300);
     // Connector now leaves A's bottom and enters B's top
-    expect(childNode.sourceSide).toBe('bottom');
-    expect(childNode.targetSide).toBe('top');
+    expect(childNode!.sourceSide).toBe('bottom');
+    expect(childNode!.targetSide).toBe('top');
   });
 
-  test('7. Pin a connector end to a chosen side, then drag the node around. Pinned end does not change sides.', async ({ page }) => {
+  test('7. Pin a connector end to a chosen side, then drag the node around. Pinned end does not change sides.', async ({ dashboard: page }) => {
     // Start with B to the right of A, with target end PINNED to top
     await setupTwoNodes(page, { x: 80, y: 120 }, { x: 420, y: 120 }, true, {
       sourceSide: 'right',
@@ -334,12 +341,12 @@ test.describe('E2E: Node Canvas Connectors and Interactions', () => {
 
     const childNode = await page.evaluate(({ NODE_B_ID }) => {
       const store = window.__ROOT_CANVAS_STORE__;
-      return store.getState().canvas.nodes.find((n: any) => n.id === NODE_B_ID);
+      return store.getState().canvas.nodes.find((n: StoredNode) => n.id === NODE_B_ID);
     }, { NODE_B_ID });
 
     // The target side was pinned to 'top'. Even though B moved below A,
     // its pinned targetSide must remain 'top'!
-    expect(childNode.targetSide).toBe('top');
-    expect(childNode.targetPinned).toBe(true);
+    expect(childNode!.targetSide).toBe('top');
+    expect(childNode!.targetPinned).toBe(true);
   });
 });

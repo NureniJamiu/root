@@ -1,22 +1,17 @@
-import { test, expect } from '@playwright/test';
+import { expect, openDashboard, test, waitForSaved } from './fixtures';
 
 /**
  * Persistence reload E2E test
  * Requirements: 8.1, 8.3, 8.4
  *
  * Covers:
- *  - Changes are persisted to localStorage after the 500ms debounce
+ *  - Changes are saved to the server (SQLite) after the debounce, and the
+ *    save indicator says so
  *  - On reload, every Node's id, title, and structure are restored exactly
- *  - The app initialises a new empty canvas when no localStorage record exists
+ *  - Another account never sees this account's canvas
  */
-test('Persistence reload — state is preserved exactly after reload', async ({ page }) => {
-  // Clear any persisted state so we always start from an empty canvas (R8.4).
-  await page.addInitScript(() => {
-    localStorage.clear();
-  });
-
-  // ── Step 1: Navigate to the app ──────────────────────────────────────────
-  await page.goto('/');
+test('Persistence reload — state is preserved exactly after reload', async ({ dashboard: page }) => {
+  // ── Step 1: the fixture signed in a new user and opened their empty project ──
 
   // ── Step 2: Create the root node via the empty-canvas affordance ─────────
   const createRootBtn = page.getByTestId('btn-create-root');
@@ -52,11 +47,12 @@ test('Persistence reload — state is preserved exactly after reload', async ({ 
   await page.keyboard.press('Escape');
   await expect(nodeEditor).not.toBeVisible();
 
-  // ── Step 9: Wait for the debounce to flush (R8.1 — 500ms interval) ───────
-  await page.waitForTimeout(600);
+  // ── Step 9: Wait until the save has reached the server (R8.1) ─────────────
+  await waitForSaved(page);
 
   // ── Step 10: Reload the page ─────────────────────────────────────────────
   await page.reload();
+  await openDashboard(page);
 
   // ── Step 11: Assert both nodes are restored exactly (R8.3) ───────────────
   const allNodeCards = page.locator('[data-testid^="node-card-"]');
@@ -66,4 +62,24 @@ test('Persistence reload — state is preserved exactly after reload', async ({ 
   const nodeTitles = page.locator('[data-testid="node-title"]');
   await expect(nodeTitles.filter({ hasText: 'Persisted Root' })).toHaveCount(1);
   await expect(nodeTitles.filter({ hasText: 'Persisted Child' })).toHaveCount(1);
+});
+
+test('Persistence — a second account starts with an empty canvas', async ({ dashboard: page, browser, baseURL }) => {
+  await page.getByTestId('btn-create-root').click();
+  await page.getByTestId('node-editor-title').fill('Private to the first user');
+  await page.keyboard.press('Escape');
+  await waitForSaved(page);
+
+  // A different user in a different browser context: nothing is shared with them.
+  const other = await browser.newContext({ baseURL: baseURL ?? 'http://localhost:5273' });
+  const otherPage = await other.newPage();
+  await otherPage.request.post('/api/auth/sign-up/email', {
+    data: { name: 'Other', email: `other-${Date.now()}@example.com`, password: 'e2e-password-123!' },
+    headers: { Origin: new URL(baseURL ?? 'http://localhost:5273').origin },
+  });
+  await openDashboard(otherPage);
+
+  await expect(otherPage.getByTestId('btn-create-root')).toBeVisible();
+  await expect(otherPage.locator('[data-testid^="node-card-"]')).toHaveCount(0);
+  await other.close();
 });

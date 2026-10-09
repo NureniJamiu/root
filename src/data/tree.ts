@@ -154,3 +154,51 @@ export function hasCycle(
   if (newParentId === childId) return true;
   return subtreeIds(c, childId).has(newParentId);
 }
+
+/* -------------------------------------------------------------------------- */
+/* nodeOrdinals                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Give every node a 1-based number by creation order (ties broken by position
+ * in `c.nodes`). Unlike a slice of the uuid, ordinals are unique within a
+ * canvas, so they are safe to show as a short label.
+ */
+export function nodeOrdinals(c: Canvas): Map<UUID, number> {
+  const ordered = c.nodes
+    .map((node, index) => ({ node, index }))
+    .sort((a, b) =>
+      a.node.createdAt < b.node.createdAt ? -1
+        : a.node.createdAt > b.node.createdAt ? 1
+        : a.index - b.index,
+    );
+  const ordinals = new Map<UUID, number>();
+  ordered.forEach(({ node }, i) => ordinals.set(node.id, i + 1));
+  return ordinals;
+}
+
+/**
+ * The ordinal `nodeOrdinals` would give `id`, computed for one node in O(n)
+ * (no sort, no map) so a card can subscribe to just its own label.
+ */
+export function nodeOrdinal(c: Canvas, id: UUID): number {
+  const index = c.nodes.findIndex((n) => n.id === id);
+  const me = c.nodes[index];
+  if (me === undefined) return 0;
+  let before = 0;
+  c.nodes.forEach((n, i) => {
+    if (n.createdAt < me.createdAt || (n.createdAt === me.createdAt && i < index)) before += 1;
+  });
+  return before + 1;
+}
+
+/** Short label such as `ROOT` or `#04` for a node, using `nodeOrdinals`. */
+export function nodeLabel(node: Node, ordinals: ReadonlyMap<UUID, number>): string {
+  return formatNodeLabel(node, ordinals.get(node.id) ?? 0);
+}
+
+/** Label for a node whose ordinal is already known. */
+export function formatNodeLabel(node: Node, ordinal: number): string {
+  if (node.parentId === null) return 'ROOT';
+  return `#${String(ordinal).padStart(2, '0')}`;
+}

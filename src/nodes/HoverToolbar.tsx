@@ -1,10 +1,9 @@
 /**
  * `HoverToolbar` — the row of action buttons rendered inside a `NodeCard`.
  *
- * The toolbar exposes five actions (design.md §Node UI Layer):
+ * The toolbar exposes these actions (design.md §Node UI Layer):
  *   - `add-child`  — insert a child under this node and open its editor.
- *   - `edit`       — open the `NodeEditor` on this node.
- *   - `add-image`  — open the editor (image upload lives inside `NodeEditor`).
+ *   - `edit`       — open the `NodeEditor` on this node (images are attached there).
  *   - `cycle-type` — cycle `topic → finding → question → conclusion → topic`.
  *   - `delete`     — open the `DeletePrompt`. The prompt itself bypasses
  *                    the modal for leaves (Requirement 7.1) and enforces
@@ -27,7 +26,6 @@ import {
   ChevronRightIcon,
   CloseIcon,
   CycleIcon,
-  ImageIcon,
   PencilIcon,
   PlusIcon,
 } from './icons';
@@ -78,11 +76,6 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
   const onEdit = (): void => {
     canvasActions.openEditor(node.id);
   };
-  const onAddImage = (): void => {
-    // Image upload lives in the editor; the toolbar button simply opens
-    // it. `NodeEditor` (task 11.1) will focus its drop zone in this flow.
-    canvasActions.openEditor(node.id);
-  };
   const onCycleType = (): void => {
     canvasActions.updateNode(node.id, { type: nextType(node.type) });
   };
@@ -108,11 +101,8 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
       <ToolbarButton label="Add sub-idea" onClick={handleAddChild} testId="btn-add-child">
         <PlusIcon />
       </ToolbarButton>
-      <ToolbarButton label="Edit" onClick={onEdit} testId="btn-edit">
+      <ToolbarButton label="Edit (notes and images)" onClick={onEdit} testId="btn-edit">
         <PencilIcon />
-      </ToolbarButton>
-      <ToolbarButton label="Add image" onClick={onAddImage} testId="btn-add-image">
-        <ImageIcon />
       </ToolbarButton>
       <ToolbarButton
         label={`Change card type (current: ${node.type})`}

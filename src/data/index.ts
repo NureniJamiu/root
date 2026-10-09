@@ -57,9 +57,11 @@ export {
   deleteNodeOnly,
   deleteSubtree,
   emptyCanvas,
+  expandSubtree,
   moveNode,
   removeImage,
   reparentChild,
+  setCanvasTitle,
   setCollapsed,
   updateConnection,
   updateNode,
@@ -69,11 +71,22 @@ export type { ConnectionPatch, NodePatch } from './mutators';
 export {
   childrenIndex,
   descendantCount,
+  formatNodeLabel,
   hasCycle,
+  nodeLabel,
+  nodeOrdinal,
+  nodeOrdinals,
   rootNode,
   subtreeIds,
   visibleNodeIds,
 } from './tree';
+
+export {
+  CANVAS_TITLE_MAX,
+  IMAGE_DATA_URL_MAX_BYTES,
+  NODE_BODY_MAX,
+  NODE_TITLE_MAX,
+} from './limits';
 
 export { parseCanvas, serializeCanvas } from './serialize';
 export type { ParseCanvasResult } from './serialize';

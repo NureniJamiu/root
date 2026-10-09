@@ -24,20 +24,20 @@ Linear note-taking (docs, plain text) doesn't reflect how research actually bran
 **Explicitly out of scope for MVP:**
 - AI/LLM prompt-to-node generation
 - Multi-user collaboration / real-time sync
-- Accounts, auth, cloud sync (local persistence is enough for MVP)
+- Real-time sync between devices or users (accounts and server-side saving are in: see 6.5)
 - Mobile responsiveness (desktop-first)
 - Export (PDF/image export) — nice-to-have, not MVP
 
 ## 4. Core User Flow
 
-1. User opens the app to an empty canvas (or their last saved canvas).
+1. User signs in and opens the app to an empty canvas (or their last saved project).
 2. User creates a root node (e.g. "Bones").
 3. User clicks the node, hits the `+` control, adds a child node (e.g. "Organic minerals").
 4. User repeats, building a tree outward in any direction.
 5. User edits node content: title, body text, optional image(s).
 6. User freely drags nodes to reposition, pans and zooms the canvas.
 7. User collapses/expands a node's children via a toggle to declutter or focus during presentation.
-8. Canvas state persists automatically (local storage for MVP) so the user can return later.
+8. Canvas state is saved automatically to the user's account so they can return later, from any browser.
 
 ## 5. Data Model
 
@@ -95,8 +95,12 @@ Notes for the dev agent:
 - Deleting a node with children must prompt: delete just this node (re-parent children to its parent) or delete this node and its whole subtree. Pick one sane default behavior and confirm with the user — don't silently orphan nodes.
 
 ### 6.5 Persistence
-- Auto-save canvas state to local storage (or equivalent local persistence) on every change, debounced.
+- Each signed-in user has their own projects, stored in SQLite behind the `/api/projects` API (the server validates every canvas with the same schema as the client).
+- Auto-save the canvas on every change, debounced, through a sequenced save queue: one request at a time, latest state wins, retried on failure, flushed when switching projects or leaving the page. The UI shows whether the project is saved, saving, or not saved.
+- A project becomes active only together with its own loaded canvas; nothing is saved before a project has loaded.
+- Images are stored separately from the canvas document and referenced by id, so an edit does not re-upload them.
 - Reload restores exact node positions, content, and collapsed states.
+- `localStorage` holds UI preferences only (pane open/closed, last active project); it never holds canvas content.
 
 ### 6.6 Visual design
 - This is a stated priority: the node cards, canvas background, connectors, and controls need a deliberate, cohesive visual design — not default/unstyled UI. Establish a small design system early (spacing, type scale, color palette per node `type`, shadow/elevation for selected nodes) rather than styling ad hoc per component.
@@ -104,7 +108,7 @@ Notes for the dev agent:
 ## 7. Non-Functional Requirements
 
 - Performance: canvas should stay smooth with at least 100–150 nodes on screen (pan/zoom/drag should not visibly lag).
-- No backend required for MVP — this can be a client-only app.
+- A small Express + SQLite API handles accounts (Better Auth) and projects; the React app talks to it on the same origin (the Vite dev proxy forwards `/api`).
 - Codebase should cleanly separate: (a) node data model / state management, (b) canvas rendering/interaction layer, (c) node UI components — so a future AI-generation feature can plug into (a) without touching (b)/(c).
 
 ## 8. Future Extensions (not MVP, but the architecture should not block these)
@@ -113,13 +117,13 @@ Notes for the dev agent:
 - **Presentation/walkthrough mode:** a guided sequential view that steps through nodes for screen-sharing, reusing the existing collapse/expand and positions.
 - **Export:** PDF/PNG export of the canvas, or export to a shareable read-only link.
 - **Citations/sources panel:** structured source/reference field per node, beyond a plain text mention.
-- **Cloud sync / accounts:** move from local storage to a backend once the tool proves useful.
+- **Sharing and real-time collaboration:** accounts and server-side persistence exist; sharing a project with other people does not.
 
 ## 9. Suggested Tech Direction (non-binding)
 
 Left flexible for the dev agent to decide based on constraints, but as a reference:
 - Frontend: React + a canvas/graph interaction library (e.g. React Flow) rather than hand-rolled drag/zoom/pan logic, to move fast on the MVP.
-- State: local component/store state (e.g. Zustand or React context), serialized to local storage.
+- State: a Zustand store holds the open canvas; the server is the source of truth for saved projects.
 - Styling: a utility CSS framework (e.g. Tailwind) paired with a deliberate design pass per Section 6.6 — avoid shipping default component-library looks.
 
 ## 10. Success Criteria for MVP

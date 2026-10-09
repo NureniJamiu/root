@@ -23,6 +23,9 @@ export {
   computeTreeLayout,
 } from './placement';
 
+export { getMeasuredSizes } from './measuredSizes';
+export type { NodeSize, NodeSizes } from './measuredSizes';
+
 export { CanvasView } from './CanvasView';
 export type { CanvasViewProps, CanvasViewProbeProps, CanvasViewControls, DragState } from './CanvasView';
 export { determineReconnect, determineReparent } from './reconnect';

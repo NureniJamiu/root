@@ -15,7 +15,7 @@ import cors from 'cors';
 import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
 import { auth } from './src/lib/auth';
 import { db } from './src/lib/db';
-import crypto from 'node:crypto';
+import { createProjectStore, ProjectError } from './src/lib/project-store';
 
 const app = express();
 const PORT = process.env.AUTH_SERVER_PORT ?? 3001;
@@ -63,238 +63,69 @@ app.use('/api/projects', requireUser);
 /* Project API Routes (Database-backed)                                       */
 /* -------------------------------------------------------------------------- */
 
-interface ProjectRow {
-  id: string;
-  userId: string;
-  title: string;
-  canvas: string;
-  nodeCount: number;
-  createdAt: string;
-  updatedAt: string;
+const projects = createProjectStore(db);
+
+// Map a refused request to its HTTP response; anything else is a 500.
+function sendError(
+  res: express.Response,
+  error: unknown,
+  fallback: string,
+): express.Response {
+  if (error instanceof ProjectError) {
+    return res.status(error.status).json({ error: error.message, code: error.code });
+  }
+  console.error(fallback, error);
+  return res.status(500).json({ error: fallback });
 }
 
 // 1. List all projects for current user (summaries only, excluding heavy canvas payloads)
-app.get('/api/projects', async (req, res) => {
+app.get('/api/projects', (_req, res) => {
   try {
-    const userId: string = res.locals.userId;
-    const rows = db
-      .prepare(
-        'SELECT id, title, nodeCount, createdAt, updatedAt FROM project WHERE userId = ? ORDER BY updatedAt DESC',
-      )
-      .all(userId) as Array<Omit<ProjectRow, 'canvas' | 'userId'>>;
-
-    // If user has no projects, create an initial one
-    if (rows.length === 0) {
-      const initialId = crypto.randomUUID();
-      const now = new Date().toISOString();
-      const initialCanvas = {
-        id: initialId,
-        title: 'Interactive Graph',
-        nodes: [],
-        edges: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      db.prepare(
-        `INSERT INTO project (id, userId, title, canvas, nodeCount, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        initialId,
-        userId,
-        initialCanvas.title,
-        JSON.stringify(initialCanvas),
-        0,
-        now,
-        now,
-      );
-
-      return res.json([
-        {
-          id: initialId,
-          title: initialCanvas.title,
-          nodeCount: 0,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ]);
-    }
-
-    return res.json(rows);
+    return res.json(projects.list(res.locals.userId));
   } catch (error) {
-    console.error('Error fetching projects:', error);
-    return res.status(500).json({ error: 'Failed to fetch projects' });
+    return sendError(res, error, 'Failed to fetch projects');
   }
 });
 
 // 2. Get single project with full canvas document
-app.get('/api/projects/:id', async (req, res) => {
+app.get('/api/projects/:id', (req, res) => {
   try {
-    const userId: string = res.locals.userId;
-    const { id } = req.params;
-
-    const row = db
-      .prepare(
-        "SELECT id, title, canvas, nodeCount, createdAt, updatedAt FROM project WHERE id = ? AND userId = ?",
-      )
-      .get(id, userId) as Omit<ProjectRow, 'userId'> | undefined;
-
-    if (!row) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-
-    let parsedCanvas;
-    try {
-      parsedCanvas = typeof row.canvas === 'string' ? JSON.parse(row.canvas) : row.canvas;
-    } catch {
-      parsedCanvas = {
-        id: row.id,
-        title: row.title,
-        nodes: [],
-        edges: [],
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-      };
-    }
-
-    return res.json({
-      id: row.id,
-      title: row.title,
-      nodeCount: row.nodeCount,
-      canvas: parsedCanvas,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    });
+    const project = projects.get(res.locals.userId, req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    return res.json(project);
   } catch (error) {
-    console.error('Error fetching project:', error);
-    return res.status(500).json({ error: 'Failed to fetch project' });
+    return sendError(res, error, 'Failed to fetch project');
   }
 });
 
 // 3. Create a new project
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', (req, res) => {
   try {
-    const userId: string = res.locals.userId;
-    const body = req.body || {};
-    const now = new Date().toISOString();
-    const id = body.id || crypto.randomUUID();
-    const title = body.title || 'Interactive Graph';
-    const canvasData =
-      body.canvas || {
-        id,
-        title,
-        nodes: [],
-        edges: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-    const serializedCanvas =
-      typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData);
-    const nodeCount =
-      typeof body.nodeCount === 'number'
-        ? body.nodeCount
-        : Array.isArray(canvasData.nodes)
-        ? canvasData.nodes.length
-        : 0;
-
-    db.prepare(
-      `INSERT INTO project (id, userId, title, canvas, nodeCount, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, userId, title, serializedCanvas, nodeCount, now, now);
-
-    return res.status(201).json({
-      id,
-      title,
-      nodeCount,
-      canvas: typeof canvasData === 'string' ? JSON.parse(canvasData) : canvasData,
-      createdAt: now,
-      updatedAt: now,
-    });
+    return res.status(201).json(projects.create(res.locals.userId, req.body));
   } catch (error) {
-    console.error('Error creating project:', error);
-    return res.status(500).json({ error: 'Failed to create project' });
+    return sendError(res, error, 'Failed to create project');
   }
 });
 
-// 4. Update project (title, canvas, nodeCount)
-app.put('/api/projects/:id', async (req, res) => {
+// 4. Update an existing project (title and/or canvas). Never creates one.
+app.put('/api/projects/:id', (req, res) => {
   try {
-    const userId: string = res.locals.userId;
-    const { id } = req.params;
-    const body = req.body || {};
-    const now = new Date().toISOString();
-
-    const existing = db
-      .prepare("SELECT id, title, canvas, nodeCount FROM project WHERE id = ? AND userId = ?")
-      .get(id, userId) as ProjectRow | undefined;
-
-    if (!existing) {
-      // Upsert only when no project with this id exists at all; an id owned
-      // by another user is reported as not found.
-      const taken = db.prepare('SELECT 1 FROM project WHERE id = ?').get(id);
-      if (taken) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
-
-      const title = body.title || 'Interactive Graph';
-      const canvasData = body.canvas || { id, title, nodes: [], edges: [], createdAt: now, updatedAt: now };
-      const serializedCanvas = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData);
-      const nodeCount = typeof body.nodeCount === 'number' ? body.nodeCount : (Array.isArray(canvasData.nodes) ? canvasData.nodes.length : 0);
-
-      db.prepare(
-        `INSERT INTO project (id, userId, title, canvas, nodeCount, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).run(id, userId, title, serializedCanvas, nodeCount, now, now);
-
-      return res.json({ success: true, id, updatedAt: now });
-    }
-
-    const title = body.title !== undefined ? body.title : existing.title;
-    const serializedCanvas =
-      body.canvas !== undefined
-        ? typeof body.canvas === 'string'
-          ? body.canvas
-          : JSON.stringify(body.canvas)
-        : existing.canvas;
-    const nodeCount =
-      body.nodeCount !== undefined
-        ? body.nodeCount
-        : body.canvas && Array.isArray(body.canvas.nodes)
-        ? body.canvas.nodes.length
-        : existing.nodeCount;
-
-    db.prepare(
-      `UPDATE project
-       SET title = ?, canvas = ?, nodeCount = ?, updatedAt = ?
-       WHERE id = ? AND userId = ?`,
-    ).run(title, serializedCanvas, nodeCount, now, id, userId);
-
-    return res.json({
-      success: true,
-      id,
-      title,
-      nodeCount,
-      updatedAt: now,
-    });
+    const updated = projects.update(res.locals.userId, req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Project not found' });
+    return res.json({ success: true, ...updated });
   } catch (error) {
-    console.error('Error updating project:', error);
-    return res.status(500).json({ error: 'Failed to update project' });
+    return sendError(res, error, 'Failed to update project');
   }
 });
 
 // 5. Delete project
-app.delete('/api/projects/:id', async (req, res) => {
+app.delete('/api/projects/:id', (req, res) => {
   try {
-    const userId: string = res.locals.userId;
-    const { id } = req.params;
-
-    db.prepare(
-      "DELETE FROM project WHERE id = ? AND userId = ?",
-    ).run(id, userId);
-
-    return res.json({ success: true, id });
+    const removed = projects.remove(res.locals.userId, req.params.id);
+    if (!removed) return res.status(404).json({ error: 'Project not found' });
+    return res.json({ success: true, id: req.params.id });
   } catch (error) {
-    console.error('Error deleting project:', error);
-    return res.status(500).json({ error: 'Failed to delete project' });
+    return sendError(res, error, 'Failed to delete project');
   }
 });
 

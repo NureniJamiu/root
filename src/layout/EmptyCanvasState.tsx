@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
+import { NODE_TITLE_MAX } from '../data';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Divider } from '../ui/Divider';
@@ -7,14 +8,11 @@ import { TextInput } from '../ui/TextInput';
 
 export interface EmptyCanvasStateProps {
   readonly onCreateRoot: (premise?: string) => void;
+  /** Fill the canvas with the worked example. */
+  readonly onLoadExample: () => void;
 }
 
 const TEMPLATES = [
-  {
-    title: 'Content Plan',
-    subtitle: 'Video or article outline',
-    premise: 'Weekly Content Plan: Ideas, Hooks & Outlines',
-  },
   {
     title: 'Brainstorming',
     subtitle: 'Explore concepts & angles',
@@ -32,7 +30,7 @@ const TEMPLATES = [
   },
 ] as const;
 
-export function EmptyCanvasState({ onCreateRoot }: EmptyCanvasStateProps): JSX.Element {
+export function EmptyCanvasState({ onCreateRoot, onLoadExample }: EmptyCanvasStateProps): JSX.Element {
   const [premise, setPremise] = useState('');
 
   const handleSubmit = (e?: FormEvent) => {
@@ -62,9 +60,6 @@ export function EmptyCanvasState({ onCreateRoot }: EmptyCanvasStateProps): JSX.E
             <span className="w-1.5 h-1.5 rounded-full bg-[#0051c3]" />
             Get Started • Central Idea
           </div>
-          <span className="font-mono text-[9px] uppercase tracking-[0.06em] text-[#737785]">
-            STEP 01
-          </span>
         </div>
 
         {/* Headline */}
@@ -89,17 +84,17 @@ export function EmptyCanvasState({ onCreateRoot }: EmptyCanvasStateProps): JSX.E
             <TextInput
               id="root-premise-input"
               value={premise}
-              onChange={(e) => setPremise(e.target.value.slice(0, 120))}
+              onChange={(e) => setPremise(e.target.value.slice(0, NODE_TITLE_MAX))}
               onKeyDown={handleKeyDown}
               placeholder="e.g. YouTube Video: 5 Lessons From Starting My Channel"
-              maxLength={120}
+              maxLength={NODE_TITLE_MAX}
               className="font-serif text-[14px]"
             />
             <div className="flex items-center justify-between font-mono text-[9px] text-[#595959] pt-0.5">
               <span className="flex items-center gap-1">
                 Starts as a main <Badge variant="topic">TOPIC</Badge> card
               </span>
-              <span>{premise.length}/120</span>
+              <span>{premise.length}/{NODE_TITLE_MAX}</span>
             </div>
           </div>
 
@@ -126,10 +121,23 @@ export function EmptyCanvasState({ onCreateRoot }: EmptyCanvasStateProps): JSX.E
         </form>
 
         {/* Divider */}
-        <Divider label="OR START WITH A POPULAR TEMPLATE" />
+        <Divider label="OR START WITH A TEMPLATE" />
 
-        {/* 4 Template Cards */}
+        {/* Template Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <button
+            type="button"
+            onClick={onLoadExample}
+            className="flex flex-col text-left p-2.5 bg-[#fbf9f8] border border-[#ebebeb] rounded-[2px] hover:border-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer group"
+            data-testid="btn-load-example"
+          >
+            <span className="font-mono text-[11px] font-medium text-[#000000] group-hover:text-[#0051c3] leading-snug">
+              Load example
+            </span>
+            <span className="font-mono text-[9px] text-[#595959] mt-0.5">
+              A worked content plan
+            </span>
+          </button>
           {TEMPLATES.map((tmpl) => (
             <button
               key={tmpl.title}

@@ -1,5 +1,7 @@
 # Design Document: Root MVP
 
+> **Superseded in part.** This document describes the original client-only MVP, where the canvas was persisted to `localStorage`. Projects are now saved to SQLite through `/api/projects` (see `src/app/useProjects.ts`, `src/lib/save-queue.ts`, `src/lib/project-store.ts` and PRD.md §6.5); the `localStorage` middleware and load path described below were removed.
+
 ## Overview
 
 Root MVP is a client-only, desktop-first, canvas-based research tool for manually constructing a hierarchical tree of research nodes on an infinite pannable and zoomable canvas. The MVP has no backend, no AI generation, and no collaboration. State lives in the browser, is persisted to `localStorage`, and is restored exactly on reload.

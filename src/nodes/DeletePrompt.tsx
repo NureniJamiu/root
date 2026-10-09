@@ -252,8 +252,8 @@ function ChoiceButton({
       data-testid={testId}
       className="rounded-xs px-2 py-1 text-body transition-colors"
       style={{
-        border: `1px solid ${filled ? '#ff3c00' : '#312e2e'}`, // strong : text.tertiary
-        background: filled ? (disabled ? '#f6f5f4' : '#ff3c00') : '#ffffff', // muted : strong : raised
+        border: `1px solid ${filled ? '#ba1a1a' : '#312e2e'}`, // strong : text.tertiary
+        background: filled ? (disabled ? '#f6f5f4' : '#ba1a1a') : '#ffffff', // muted : strong : raised
         color: filled ? (disabled ? '#312e2e' : '#ffffff') : '#191818',       // tertiary : raised : primary
         cursor: disabled ? 'not-allowed' : 'pointer',
         boxShadow: 'none',

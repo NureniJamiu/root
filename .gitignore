@@ -28,6 +28,8 @@ lerna-debug.log*
 coverage
 playwright-report
 test-results
+.e2e
 .playwright
 auth.db
 auth.db-*
+database.sqlite

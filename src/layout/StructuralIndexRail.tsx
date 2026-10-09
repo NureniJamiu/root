@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
+import { formatRelativeTime } from './formatTime';
 import { RootLogo } from './Logo';
 import { PanelLeftIcon } from './panelIcons';
 
@@ -17,7 +18,6 @@ export interface RailUser {
 
 export interface StructuralIndexRailProps {
   readonly nodeCount: number;
-  readonly isOpen?: boolean;
   readonly onClose?: () => void;
   readonly projects?: readonly ProjectItem[];
   readonly activeProjectId?: string;
@@ -27,21 +27,6 @@ export interface StructuralIndexRailProps {
   readonly onNavigateHome?: () => void;
   readonly user?: RailUser | null;
   readonly onSignOut?: () => void;
-}
-
-/** Compact "2h ago" style label for a project's last update. */
-function formatUpdatedAt(iso: string | undefined): string | null {
-  if (!iso) return null;
-  const then = Date.parse(iso);
-  if (Number.isNaN(then)) return null;
-  const minutes = Math.floor((Date.now() - then) / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(then).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function initialsFor(user: RailUser): string {
@@ -140,7 +125,7 @@ export function StructuralIndexRail({
           const isActive = project.id === currentActiveId;
           const isConfirmingDelete = pendingDeleteId === project.id;
           const title = project.title || `Project ${idx + 1}`;
-          const updated = formatUpdatedAt(project.updatedAt);
+          const updated = formatRelativeTime(project.updatedAt);
           return (
             <div
               key={project.id}
@@ -152,26 +137,22 @@ export function StructuralIndexRail({
                   : 'border border-transparent text-[#404040] hover:bg-[#f0eded] hover:text-[#000000]'
               }`}
               data-testid={`project-item-${project.id}`}
-              aria-current={isActive ? 'page' : undefined}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onSelectProject?.(project.id);
-                }
-              }}
             >
               {isActive && (
                 <span className="absolute left-0 top-2 bottom-2 w-[2px] bg-[#0051c3]" aria-hidden="true" />
               )}
-              <div className="flex flex-col min-w-0 flex-1">
+              {/* The row's one real control: Enter/Space on it bubbles up to the row's click handler. */}
+              <button
+                type="button"
+                aria-current={isActive ? 'page' : undefined}
+                className="flex flex-col min-w-0 flex-1 text-left bg-transparent border-0 p-0 cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#0051c3]"
+              >
                 <span className="font-serif text-[14px] font-medium leading-[18px] truncate">{title}</span>
                 <span className="font-mono text-[9.5px] text-[#737785] tracking-wide truncate">
                   {project.nodeCount} {project.nodeCount === 1 ? 'idea' : 'ideas'}
                   {updated ? ` · ${updated}` : ''}
                 </span>
-              </div>
+              </button>
 
               {onDeleteProject &&
                 (isConfirmingDelete ? (

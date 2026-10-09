@@ -1,5 +1,7 @@
 # Requirements Document
 
+> **Superseded in part.** Requirement 8 (persistence) described `localStorage`; saving now happens on the server per signed-in user. See PRD.md §6.5.
+
 ## Introduction
 
 Root MVP is a desktop-first, canvas-based, node-driven research tool that lets a single user manually construct, arrange, and present a hierarchical tree of research nodes on an infinite pannable and zoomable canvas. The MVP is manual-only — no AI generation is included — but the data model and code structure are designed so a future AI generation step can plug into the same shape and interfaces.

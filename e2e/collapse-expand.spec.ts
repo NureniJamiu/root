@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 /**
  * E2E: Collapse and expand a subtree
@@ -13,14 +13,8 @@ import { test, expect } from '@playwright/test';
  * The collapse/expand affordance is the ▼/▶ button in the HoverToolbar,
  * only visible on hover when the node has children (R6.1) or is collapsed (R6.3).
  */
-test('collapse and expand a subtree', async ({ page }) => {
-  // Start from a clean slate every time.
-  await page.addInitScript(() => {
-    localStorage.clear();
-  });
-
-  // ── Step 1: Navigate to the app ─────────────────────────────────────────
-  await page.goto('/');
+test('collapse and expand a subtree', async ({ dashboard: page }) => {
+  // ── Step 1: the fixture signed in a new user and opened their empty project ──
 
   // ── Step 2: Create the root node ────────────────────────────────────────
   const createRootBtn = page.getByTestId('btn-create-root');
@@ -52,7 +46,8 @@ test('collapse and expand a subtree', async ({ page }) => {
   await expect(allCards).toHaveCount(2);
 
   // ── Step 4: Add a grandchild node (child of the child) ──────────────────
-  // The child card is the second one.
+  // Cards outside the viewport are not rendered, so bring every idea into view first.
+  await page.getByTestId('btn-fit').click();
   const childCard = allCards.nth(1);
   await expect(childCard).toBeVisible();
   await childCard.hover();
@@ -102,13 +97,7 @@ test('collapse and expand a subtree', async ({ page }) => {
   await expect(collapseBadge).not.toBeVisible();
 });
 
-test('collapse badge shows correct descendant count', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.clear();
-  });
-
-  await page.goto('/');
-
+test('collapse badge shows correct descendant count', async ({ dashboard: page }) => {
   // Create root.
   await page.getByTestId('btn-create-root').click();
   const nodeEditor = page.getByTestId('node-editor');
@@ -120,6 +109,7 @@ test('collapse badge shows correct descendant count', async ({ page }) => {
   const rootCard = allCards.first();
 
   for (let i = 0; i < 3; i++) {
+    await page.getByTestId('btn-fit').click();
     await rootCard.hover();
     await rootCard.getByTestId('btn-add-child').click();
     await expect(nodeEditor).toBeVisible();

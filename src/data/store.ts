@@ -43,9 +43,11 @@ import {
   deleteNodeOnly as mutDeleteNodeOnly,
   deleteSubtree as mutDeleteSubtree,
   emptyCanvas,
+  expandSubtree as mutExpandSubtree,
   moveNode as mutMoveNode,
   removeImage as mutRemoveImage,
   reparentChild as mutReparentChild,
+  setCanvasTitle as mutSetCanvasTitle,
   setCollapsed as mutSetCollapsed,
   updateConnection as mutUpdateConnection,
   updateNode as mutUpdateNode,
@@ -131,6 +133,59 @@ function formatZodMessage(issues: readonly { message: string }[]): string {
   return issues.map((i) => i.message).join('; ');
 }
 
+/* -------------------------------------------------------------------------- */
+/* Undo / redo history                                                        */
+/* -------------------------------------------------------------------------- */
+
+/** Most snapshots kept for undo. */
+const HISTORY_LIMIT = 100;
+
+/** Edits with the same key inside this window share one undo step. */
+const COALESCE_WINDOW_MS = 1_000;
+
+// Kept outside the store state: nothing renders from it, and the pure
+// `Canvas` snapshots are cheap to hold because mutators share structure.
+let undoStack: Canvas[] = [];
+let redoStack: Canvas[] = [];
+let lastCoalesceKey: string | null = null;
+let lastCoalesceAt = 0;
+
+function recordHistory(before: Canvas, coalesceKey: string | null): void {
+  const at = Date.now();
+  const coalesce =
+    coalesceKey !== null &&
+    coalesceKey === lastCoalesceKey &&
+    at - lastCoalesceAt < COALESCE_WINDOW_MS;
+  lastCoalesceKey = coalesceKey;
+  lastCoalesceAt = at;
+  redoStack = [];
+  if (coalesce) return;
+  undoStack.push(before);
+  if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+}
+
+function clearHistory(): void {
+  undoStack = [];
+  redoStack = [];
+  lastCoalesceKey = null;
+}
+
+/** Drop UI state that points at a node the restored canvas no longer has. */
+function uiForCanvas(canvas: Canvas, state: CanvasState): Partial<CanvasState> {
+  const ids = new Set<UUID>(canvas.nodes.map((n) => n.id));
+  const patch: Partial<CanvasState> = {};
+  if (state.editor.openNodeId !== null && !ids.has(state.editor.openNodeId)) {
+    patch.editor = { openNodeId: null };
+  }
+  if (state.deletePrompt.nodeId !== null && !ids.has(state.deletePrompt.nodeId)) {
+    patch.deletePrompt = { nodeId: null };
+  }
+  if (state.selection.nodeId !== null && !ids.has(state.selection.nodeId)) {
+    patch.selection = { nodeId: null };
+  }
+  return patch;
+}
+
 /**
  * Shared write path. Invokes `compute`, checks for a guarded no-op via
  * reference identity, runs `safeParse`, and — on success — hands the
@@ -146,6 +201,7 @@ function commitCanvasWrite(
   actionName: string,
   compute: (state: CanvasState) => Canvas,
   commit: (parsed: Canvas, state: CanvasState) => Partial<CanvasState>,
+  coalesceKey: string | null = null,
 ): void {
   const state = useCanvasStore.getState();
   const before = state.canvas;
@@ -163,6 +219,7 @@ function commitCanvasWrite(
     return;
   }
   const patch = commit(parsed.data, state);
+  recordHistory(before, coalesceKey);
   useCanvasStore.setState({ canvas: parsed.data, ...patch });
 }
 
@@ -251,6 +308,7 @@ export const canvasActions = {
       'updateNode',
       (s) => mutUpdateNode(s.canvas, id, patch),
       () => ({}),
+      `updateNode:${id}`,
     );
   },
 
@@ -323,6 +381,76 @@ export const canvasActions = {
       (s) => mutSetCollapsed(s.canvas, id, collapsed),
       () => ({}),
     );
+  },
+
+  /**
+   * Reveal the whole branch under `id`: clears `collapsed` on the node and
+   * on every descendant (`setCollapsed` only reveals one level).
+   */
+  expandSubtree(id: UUID): void {
+    commitCanvasWrite(
+      'expandSubtree',
+      (s) => mutExpandSubtree(s.canvas, id),
+      () => ({}),
+    );
+  },
+
+  /** Rename the canvas (project). Validated and timestamped like any edit. */
+  setTitle(title: string): void {
+    commitCanvasWrite(
+      'setTitle',
+      (s) => mutSetCanvasTitle(s.canvas, title),
+      () => ({}),
+      'setTitle',
+    );
+  },
+
+  /**
+   * Replace the canvas with a derived one (auto layout, loading an example).
+   * The result goes through the same schema check as every other write and
+   * is a single undo step.
+   */
+  applyCanvas(next: Canvas): void {
+    commitCanvasWrite(
+      'applyCanvas',
+      () => next,
+      (parsed, s) => uiForCanvas(parsed, s),
+    );
+  },
+
+  /**
+   * Swap in a canvas that was loaded from the server (project open/switch).
+   * Resets selection, open dialogs and undo history: they belong to the
+   * previous project.
+   */
+  loadCanvas(canvas: Canvas): void {
+    clearHistory();
+    useCanvasStore.setState({
+      canvas,
+      selection: { nodeId: null },
+      editor: { openNodeId: null },
+      deletePrompt: { nodeId: null },
+    });
+  },
+
+  /** Step back to the canvas before the last edit. */
+  undo(): void {
+    const previous = undoStack.pop();
+    if (previous === undefined) return;
+    const state = useCanvasStore.getState();
+    redoStack.push(state.canvas);
+    lastCoalesceKey = null;
+    useCanvasStore.setState({ canvas: previous, ...uiForCanvas(previous, state) });
+  },
+
+  /** Re-apply an edit that was undone. */
+  redo(): void {
+    const next = redoStack.pop();
+    if (next === undefined) return;
+    const state = useCanvasStore.getState();
+    undoStack.push(state.canvas);
+    lastCoalesceKey = null;
+    useCanvasStore.setState({ canvas: next, ...uiForCanvas(next, state) });
   },
 
   /**

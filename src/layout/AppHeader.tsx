@@ -8,10 +8,14 @@ import { PanelLeftIcon, PanelRightIcon } from './panelIcons';
 
 export interface AppHeaderProps {
   readonly title: string;
+  /** Longest title the rename field accepts. */
+  readonly titleMaxLength?: number;
   readonly onTitleChange?: (newTitle: string) => void;
   readonly nodeCount: number;
   readonly branchCount: number;
   readonly onAddNode: () => void;
+  /** Disable Add Idea while there is no project to add to (still loading, or failed to load). */
+  readonly addNodeDisabled?: boolean;
   /** Tooltip for the Add Idea button, e.g. which idea the new card will branch from. */
   readonly addNodeHint?: string;
   readonly isSidebarOpen?: boolean;
@@ -35,14 +39,18 @@ const GUIDE_ITEMS: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
   { keys: ['Scroll'], label: 'Zoom in and out' },
   { keys: ['Del'], label: 'Delete the selected idea' },
   { keys: ['N'], label: 'Start the first idea on an empty canvas' },
+  { keys: ['Ctrl/⌘', 'Z'], label: 'Undo the last change' },
+  { keys: ['Ctrl/⌘', 'Shift', 'Z'], label: 'Redo' },
 ];
 
 export function AppHeader({
   title,
+  titleMaxLength,
   onTitleChange,
   nodeCount,
   branchCount,
   onAddNode,
+  addNodeDisabled = false,
   addNodeHint,
   isSidebarOpen = true,
   onToggleSidebar,
@@ -132,6 +140,7 @@ export function AppHeader({
                 }
               }}
               autoFocus
+              maxLength={titleMaxLength}
               aria-label="Project title"
               className="font-serif text-[17px] font-medium text-[#000000] border-b border-[#000000] bg-transparent outline-none px-1 py-0.5 min-w-[220px]"
             />
@@ -225,6 +234,9 @@ export function AppHeader({
               <p className="font-serif text-[13px] leading-[19px] text-[#404040] m-0 mb-3">
                 Hover an idea to branch, edit or collapse it. Drag from a card&apos;s edge dot to another card to connect them.
               </p>
+              <p className="font-serif text-[13px] leading-[19px] text-[#404040] m-0 mb-3">
+                A dashed connector leads to a Question; every other connector is solid.
+              </p>
               <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
                 {GUIDE_ITEMS.map((item) => (
                   <li key={item.label} className="flex items-center justify-between gap-3">
@@ -245,6 +257,7 @@ export function AppHeader({
           size="sm"
           variant="primary"
           onClick={onAddNode}
+          disabled={addNodeDisabled}
           title={addNodeHint}
           className="text-[11px] px-3"
           icon={
