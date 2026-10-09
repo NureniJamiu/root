@@ -31,6 +31,7 @@ import { useEffect, useRef } from 'react';
 
 import { descendantCount, useCanvasStore } from '../data';
 import type { Node, UUID } from '../data';
+import { Button } from '../ui';
 
 /**
  * The two confirm modes exposed by the prompt. `nodeOnly` removes the target
@@ -74,6 +75,7 @@ export function DeletePrompt({
 }: DeletePromptProps): JSX.Element | null {
   const node = useCanvasStore(selectNode(nodeId));
   const hasChildren = useCanvasStore(selectHasDependents(nodeId));
+  const branchCount = useCanvasStore((s) => descendantCount(s.canvas, nodeId));
 
   // Keep the latest `onConfirm` in a ref so the leaf-bypass effect only
   // depends on the target's identity, not on a callback whose reference
@@ -123,12 +125,8 @@ export function DeletePrompt({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      // A translucent black backdrop keeps the modal readable without
-      // relying on shadows (design.md §Visual Design: flat material, no
-      // shadows). Clicking the backdrop cancels — matches the editor's
-      // click-away behavior in task 11.1.
-      style={{ background: 'rgba(0, 0, 0, 0.4)' }}
+      className="root-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
+      // Clicking the backdrop cancels, like the editor's click-away.
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
@@ -139,39 +137,40 @@ export function DeletePrompt({
         aria-modal="true"
         aria-labelledby="delete-prompt-title"
         aria-describedby="delete-prompt-body"
-        className="rounded-sm"
-        style={{
-          background: '#ffffff',         // color.surface.raised
-          color: '#191818',              // color.text.primary
-          border: '1px solid #312e2e',   // color.text.tertiary
-          borderRadius: 8,               // radius.sm
-          minWidth: 360,
-          maxWidth: 480,
-          padding: 16,                   // space.7
-        }}
+        className="root-modal-panel w-[440px] max-w-full bg-[#ffffff] text-[#1b1c1c] border border-[#d9d9de] rounded-[4px] overflow-hidden"
         data-testid="delete-prompt"
       >
-        <h2
-          id="delete-prompt-title"
-          className="text-body"
-          style={{ margin: 0, fontWeight: 400, fontSize: 16 }}
-        >
-          Delete this idea?
-        </h2>
+        <div className="relative px-6 pt-5 pb-4">
+          <span className="absolute left-0 top-0 h-[3px] w-full bg-[#ba1a1a]" aria-hidden="true" />
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-full bg-[#fdf2f2] text-[#ba1a1a]" aria-hidden="true">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 6h18" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </span>
+            <div className="flex flex-col gap-1 min-w-0">
+              <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[#737785]">
+                Delete idea
+              </span>
+              <h2 id="delete-prompt-title" className="font-serif text-[20px] leading-[26px] font-normal text-[#000000] m-0 truncate">
+                {node.title.trim() ? `Delete “${node.title.trim()}”?` : 'Delete this idea?'}
+              </h2>
+              <p id="delete-prompt-body" className="font-serif text-[14px] leading-[21px] text-[#404040] m-0">
+                Some ideas hang only from this one. What should happen to them?
+              </p>
+            </div>
+          </div>
+        </div>
 
-        <p
-          id="delete-prompt-body"
-          className="text-body"
-          style={{ margin: '8px 0 16px 0' }}
-        >
-          Some ideas hang only from this one. What should happen to them?
-        </p>
-
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 px-6 pb-5">
           <ChoiceButton
             testId="btn-delete-node-only"
             onClick={() => onConfirm('nodeOnly')}
             title="Remove this idea and its connectors. The ideas it was connected to stay."
+            hint="Connected ideas stay on the canvas."
           >
             Delete this idea only
           </ChoiceButton>
@@ -180,19 +179,18 @@ export function DeletePrompt({
             testId="btn-delete-subtree"
             onClick={() => onConfirm('subtree')}
             title="Remove this idea and every idea that hangs only from it."
+            hint={`Also removes the ${branchCount} idea${branchCount === 1 ? '' : 's'} below it.`}
+            danger
           >
             Delete idea and everything that hangs from it
           </ChoiceButton>
         </div>
 
-        <div className="mt-4 flex flex-row justify-end">
-          <ChoiceButton
-            testId="btn-delete-cancel"
-            onClick={onCancel}
-            variant="secondary"
-          >
+        <div className="flex flex-row items-center justify-between px-6 py-3.5 border-t border-[#ebebeb] bg-[#fbfbfc]">
+          <span className="font-mono text-[10px] text-[#737785]">Undo brings it back.</span>
+          <Button variant="secondary" size="md" onClick={onCancel} data-testid="btn-delete-cancel">
             Cancel
-          </ChoiceButton>
+          </Button>
         </div>
       </div>
     </div>
@@ -207,41 +205,30 @@ interface ChoiceButtonProps {
   readonly testId: string;
   readonly onClick: () => void;
   readonly children: React.ReactNode;
-  readonly disabled?: boolean;
   readonly title?: string;
-  /**
-   * `primary` — filled, used for the two confirm choices.
-   * `secondary` — outlined, used for Cancel.
-   */
-  readonly variant?: 'primary' | 'secondary';
+  /** One-line consequence shown under the label. */
+  readonly hint?: string;
+  /** The stronger of the two choices: filled red. */
+  readonly danger?: boolean;
 }
 
-function ChoiceButton({
-  testId,
-  onClick,
-  children,
-  disabled = false,
-  title,
-  variant = 'primary',
-}: ChoiceButtonProps): JSX.Element {
-  const filled = variant === 'primary';
+function ChoiceButton({ testId, onClick, children, title, hint, danger = false }: ChoiceButtonProps): JSX.Element {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
       title={title}
       data-testid={testId}
-      className="rounded-xs px-2 py-1 text-body transition-colors"
-      style={{
-        border: `1px solid ${filled ? '#ba1a1a' : '#312e2e'}`, // strong : text.tertiary
-        background: filled ? (disabled ? '#f6f5f4' : '#ba1a1a') : '#ffffff', // muted : strong : raised
-        color: filled ? (disabled ? '#312e2e' : '#ffffff') : '#191818',       // tertiary : raised : primary
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        boxShadow: 'none',
-      }}
+      className={`group w-full flex flex-col items-start gap-0.5 px-4 py-3 text-left rounded-[3px] border transition-colors duration-150 cursor-pointer ${
+        danger
+          ? 'bg-[#ba1a1a] border-[#ba1a1a] text-[#ffffff] hover:bg-[#93000a] hover:border-[#93000a]'
+          : 'bg-[#ffffff] border-[#e3c4c4] text-[#ba1a1a] hover:bg-[#fdf2f2] hover:border-[#ba1a1a]'
+      }`}
     >
-      {children}
+      <span className="font-mono text-[12px] font-medium">{children}</span>
+      {hint && (
+        <span className={`font-serif text-[12.5px] ${danger ? 'text-[#ffffff]/80' : 'text-[#595959]'}`}>{hint}</span>
+      )}
     </button>
   );
 }

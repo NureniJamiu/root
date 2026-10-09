@@ -45,11 +45,13 @@ import { canvasActions, isDuplicateEdge, useCanvasStore } from '../data';
 import type { NodeType, Position, Side, UUID } from '../data';
 import { FitViewIcon, NodeCard, ZoomInIcon, ZoomOutIcon } from '../nodes';
 
+import { BranchToolbarGroup, WalkthroughBar } from './BranchControls';
 import { ConnectorEdge } from './ConnectorEdge';
 import { CONNECTION_LINE_STYLE, CONNECTOR_EDGE_TYPE } from './edgeStyles';
 import { getMeasuredSizes, setMeasuredSize } from './measuredSizes';
 import type { NodeSize } from './measuredSizes';
 import { relayoutEdges, useReactFlowGraph } from './useReactFlowGraph';
+import { useBranchMotion } from './useBranchMotion';
 import { computeFacingSides, connectionToEnds, handleIdToSide, nearestSide } from './reconnect';
 import { NODE_HEIGHT, computeTreeLayout, findFreePosition } from './placement';
 
@@ -136,6 +138,22 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   const selectedNodeId = useCanvasStore((s) => s.selection.nodeId);
 
   const { nodes: derivedNodes, edges: derivedEdges } = useReactFlowGraph();
+
+  // Every selected card (Ctrl/⌘-click or a drag box selects several). The
+  // store keeps the one the inspector shows; this keeps the rest so they
+  // stay highlighted and branch controls can act on all of them.
+  const [multiSelected, setMultiSelected] = useState<ReadonlySet<UUID>>(() => new Set());
+  const multiSelectedRef = useRef<ReadonlySet<UUID>>(multiSelected);
+  useEffect(() => {
+    const prev = multiSelectedRef.current;
+    let next = prev;
+    if (selectedNodeId === null) next = prev.size === 0 ? prev : new Set();
+    else if (!prev.has(selectedNodeId)) next = new Set([selectedNodeId]);
+    if (next !== prev) {
+      multiSelectedRef.current = next;
+      setMultiSelected(next);
+    }
+  }, [selectedNodeId]);
 
   // Card sizes measured by React Flow. React Flow keeps width/height on the
   // node objects it is given, so they are merged back in below.
@@ -280,13 +298,30 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     const measured: Array<[UUID, NodeSize]> = [];
     let selectedId: UUID | null = null;
+    const selectChanges: Array<{ id: UUID; selected: boolean }> = [];
     for (const change of changes) {
       if (change.type === 'dimensions' && change.dimensions) {
         if (setMeasuredSize(change.id, change.dimensions)) {
           measured.push([change.id, change.dimensions]);
         }
-      } else if (change.type === 'select' && change.selected) {
-        selectedId = change.id;
+      } else if (change.type === 'select') {
+        selectChanges.push({ id: change.id, selected: change.selected });
+        if (change.selected) selectedId = change.id;
+      }
+    }
+    if (selectChanges.length > 0) {
+      const next = new Set(multiSelectedRef.current);
+      for (const c of selectChanges) {
+        if (c.selected) next.add(c.id);
+        else next.delete(c.id);
+      }
+      multiSelectedRef.current = next;
+      setMultiSelected(next);
+      // Ctrl/⌘-click took the inspected card out of a multi-selection:
+      // inspect one of the cards still selected instead.
+      const current = useCanvasStore.getState().selection.nodeId;
+      if (selectedId === null && current !== null && !next.has(current) && next.size > 0) {
+        selectedId = [...next][next.size - 1] as UUID;
       }
     }
     if (measured.length > 0) {
@@ -315,7 +350,13 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   /* ----------------------------- selection ------------------------------ */
 
   const handleNodeClick = useCallback(
-    (_event: React.MouseEvent, node: { id: string }): void => {
+    (event: React.MouseEvent, node: { id: string }): void => {
+      // Ctrl/⌘-click toggles the card in a multi-selection; React Flow has
+      // already reported that through onNodesChange.
+      if ((event.metaKey || event.ctrlKey) && !multiSelectedRef.current.has(node.id)) {
+        if (useCanvasStore.getState().selection.nodeId === node.id) canvasActions.select(null);
+        return;
+      }
       canvasActions.select(node.id);
       onNodeSelect?.(node.id);
     },
@@ -535,7 +576,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       const size = sizes.get(dn.id);
       return {
         ...dn,
-        selected: dn.id === selectedNodeId,
+        selected: dn.id === selectedNodeId || multiSelected.has(dn.id),
         ...(size ? { width: size.width, height: size.height } : {}),
         ...(typeById
           ? {
@@ -547,12 +588,49 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
           : {}),
       };
     });
-  }, [derivedNodes, sizes, selectedNodeId, canvas.nodes, highlightType]);
+  }, [derivedNodes, sizes, selectedNodeId, multiSelected, canvas.nodes, highlightType]);
+
+  // Selected ideas that are on screen, for the branch controls.
+  const selectedIds = useMemo(() => {
+    const onScreen = new Set(derivedNodes.map((n) => n.id));
+    const ids = new Set<UUID>(multiSelected);
+    if (selectedNodeId !== null) ids.add(selectedNodeId);
+    return [...ids].filter((id) => onScreen.has(id));
+  }, [derivedNodes, multiSelected, selectedNodeId]);
+
+  // Bring a freshly revealed idea into view when it lands off screen.
+  const handleRevealed = useCallback(
+    (id: UUID) => {
+      const node = useCanvasStore.getState().canvas.nodes.find((n) => n.id === id);
+      const rect = surfaceRef.current?.getBoundingClientRect();
+      if (!node || !rect) return;
+      const size = getMeasuredSizes().get(id) ?? { width: CARD_WIDTH, height: NODE_HEIGHT };
+      const { x, y, zoom } = reactFlow.getViewport();
+      const left = node.position.x * zoom + x;
+      const top = node.position.y * zoom + y;
+      const margin = 48;
+      const inView =
+        left >= margin &&
+        top >= margin &&
+        left + size.width * zoom <= rect.width - margin &&
+        top + size.height * zoom <= rect.height - 96;
+      if (!inView) {
+        reactFlow.setCenter(node.position.x + size.width / 2, node.position.y + size.height / 2, {
+          zoom,
+          duration: 450,
+        });
+      }
+    },
+    [reactFlow],
+  );
 
   // During a drag only the dragged cards change; every other card keeps its object.
+  // Ideas grow out of / slide back into their parent as branches open and close.
+  const animated = useBranchMotion(canvas, baseNodes, derivedEdges);
+
   const displayNodes = useMemo(() => {
-    if (!livePositions) return baseNodes;
-    return baseNodes.map((n) => {
+    if (!livePositions) return animated.nodes;
+    return animated.nodes.map((n) => {
       const live = livePositions.get(n.id);
       if (!live) return n;
       const isPrimary = dragState?.nodeId === n.id;
@@ -567,12 +645,12 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
         },
       };
     });
-  }, [baseNodes, livePositions, dragState]);
+  }, [animated.nodes, livePositions, dragState]);
 
   // Automatic connector ends re-route live while a card is dragged.
   const displayEdges = useMemo(
-    () => (livePositions ? relayoutEdges(derivedEdges, canvas, livePositions) : derivedEdges),
-    [derivedEdges, canvas, livePositions],
+    () => (livePositions ? relayoutEdges(animated.edges, canvas, livePositions) : animated.edges),
+    [animated.edges, canvas, livePositions],
   );
 
   /* ------------------------------ keyboard ------------------------------ */
@@ -695,6 +773,8 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
           <Background id="major" variant={BackgroundVariant.Dots} gap={100} size={2.6} color="#9299b3" />
         </ReactFlow>
 
+        <WalkthroughBar onRevealed={handleRevealed} />
+
         {/* Canvas toolbar — the single home for viewport controls */}
         <div
           className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-[#ffffff] border border-[#ebebeb] rounded-[2px] p-1"
@@ -770,6 +850,10 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
               <path d="M12 14v2" />
             </svg>
           </ToolbarIconButton>
+
+          <ToolbarDivider />
+
+          <BranchToolbarGroup selectedIds={selectedIds} />
         </div>
       </div>
     </div>

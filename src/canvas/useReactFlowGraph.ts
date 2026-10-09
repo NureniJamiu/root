@@ -8,7 +8,8 @@
  *     `CanvasView`, and connectors follow their cards inside React Flow.
  *   - The visible-node set is computed via `visibleNodeIds(canvas)`, so the
  *     ideas hidden by a collapsed card, and every connector that touches one,
- *     are not handed to React Flow at all.
+ *     are not handed to React Flow at all — except those a walkthrough has
+ *     revealed (see `walkthrough.ts`).
  *   - RF `nodes` map 1:1 to visible domain nodes: `id`, `type: 'research'`,
  *     `position`, `data: { nodeId }`. The card reads its full `Node` back from
  *     the store on its own subscription.
@@ -21,12 +22,13 @@
 import { useMemo } from 'react';
 import type { Edge as RFEdge, Node as RFNode } from 'reactflow';
 
-import { resolveEdgeSides, useCanvasStore, visibleNodeIds } from '../data';
+import { resolveEdgeSides, useCanvasStore } from '../data';
 import type { Canvas, Position, UUID } from '../data';
 
 import { CONNECTOR_EDGE_TYPE, EDGE_COLOR_BY_TYPE, EDGE_INTERACTION_WIDTH } from './edgeStyles';
 import type { ConnectorEdgeData } from './ConnectorEdge';
 import { sourceHandleId, targetHandleId } from './reconnect';
+import { shownNodeIds, useWalkthroughStore } from './walkthrough';
 
 /**
  * The `data` payload React Flow attaches to every `'research'` node. Kept
@@ -39,6 +41,8 @@ export interface ResearchNodeData {
 
 export interface DeriveGraphOptions {
   readonly selectedEdgeId?: UUID | null;
+  /** Hidden ideas a walkthrough has revealed; shown as if expanded. */
+  readonly revealed?: readonly UUID[];
 }
 
 export interface ReactFlowGraph {
@@ -54,7 +58,7 @@ export function deriveReactFlowGraph(
   canvas: Canvas,
   options?: DeriveGraphOptions,
 ): ReactFlowGraph {
-  const visible = visibleNodeIds(canvas);
+  const visible = shownNodeIds(canvas, options?.revealed ?? []);
   const byId = new Map(canvas.nodes.map((n) => [n.id, n]));
 
   const nodes: RFNode<ResearchNodeData>[] = [];
@@ -133,5 +137,9 @@ function selectSelectedEdgeId(s: { selection: { edgeId: UUID | null } }): UUID |
 export function useReactFlowGraph(): ReactFlowGraph {
   const canvas = useCanvasStore(selectCanvas);
   const selectedEdgeId = useCanvasStore(selectSelectedEdgeId);
-  return useMemo(() => deriveReactFlowGraph(canvas, { selectedEdgeId }), [canvas, selectedEdgeId]);
+  const revealed = useWalkthroughStore((s) => s.revealed);
+  return useMemo(
+    () => deriveReactFlowGraph(canvas, { selectedEdgeId, revealed }),
+    [canvas, selectedEdgeId, revealed],
+  );
 }

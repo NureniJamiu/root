@@ -30,7 +30,7 @@ async function getProject(page: Page, id: string): Promise<ApiProject> {
 async function createRootTitled(page: Page, title: string): Promise<void> {
   await addIdea(page);
   await page.getByTestId('node-editor-title').fill(title);
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
 }
 
 test('switching projects keeps each canvas in its own project', async ({ dashboard: page }) => {

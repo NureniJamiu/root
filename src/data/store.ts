@@ -41,10 +41,12 @@ import {
   addImage as mutAddImage,
   addNode as mutAddNode,
   autoRouteEdge as mutAutoRouteEdge,
+  collapseMany as mutCollapseMany,
   connect as mutConnect,
   deleteNodeOnly as mutDeleteNodeOnly,
   deleteSubtree as mutDeleteSubtree,
   emptyCanvas,
+  expandMany as mutExpandMany,
   expandSubtree as mutExpandSubtree,
   moveNode as mutMoveNode,
   moveNodes as mutMoveNodes,
@@ -58,7 +60,15 @@ import {
 import type { ConnectorEnds, NodePatch } from './mutators';
 import { emitSaveError } from './storeEvents';
 import { subtreeIds } from './graph';
-import type { Canvas, ImageEntry, Position, Side, UUID } from './types';
+import type { Canvas, ImageEntry, NodeType, Position, Side, UUID } from './types';
+
+/** The values the node editor saves in one go. */
+export interface NodeEdits {
+  readonly title: string;
+  readonly body: string;
+  readonly type: NodeType;
+  readonly images: readonly ImageEntry[];
+}
 
 /* -------------------------------------------------------------------------- */
 /* State shape                                                                */
@@ -73,7 +83,8 @@ import type { Canvas, ImageEntry, Position, Side, UUID } from './types';
 export interface CanvasState {
   canvas: Canvas;
   selection: { nodeId: UUID | null; edgeId: UUID | null };
-  editor: { openNodeId: UUID | null };
+  /** `isNew` marks an idea that was just added, so Cancel can discard it. */
+  editor: { openNodeId: UUID | null; isNew?: boolean };
   deletePrompt: { nodeId: UUID | null };
   viewport: { x: number; y: number; zoom: number };
 }
@@ -291,7 +302,7 @@ export const canvasActions = {
       (s) => mutAddNode(s.canvas, { position }),
       (parsed, s) => {
         const newId = findNewNodeId(s.canvas, parsed);
-        return newId === null ? {} : { editor: { openNodeId: newId } };
+        return newId === null ? {} : { editor: { openNodeId: newId, isNew: true } };
       },
     );
   },
@@ -311,7 +322,7 @@ export const canvasActions = {
       (s) => mutAddChild(s.canvas, parentId, { position, ...sides }),
       (parsed, s) => {
         const newId = findNewNodeId(s.canvas, parsed);
-        return newId === null ? {} : { editor: { openNodeId: newId } };
+        return newId === null ? {} : { editor: { openNodeId: newId, isNew: true } };
       },
     );
   },
@@ -327,6 +338,67 @@ export const canvasActions = {
       () => ({}),
       `updateNode:${id}`,
     );
+  },
+
+  /**
+   * Commit everything the editor changed on `id` (text, type and images) as
+   * one undo step, then close the editor. Nothing is written when the
+   * values already match the node.
+   */
+  saveNodeEdits(id: UUID, edits: NodeEdits): void {
+    const node = useCanvasStore.getState().canvas.nodes.find((n) => n.id === id);
+    if (node === undefined) return;
+    const keep = new Set(edits.images.map((img) => img.id));
+    const had = new Set(node.images.map((img) => img.id));
+    const removed = node.images.filter((img) => !keep.has(img.id));
+    const added = edits.images.filter((img) => !had.has(img.id));
+    const textChanged =
+      node.title !== edits.title || node.body !== edits.body || node.type !== edits.type;
+    if (textChanged || removed.length > 0 || added.length > 0) {
+      commitCanvasWrite(
+        'saveNodeEdits',
+        (s) => {
+          let next = textChanged
+            ? mutUpdateNode(s.canvas, id, { title: edits.title, body: edits.body, type: edits.type })
+            : s.canvas;
+          for (const img of removed) next = mutRemoveImage(next, id, img.id);
+          for (const img of added) next = mutAddImage(next, id, img);
+          return next;
+        },
+        () => ({ editor: { openNodeId: null } }),
+      );
+    }
+    useCanvasStore.setState({ editor: { openNodeId: null } });
+  },
+
+  /**
+   * Cancel on a freshly added idea: take the idea (and its connector) back
+   * out as if it had never been added, leaving no undo step behind. Falls
+   * back to a plain delete when other edits landed after the add.
+   */
+  discardNewNode(id: UUID): void {
+    const state = useCanvasStore.getState();
+    const before = undoStack[undoStack.length - 1];
+    const wasLastAdd =
+      before !== undefined &&
+      !before.nodes.some((n) => n.id === id) &&
+      before.nodes.length === state.canvas.nodes.length - 1;
+    if (wasLastAdd) {
+      undoStack.pop();
+      lastCoalesceKey = null;
+      useCanvasStore.setState({
+        canvas: before,
+        ...uiForCanvas(before, state),
+        editor: { openNodeId: null },
+      });
+      return;
+    }
+    commitCanvasWrite(
+      'deleteNodeOnly',
+      (s) => mutDeleteNodeOnly(s.canvas, id),
+      (_parsed, s) => clearUiForRemoved(new Set<UUID>([id]), s),
+    );
+    useCanvasStore.setState({ editor: { openNodeId: null } });
   },
 
   /**
@@ -424,6 +496,30 @@ export const canvasActions = {
     commitCanvasWrite(
       'setCollapsed',
       (s) => mutSetCollapsed(s.canvas, id, collapsed),
+      () => ({}),
+    );
+  },
+
+  /**
+   * Collapse several ideas in one undo step; `'all'` collapses every idea
+   * that has something below it.
+   */
+  collapseNodes(ids: readonly UUID[] | 'all'): void {
+    commitCanvasWrite(
+      'collapseNodes',
+      (s) => mutCollapseMany(s.canvas, ids === 'all' ? s.canvas.nodes.map((n) => n.id) : ids),
+      () => ({}),
+    );
+  },
+
+  /**
+   * Expand several ideas and everything below them in one undo step;
+   * `'all'` expands the whole canvas.
+   */
+  expandNodes(ids: readonly UUID[] | 'all'): void {
+    commitCanvasWrite(
+      'expandNodes',
+      (s) => mutExpandMany(s.canvas, ids === 'all' ? s.canvas.nodes.map((n) => n.id) : ids),
       () => ({}),
     );
   },

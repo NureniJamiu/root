@@ -27,7 +27,7 @@ test('Persistence reload — state is preserved exactly after reload', async ({ 
   await titleInput.fill('Persisted Root');
 
   // ── Step 5: Close the editor ─────────────────────────────────────────────
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
   await expect(nodeEditor).not.toBeVisible();
 
   // ── Step 6: Add a child node ─────────────────────────────────────────────
@@ -43,7 +43,7 @@ test('Persistence reload — state is preserved exactly after reload', async ({ 
   await page.fill('[data-testid="node-editor-title"]', 'Persisted Child');
 
   // ── Step 8: Close the child editor ───────────────────────────────────────
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
   await expect(nodeEditor).not.toBeVisible();
 
   // ── Step 9: Wait until the save has reached the server (R8.1) ─────────────
@@ -66,7 +66,7 @@ test('Persistence reload — state is preserved exactly after reload', async ({ 
 test('Persistence — a second account starts with an empty canvas', async ({ dashboard: page, browser, baseURL }) => {
   await addIdea(page);
   await page.getByTestId('node-editor-title').fill('Private to the first user');
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
   await waitForSaved(page);
 
   // A different user in a different browser context: nothing is shared with them.

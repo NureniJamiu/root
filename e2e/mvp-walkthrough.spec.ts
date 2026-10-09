@@ -32,7 +32,7 @@ test('MVP walkthrough — build a two-node tree', async ({ dashboard: page }) =>
   await titleInput.fill('Root Research');
 
   // ── Step 6: Close the editor ─────────────────────────────────────────────
-  await page.keyboard.press('Escape');
+  await page.getByTestId('node-editor-save').click();
   await expect(nodeEditor).not.toBeVisible();
 
   // ── Step 7: Assert the node card's title shows "Root Research" ───────────

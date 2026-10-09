@@ -374,7 +374,7 @@ export function AppShell(): JSX.Element {
 
         {/* Node editor — rendered as a fixed overlay when a node is open. */}
         {openNodeId !== null && (
-          <NodeEditor nodeId={openNodeId} onClose={handleEditorClose} />
+          <NodeEditor key={openNodeId} nodeId={openNodeId} onClose={handleEditorClose} />
         )}
 
         {/* Delete prompt — rendered as a fixed overlay when a delete is

@@ -2,16 +2,15 @@
  * `NodeEditor` — the title / body / images / type editor for a single Node
  * (Requirements 4.1–4.7, design.md §Editor Flow).
  *
- * The editor is bound to a specific `nodeId` and reads its Node from the
- * Zustand store on every keystroke (via a memoized selector). Every user
- * action routes through `canvasActions` so the store remains the sole
- * mutation surface:
+ * The editor works on a local draft of the node (title, body, type and
+ * images). Nothing reaches the store until the user saves:
  *
- *   - Title / body typing         → `canvasActions.updateNode({...})`
- *   - Type button                 → `canvasActions.updateNode({type})`
- *   - Image drop / paste / pick   → `canvasActions.addImage(nodeId, entry)`
- *   - Image delete                → `canvasActions.removeImage(nodeId, id)`
- *   - Esc key / click-away        → `canvasActions.closeEditor()`
+ *   - Save (button, Enter in the title, Cmd/Ctrl+Enter)
+ *       → `canvasActions.saveNodeEdits(nodeId, draft)` — one undo step
+ *   - Cancel (button, Esc, click-away while nothing changed)
+ *       → `canvasActions.closeEditor()`, or `discardNewNode(nodeId)` when
+ *         the idea was only just added, so cancelling an add leaves nothing
+ *         behind.
  *
  * Structural caps come from `maxLength` on the inputs (200 / 20 000 —
  * design.md §Edge Cases and Boundary Conditions), and the body character
@@ -25,9 +24,9 @@
  * the drop zone border flashes red once so the user knows the drop was
  * seen but rejected (design.md §Edge Cases and Boundary Conditions).
  *
- * The editor renders as an overlay with a translucent backdrop; clicks
- * on the backdrop close the editor. The panel itself stops propagation
- * so interior clicks never register as click-away.
+ * The editor renders as an overlay with a translucent backdrop. Clicking
+ * the backdrop cancels only while the draft is unchanged, so a stray click
+ * never throws away typing.
  */
 
 import {
@@ -42,6 +41,7 @@ import type {
   ChangeEvent,
   ClipboardEvent,
   DragEvent as ReactDragEvent,
+  KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
 } from 'react';
 
@@ -52,7 +52,8 @@ import {
   canvasActions,
   useCanvasStore,
 } from '../data';
-import type { ImageEntry, Node, NodeType, UUID } from '../data';
+import type { ImageEntry, Node, NodeEdits, NodeType, UUID } from '../data';
+import { Button } from '../ui';
 
 import { typeStyles } from './typeStyles';
 
@@ -89,13 +90,6 @@ const TYPE_ORDER: readonly NodeType[] = [
 ];
 
 /**
- * Palette color used for the selected type button's border — uses
- * DESIGN.md color.surface.strong token so the selection indicator
- * matches the card selection border and the overall accent.
- */
-const SURFACE_STRONG = '#0051c3'; // cobalt: selection / action accent
-
-/**
  * Palette color used when the character counter is in warn state, and
  * for the drop-zone-rejected border flash. Uses color.surface.strong
  * as the single "alert/action" accent in the new palette.
@@ -107,6 +101,27 @@ const SECONDARY = '#de5052'; // warning accent
  * dropped. motion.duration.normal = 150ms from DESIGN.md.
  */
 const FLASH_MS = 150; // motion.duration.normal
+
+/** Display names for the type picker and header. */
+const TYPE_LABEL: { readonly [K in NodeType]: string } = {
+  topic: 'Topic',
+  finding: 'Finding',
+  question: 'Question',
+  conclusion: 'Conclusion',
+};
+
+const FIELD_LABEL =
+  'font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[#595959]';
+
+const FIELD_INPUT =
+  'w-full bg-[#ffffff] text-[#1b1c1c] border border-[#c3c6d6] rounded-[3px] outline-none placeholder:text-[#a3a6b4] transition-[border-color,box-shadow] duration-150 hover:border-[#9299b3] focus:border-[#0051c3] focus:shadow-[0_0_0_3px_rgba(0,81,195,0.12)]';
+
+const KBD =
+  'inline-flex items-center px-1 h-4 mr-1 rounded-[2px] border border-[#d9d9de] bg-[#ffffff] text-[9.5px] text-[#404040]';
+
+/** Shortcut hint for the save key: ⌘ on Apple platforms, Ctrl elsewhere. */
+const MOD_KEY =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 
 /* -------------------------------------------------------------------------- */
 /* Public types                                                               */
@@ -138,6 +153,22 @@ function selectNode(nodeId: UUID) {
 
 function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | null {
   const node = useCanvasStore(selectNode(nodeId));
+  const isNew = useCanvasStore((s) => s.editor.openNodeId === nodeId && s.editor.isNew === true);
+
+  // The draft is seeded once from the node; the store is only written on Save.
+  const [draft, setDraft] = useState<NodeEdits | null>(() =>
+    node === undefined
+      ? null
+      : { title: node.title, body: node.body, type: node.type, images: node.images },
+  );
+  const isDirty =
+    node !== undefined &&
+    draft !== null &&
+    (draft.title !== node.title ||
+      draft.body !== node.body ||
+      draft.type !== node.type ||
+      draft.images.length !== node.images.length ||
+      draft.images.some((img, i) => img.id !== node.images[i]?.id));
 
   const [imageError, setImageError] = useState<string | null>(null);
   const [dropFlash, setDropFlash] = useState(false);
@@ -149,24 +180,33 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
   /* Close plumbing                                                     */
   /* ------------------------------------------------------------------ */
 
-  const close = useCallback((): void => {
-    canvasActions.closeEditor();
+  const cancel = useCallback((): void => {
+    if (isNew) canvasActions.discardNewNode(nodeId);
+    else canvasActions.closeEditor();
     onClose();
-  }, [onClose]);
+  }, [isNew, nodeId, onClose]);
 
-  // Esc closes the editor from anywhere in the document — the editor
-  // does not need to hold focus for the shortcut to work (design.md
-  // §Editor Flow).
+  const save = useCallback((): void => {
+    if (draft !== null) canvasActions.saveNodeEdits(nodeId, draft);
+    else canvasActions.closeEditor();
+    onClose();
+  }, [draft, nodeId, onClose]);
+
+  // Esc cancels and Cmd/Ctrl+Enter saves from anywhere in the document —
+  // the editor does not need to hold focus for the shortcuts to work.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent): void {
       if (e.key === 'Escape') {
         e.preventDefault();
-        close();
+        cancel();
+      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        save();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [close]);
+  }, [cancel, save]);
 
   // Clear any pending flash timeout on unmount so we don't call
   // `setState` on a stale component.
@@ -225,11 +265,11 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
           addedAt: new Date().toISOString(),
         };
         setImageError(null);
-        canvasActions.addImage(nodeId, entry);
+        setDraft((d) => (d === null ? d : { ...d, images: [...d.images, entry] }));
       };
       reader.readAsDataURL(file);
     },
-    [flashDropZone, nodeId],
+    [flashDropZone],
   );
 
   const ingestFiles = useCallback(
@@ -299,33 +339,33 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
   /* Text handlers                                                      */
   /* ------------------------------------------------------------------ */
 
-  const onTitleChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>): void => {
-      canvasActions.updateNode(nodeId, { title: e.target.value });
+  const onTitleChange = useCallback((e: ChangeEvent<HTMLInputElement>): void => {
+    const title = e.target.value;
+    setDraft((d) => (d === null ? d : { ...d, title }));
+  }, []);
+
+  const onTitleKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLInputElement>): void => {
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
+        e.preventDefault();
+        save();
+      }
     },
-    [nodeId],
+    [save],
   );
 
-  const onBodyChange = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>): void => {
-      canvasActions.updateNode(nodeId, { body: e.target.value });
-    },
-    [nodeId],
-  );
+  const onBodyChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>): void => {
+    const body = e.target.value;
+    setDraft((d) => (d === null ? d : { ...d, body }));
+  }, []);
 
-  const onPickType = useCallback(
-    (t: NodeType): void => {
-      canvasActions.updateNode(nodeId, { type: t });
-    },
-    [nodeId],
-  );
+  const onPickType = useCallback((t: NodeType): void => {
+    setDraft((d) => (d === null ? d : { ...d, type: t }));
+  }, []);
 
-  const onRemoveImage = useCallback(
-    (imageId: UUID): void => {
-      canvasActions.removeImage(nodeId, imageId);
-    },
-    [nodeId],
-  );
+  const onRemoveImage = useCallback((imageId: UUID): void => {
+    setDraft((d) => (d === null ? d : { ...d, images: d.images.filter((img) => img.id !== imageId) }));
+  }, []);
 
   /* ------------------------------------------------------------------ */
   /* Click-away                                                         */
@@ -337,11 +377,11 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
       // mousedown inside the panel bubbles here but with a different
       // target, so click-away is not falsely triggered by e.g.
       // selecting text in the body textarea.
-      if (e.target === e.currentTarget) {
-        close();
+      if (e.target === e.currentTarget && !isDirty) {
+        cancel();
       }
     },
-    [close],
+    [cancel, isDirty],
   );
 
   /* ------------------------------------------------------------------ */
@@ -349,12 +389,12 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
   /* ------------------------------------------------------------------ */
 
   // Body counter color: red in the last 200 characters of headroom.
-  const bodyLength = node?.body.length ?? 0;
+  const bodyLength = draft?.body.length ?? 0;
   const counterWarn = bodyLength > BODY_COUNTER_WARN_AT;
 
   // Drop zone border: solid text.tertiary normally, surface.strong during a flash.
   const dropZoneBorder = useMemo(() => {
-    return dropFlash ? `2px solid ${SECONDARY}` : '2px dashed #312e2e'; // color.text.tertiary
+    return dropFlash ? `1.5px solid ${SECONDARY}` : '1.5px dashed #c3c6d6'; // outline-variant
   }, [dropFlash]);
 
   /* ------------------------------------------------------------------ */
@@ -363,261 +403,229 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
 
   // Guard: node deleted while editor was open. Return `null` so the
   // parent's re-render can drop the editor cleanly.
-  if (node === undefined) return null;
+  if (node === undefined || draft === null) return null;
+
+  const typeLabel = TYPE_LABEL[draft.type];
+  const accent = typeStyles[draft.type].border;
 
   return (
     <div
       // Backdrop: full-viewport overlay. `data-testid` lets component
       // tests target the click-away zone unambiguously.
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0, 0, 0, 0.55)' }}
+      className="root-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
       data-testid="node-editor-backdrop"
       onMouseDown={onBackdropMouseDown}
       role="dialog"
       aria-modal="true"
-      aria-label="Node editor"
+      aria-label={isNew ? 'New idea' : 'Edit idea'}
     >
       <div
-        // Panel: opaque card carrying the editor UI. Clicks inside are
-        // caught by React's synthetic system; the backdrop's mousedown
-        // handler ignores events whose target is not the backdrop
-        // itself, so this container does not need to `stopPropagation`.
-        className="flex flex-col gap-3"
-        style={{
-          background: '#ffffff',         // color.surface.raised
-          color: '#191818',              // color.text.primary
-          border: '1px solid #312e2e',   // color.text.tertiary
-          borderRadius: 8,               // radius.sm
-          padding: 16,                   // space.7
-          width: 480,
-          maxWidth: '90vw',
-          maxHeight: '90vh',
-          overflow: 'auto',
-        }}
+        className="root-modal-panel flex flex-col w-[560px] max-w-full max-h-[90vh] bg-[#ffffff] text-[#1b1c1c] border border-[#d9d9de] rounded-[4px] overflow-hidden"
         data-testid="node-editor"
         onPaste={onPaste}
       >
-        {/* Title -------------------------------------------------------- */}
-        <label className="flex flex-col gap-1 text-body">
-          <span style={{ color: '#312e2e' }}>Title</span>
-          <input
-            ref={titleRef}
-            type="text"
-            value={node.title}
-            onChange={onTitleChange}
-            maxLength={TITLE_MAX}
-            autoFocus
-            className="text-body"
-            style={{
-              border: '1px solid #312e2e',   // color.text.tertiary
-              borderRadius: 6,               // radius.xs
-              padding: '4px 6px',            // space.1 / space.2
-              background: '#ffffff',         // color.surface.raised
-              color: '#191818',              // color.text.primary
-              outline: 'none',
-            }}
-            data-testid="node-editor-title"
+        {/* Header ------------------------------------------------------- */}
+        <div className="relative flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-[#ebebeb]">
+          <span
+            className="absolute left-0 top-0 h-[3px] w-full transition-colors duration-200"
+            style={{ background: accent }}
+            aria-hidden="true"
           />
-        </label>
-
-        {/* Body --------------------------------------------------------- */}
-        <label className="flex flex-col gap-1 text-body">
-          <span style={{ color: '#312e2e' }}>Notes & Details</span>
-          <textarea
-            value={node.body}
-            onChange={onBodyChange}
-            maxLength={BODY_MAX}
-            rows={8}
-            className="text-body"
-            style={{
-              border: '1px solid #312e2e',   // color.text.tertiary
-              borderRadius: 6,               // radius.xs
-              padding: '4px 6px',
-              background: '#ffffff',         // color.surface.raised
-              color: '#191818',              // color.text.primary
-              outline: 'none',
-              resize: 'vertical',
-            }}
-            data-testid="node-editor-body"
-          />
-          <div
-            className="text-body"
-            style={{
-              alignSelf: 'flex-end',
-              color: counterWarn ? SECONDARY : '#312e2e', // warn: surface.strong, normal: text.tertiary
-            }}
-            data-testid="node-editor-body-counter"
-          >
-            {bodyLength}/{BODY_MAX}
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-[#737785]">
+              {isNew ? 'New idea' : 'Edit idea'} · {typeLabel}
+            </span>
+            <h2 className="font-serif text-[22px] leading-[28px] font-normal text-[#000000] truncate">
+              {draft.title.trim() || (isNew ? 'Untitled idea' : 'Untitled')}
+            </h2>
           </div>
-        </label>
-
-        {/* Type picker -------------------------------------------------- */}
-        <div className="flex flex-col gap-1 text-body">
-          <span style={{ color: '#312e2e' }}>Card Type</span>
-          <div
-            className="flex flex-row gap-2"
-            data-testid="node-editor-type-buttons"
+          <button
+            type="button"
+            onClick={cancel}
+            aria-label="Close without saving"
+            title="Close without saving (Esc)"
+            className="shrink-0 w-8 h-8 -mr-2 inline-flex items-center justify-center rounded-[2px] text-[#737785] hover:text-[#000000] hover:bg-[#f5f3f3] transition-colors cursor-pointer"
+            data-testid="node-editor-dismiss"
           >
-            {TYPE_ORDER.map((t) => {
-              const style = typeStyles[t];
-              const isSelected = node.type === t;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => onPickType(t)}
-                  aria-pressed={isSelected}
-                  className="rounded-xs text-body transition-colors"
-                  style={{
-                    // Selection swaps the border to the 2 px surface.strong
-                    // stroke (matches NodeCard selection rule); the base
-                    // stroke tracks the type's own border color.
-                    border: isSelected
-                      ? `2px solid ${SURFACE_STRONG}`
-                      : `1px solid ${style.border}`,
-                    background: style.background,
-                    color: style.text,
-                    padding: isSelected ? '3px 7px' : '4px 8px',
-                    cursor: 'pointer',
-                  }}
-                  data-testid={`node-editor-type-${t}`}
-                >
-                  {t}
-                </button>
-              );
-            })}
-          </div>
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
+          </button>
         </div>
 
-        {/* Images ------------------------------------------------------- */}
-        <div className="flex flex-col gap-2 text-body">
-          <span style={{ color: '#312e2e' }}>Images & Visuals</span>
-
-          <div
-            // Drop zone: dashed border, hollow center. Border flashes
-            // red for FLASH_MS on non-image drops.
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            onDragEnter={onDragOver}
-            className="flex flex-col items-center justify-center gap-2 text-body transition-colors"
-            style={{
-              border: dropZoneBorder,
-              borderRadius: 8,              // radius.sm
-              padding: 12,                  // space.6
-              minHeight: 72,
-              color: '#312e2e',             // color.text.tertiary
-            }}
-            data-testid="node-editor-drop-zone"
-            data-flashing={dropFlash ? 'true' : 'false'}
-          >
-            <div>Drop images or visuals here, paste, or</div>
-            <button
-              type="button"
-              onClick={openFilePicker}
-              className="rounded-xs text-body"
-              style={{
-                border: '1px solid #312e2e',   // color.text.tertiary
-                background: '#ffffff',          // color.surface.raised
-                color: '#191818',               // color.text.primary
-                padding: '3px 8px',
-                cursor: 'pointer',
-              }}
-              data-testid="node-editor-pick-file"
-            >
-              Choose files…
-            </button>
+        {/* Body --------------------------------------------------------- */}
+        <div className="flex flex-col gap-5 px-6 py-5 overflow-y-auto">
+          {/* Title */}
+          <label className="flex flex-col gap-1.5">
+            <span className={FIELD_LABEL}>Title</span>
             <input
-              ref={filePickerRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={onPickFiles}
-              style={{ display: 'none' }}
-              data-testid="node-editor-file-input"
+              ref={titleRef}
+              type="text"
+              value={draft.title}
+              onChange={onTitleChange}
+              onKeyDown={onTitleKeyDown}
+              maxLength={TITLE_MAX}
+              autoFocus
+              placeholder="Name this idea"
+              className={`${FIELD_INPUT} h-10 px-3 font-serif text-[16px]`}
+              data-testid="node-editor-title"
             />
+          </label>
+
+          {/* Type picker */}
+          <div className="flex flex-col gap-1.5">
+            <span className={FIELD_LABEL}>Card type</span>
+            <div
+              className="grid grid-cols-4 gap-1 p-1 bg-[#f5f3f3] rounded-[3px]"
+              role="group"
+              aria-label="Card type"
+              data-testid="node-editor-type-buttons"
+            >
+              {TYPE_ORDER.map((t) => {
+                const style = typeStyles[t];
+                const isSelected = draft.type === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => onPickType(t)}
+                    aria-pressed={isSelected}
+                    className={`h-8 inline-flex items-center justify-center gap-1.5 rounded-[2px] border font-mono text-[11px] transition-all duration-150 cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#ffffff] text-[#000000]'
+                        : 'border-transparent text-[#595959] hover:text-[#000000] hover:bg-[#ffffff]/60'
+                    }`}
+                    style={isSelected ? { borderColor: style.border } : undefined}
+                    data-testid={`node-editor-type-${t}`}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: style.border }}
+                      aria-hidden="true"
+                    />
+                    {TYPE_LABEL[t]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {imageError !== null ? (
-            <div
-              className="text-body"
-              style={{ color: SECONDARY }}
-              data-testid="node-editor-image-error"
-              role="alert"
-            >
-              {imageError}
-            </div>
-          ) : null}
+          {/* Notes */}
+          <label className="flex flex-col gap-1.5">
+            <span className="flex items-baseline justify-between">
+              <span className={FIELD_LABEL}>Notes &amp; details</span>
+              <span
+                className="font-mono text-[10px] tabular-nums"
+                style={{ color: counterWarn ? SECONDARY : '#737785' }}
+                data-testid="node-editor-body-counter"
+              >
+                {bodyLength}/{BODY_MAX}
+              </span>
+            </span>
+            <textarea
+              value={draft.body}
+              onChange={onBodyChange}
+              maxLength={BODY_MAX}
+              rows={7}
+              placeholder="Sources, evidence, open threads…"
+              className={`${FIELD_INPUT} px-3 py-2 font-serif text-[14px] leading-[22px] resize-y min-h-[120px]`}
+              data-testid="node-editor-body"
+            />
+          </label>
 
-          {node.images.length > 0 ? (
+          {/* Images */}
+          <div className="flex flex-col gap-1.5">
+            <span className={FIELD_LABEL}>Images &amp; visuals</span>
             <div
-              className="flex flex-row flex-wrap gap-2"
-              data-testid="node-editor-image-list"
+              // Drop zone: dashed border. Border flashes red for FLASH_MS
+              // on non-image drops.
+              onDrop={onDrop}
+              onDragOver={onDragOver}
+              onDragEnter={onDragOver}
+              className="flex flex-row items-center justify-center gap-3 px-4 py-4 rounded-[3px] bg-[#fbfbfc] transition-colors"
+              style={{ border: dropZoneBorder }}
+              data-testid="node-editor-drop-zone"
+              data-flashing={dropFlash ? 'true' : 'false'}
             >
-              {node.images.map((img) => (
-                <div
-                  key={img.id}
-                  className="relative"
-                  style={{
-                    border: '1px solid #312e2e',   // color.text.tertiary
-                    borderRadius: 6,               // radius.xs
-                    padding: 2,
-                    background: '#ffffff',         // color.surface.raised
-                  }}
-                >
-                  <img
-                    src={img.dataUrl}
-                    alt=""
-                    style={{
-                      width: 64,
-                      height: 64,
-                      objectFit: 'cover',
-                      display: 'block',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onRemoveImage(img.id)}
-                    aria-label="Remove image"
-                    className="rounded-xs text-body"
-                    style={{
-                      position: 'absolute',
-                      top: 2,
-                      right: 2,
-                      border: '1px solid #312e2e',   // color.text.tertiary
-                      background: '#ffffff',          // color.surface.raised
-                      color: '#191818',               // color.text.primary
-                      padding: '0 4px',
-                      cursor: 'pointer',
-                      lineHeight: 1.2,
-                    }}
-                    data-testid={`node-editor-remove-image-${img.id}`}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+              <svg className="w-5 h-5 text-[#9299b3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="m21 15-5-5L5 21" />
+              </svg>
+              <span className="font-serif text-[13px] text-[#595959]">Drop or paste images, or</span>
+              <button
+                type="button"
+                onClick={openFilePicker}
+                className="h-7 px-3 font-mono text-[11px] text-[#1b1c1c] bg-[#ffffff] border border-[#c3c6d6] rounded-[2px] hover:border-[#000000] transition-colors cursor-pointer"
+                data-testid="node-editor-pick-file"
+              >
+                Choose files…
+              </button>
+              <input
+                ref={filePickerRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={onPickFiles}
+                style={{ display: 'none' }}
+                data-testid="node-editor-file-input"
+              />
             </div>
-          ) : null}
+
+            {imageError !== null ? (
+              <div
+                className="font-mono text-[11px]"
+                style={{ color: SECONDARY }}
+                data-testid="node-editor-image-error"
+                role="alert"
+              >
+                {imageError}
+              </div>
+            ) : null}
+
+            {draft.images.length > 0 ? (
+              <div className="flex flex-row flex-wrap gap-2 pt-1" data-testid="node-editor-image-list">
+                {draft.images.map((img) => (
+                  <div
+                    key={img.id}
+                    className="group relative rounded-[3px] border border-[#ebebeb] bg-[#ffffff] p-0.5"
+                  >
+                    <img
+                      src={img.dataUrl}
+                      alt=""
+                      className="block w-[72px] h-[72px] object-cover rounded-[2px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onRemoveImage(img.id)}
+                      aria-label="Remove image"
+                      className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-[#000000]/70 text-[#ffffff] text-[10px] opacity-80 group-hover:opacity-100 hover:bg-[#ba1a1a] transition-all cursor-pointer"
+                      data-testid={`node-editor-remove-image-${img.id}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Footer ------------------------------------------------------- */}
-        <div className="flex flex-row justify-end">
-          <button
-            type="button"
-            onClick={close}
-            className="rounded-xs text-body"
-            style={{
-              border: '1px solid #312e2e',   // color.text.tertiary
-              background: '#ffffff',          // color.surface.raised
-              color: '#191818',               // color.text.primary
-              padding: '4px 10px',
-              cursor: 'pointer',
-            }}
-            data-testid="node-editor-close"
-          >
-            Close
-          </button>
+        <div className="flex flex-row items-center justify-between gap-3 px-6 py-3.5 border-t border-[#ebebeb] bg-[#fbfbfc]">
+          <span className="hidden sm:inline-flex items-center gap-3 font-mono text-[10px] text-[#737785]">
+            <span><kbd className={KBD}>Esc</kbd> cancel</span>
+            <span><kbd className={KBD}>{MOD_KEY}↵</kbd> save</span>
+          </span>
+          <div className="flex flex-row gap-2 ml-auto">
+            <Button variant="secondary" size="md" onClick={cancel} data-testid="node-editor-cancel">
+              Cancel
+            </Button>
+            <Button variant="cobalt" size="md" onClick={save} data-testid="node-editor-save">
+              Save
+            </Button>
+          </div>
         </div>
       </div>
     </div>

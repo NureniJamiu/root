@@ -513,7 +513,8 @@ test.describe('E2E: empty canvas and new ideas', () => {
     const box = (await pane.boundingBox())!;
     for (const [x, y] of [[250, 200], [650, 220], [450, 520]]) {
       await page.mouse.dblclick(box.x + x, box.y + y);
-      await page.keyboard.press('Escape');
+      // Save from the keyboard straight away, before the view refits around the first idea.
+      await page.keyboard.press('Control+Enter');
     }
     await expect(page.locator('[data-testid^="node-card-"]')).toHaveCount(3);
     expect(await edges(page)).toHaveLength(0);

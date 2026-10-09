@@ -54,10 +54,12 @@ export {
   addImage,
   addNode,
   autoRouteEdge,
+  collapseMany,
   connect,
   deleteNodeOnly,
   deleteSubtree,
   emptyCanvas,
+  expandMany,
   expandSubtree,
   moveNode,
   moveNodes,
@@ -100,7 +102,7 @@ export { parseCanvas, serializeCanvas } from './serialize';
 export type { ParseCanvasResult } from './serialize';
 
 export { canvasActions, useCanvasStore } from './store';
-export type { CanvasState } from './store';
+export type { CanvasState, NodeEdits } from './store';
 
 export { emitSaveError, onSaveError } from './storeEvents';
 export type { SaveErrorDetail } from './storeEvents';

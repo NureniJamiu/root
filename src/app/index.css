@@ -192,3 +192,119 @@ body {
   background: #0051c3;
   scale: 1.45;
 }
+
+/*
+ * Modals (node editor, delete prompt): a soft ink backdrop that fades in and
+ * a panel that rises into place.
+ */
+.root-modal-backdrop {
+  background: rgba(27, 28, 28, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: root-modal-backdrop-in 180ms ease-out both;
+}
+
+.root-modal-panel {
+  box-shadow: 0 24px 48px -12px rgba(27, 28, 28, 0.28), 0 2px 6px rgba(27, 28, 28, 0.06);
+  animation: root-modal-panel-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes root-modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes root-modal-panel-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root-modal-backdrop,
+  .root-modal-panel {
+    animation: none;
+  }
+}
+
+/*
+ * Branch motion (see canvas/useBranchMotion.ts). An idea that appears grows
+ * out of the idea it hangs from; one that is hidden slides back into it.
+ * --branch-dx / --branch-dy hold the offset to that parent.
+ */
+.react-flow__node.node-entering > * {
+  animation: root-branch-in 420ms cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+
+/* A card in flight does not catch clicks meant for what lies under it. */
+.react-flow__node.node-entering,
+.react-flow__node.node-leaving {
+  pointer-events: none;
+}
+
+.react-flow__node.node-leaving > * {
+  animation: root-branch-out 240ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.react-flow__edge.edge-entering {
+  animation: root-edge-in 360ms ease-out 80ms both;
+}
+
+.react-flow__edge.edge-leaving {
+  pointer-events: none;
+  animation: root-edge-out 180ms ease-in both;
+}
+
+@keyframes root-branch-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--branch-dx, 0), var(--branch-dy, 0)) scale(0.55);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes root-branch-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--branch-dx, 0), var(--branch-dy, 0)) scale(0.55);
+  }
+}
+
+@keyframes root-edge-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes root-edge-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* The walkthrough bar slides up into place. */
+.root-walkthrough-bar {
+  animation: root-walkthrough-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes root-walkthrough-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node.node-entering > *,
+  .react-flow__node.node-leaving > *,
+  .react-flow__edge.edge-entering,
+  .react-flow__edge.edge-leaving,
+  .root-walkthrough-bar {
+    animation: none;
+  }
+}

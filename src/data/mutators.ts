@@ -319,6 +319,50 @@ export function expandSubtree(c: Canvas, id: UUID): Canvas {
 }
 
 /* -------------------------------------------------------------------------- */
+/* collapseMany / expandMany                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Collapse every node in `ids` that has something connected below it (a
+ * node with no outgoing connector has nothing to hide). Returns `c`
+ * unchanged when nothing changes.
+ */
+export function collapseMany(c: Canvas, ids: Iterable<UUID>): Canvas {
+  const wanted = new Set(ids);
+  const hasChildren = new Set(c.edges.map((e) => e.source));
+  const ts = now();
+  let changed = false;
+  const nextNodes = c.nodes.map((n) => {
+    if (!wanted.has(n.id) || n.collapsed || !hasChildren.has(n.id)) return n;
+    changed = true;
+    return { ...n, collapsed: true, updatedAt: ts };
+  });
+  return changed ? { ...c, nodes: nextNodes, updatedAt: ts } : c;
+}
+
+/**
+ * Expand every node in `ids` together with its whole branch (as
+ * `expandSubtree` does for one node). Returns `c` unchanged when nothing in
+ * those branches is collapsed.
+ */
+export function expandMany(c: Canvas, ids: Iterable<UUID>): Canvas {
+  const branch = new Set<UUID>();
+  for (const id of ids) {
+    if (!c.nodes.some((n) => n.id === id)) continue;
+    branch.add(id);
+    for (const d of downstreamIds(c, id)) branch.add(d);
+  }
+  const ts = now();
+  let changed = false;
+  const nextNodes = c.nodes.map((n) => {
+    if (!branch.has(n.id) || !n.collapsed) return n;
+    changed = true;
+    return { ...n, collapsed: false, updatedAt: ts };
+  });
+  return changed ? { ...c, nodes: nextNodes, updatedAt: ts } : c;
+}
+
+/* -------------------------------------------------------------------------- */
 /* setCanvasTitle                                                             */
 /* -------------------------------------------------------------------------- */
 
