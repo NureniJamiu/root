@@ -372,3 +372,36 @@ body {
 .react-flow__node:focus-within {
   z-index: 1000 !important;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Formatted idea notes (MarkdownText)                                        */
+/* -------------------------------------------------------------------------- */
+
+.md-text > * + * {
+  margin-top: 0.4em;
+}
+.md-text p {
+  margin: 0;
+}
+.md-text .md-ul,
+.md-text .md-ol {
+  margin: 0;
+  padding-left: 1.15em;
+}
+.md-text .md-ul {
+  list-style: disc;
+}
+.md-text .md-ol {
+  list-style: decimal;
+}
+.md-text li + li {
+  margin-top: 0.1em;
+}
+.md-text .md-code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.86em;
+  padding: 0 0.25em;
+  border-radius: 2px;
+  background: rgb(var(--sunken));
+  color: rgb(var(--ink));
+}

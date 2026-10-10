@@ -9,6 +9,7 @@ export type AppRoute =
   | '/auth/login'
   | '/auth/register'
   | '/auth/forgot-password'
+  | '/auth/reset-password'
   | '/dashboard';
 
 export interface RouteMatch {
@@ -40,6 +41,9 @@ export function matchRoute(pathname: string): AppRoute {
     case '/auth/forgot-password':
     case '/forgot-password':
       return '/auth/forgot-password';
+    case '/auth/reset-password':
+    case '/reset-password':
+      return '/auth/reset-password';
     case '/dashboard':
     case '/app':
       return '/dashboard';

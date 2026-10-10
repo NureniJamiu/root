@@ -62,6 +62,7 @@ import {
 import type { ConnectorEnds, NodePatch } from './mutators';
 import { emitSaveError } from './storeEvents';
 import { subtreeIds } from './graph';
+import { NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
 import type { Canvas, ImageEntry, NodeType, Position, Side, UUID } from './types';
 
 /** The values the node editor saves in one go. */
@@ -327,6 +328,41 @@ export const canvasActions = {
         return newId === null ? {} : { editor: { openNodeId: newId, isNew: true } };
       },
     );
+  },
+
+  /**
+   * Add an idea with its content already filled in (for example from text
+   * selected in a document), optionally connected from `parentId`. Unlike
+   * `addNode` it does not open the editor. Returns the new idea's id, or
+   * `null` when nothing was added.
+   */
+  createIdea(opts: {
+    position: Position;
+    title: string;
+    body?: string;
+    type?: NodeType;
+    parentId?: UUID | null;
+  }): UUID | null {
+    let created: UUID | null = null;
+    commitCanvasWrite(
+      'createIdea',
+      (s) => {
+        const parentKnown = opts.parentId != null && s.canvas.nodes.some((n) => n.id === opts.parentId);
+        const added = parentKnown
+          ? mutAddChild(s.canvas, opts.parentId as UUID, { position: opts.position })
+          : mutAddNode(s.canvas, { position: opts.position });
+        const id = findNewNodeId(s.canvas, added);
+        if (id === null) return s.canvas;
+        created = id;
+        return mutUpdateNode(added, id, {
+          title: opts.title.slice(0, NODE_TITLE_MAX),
+          body: (opts.body ?? '').slice(0, NODE_BODY_MAX),
+          type: opts.type ?? 'finding',
+        });
+      },
+      () => ({}),
+    );
+    return useCanvasStore.getState().canvas.nodes.some((n) => n.id === created) ? created : null;
   },
 
   /**

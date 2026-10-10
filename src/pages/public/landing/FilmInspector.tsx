@@ -1,12 +1,12 @@
 /**
  * The idea panel shown in the product film when an idea is opened: notes,
- * gathered images, sources, documents and status. Drawn after the app's
+ * gathered images, sources, files and status. Drawn after the app's
  * inspector rail (white sheet, hairline sections, mono section labels,
  * serif title). Everything it shows comes from `PanelState`, so the film
  * script decides what is filled in at each moment.
  *
- * Documents are shown although uploads are still to come; the section
- * carries a "Soon" tag.
+ * Files (PDF uploads) are shown although uploads are still to come; the
+ * section carries a "Soon" tag. Written documents are `FilmDocument`.
  */
 
 import { PdfIcon } from './SceneCanvas';
@@ -213,10 +213,10 @@ export function FilmInspector({ state, content = FILM_CONTENT, width = PANEL_W }
             </div>
           </section>
 
-          {/* Documents */}
+          {/* Files */}
           <section>
             <div className="flex items-center justify-between mb-2">
-              <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.08em] text-faint">Documents</span>
+              <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.08em] text-faint">Files</span>
               <span className="font-mono text-[8px] uppercase tracking-[0.08em] text-topic border border-topic rounded-[2px] px-1">
                 Soon
               </span>

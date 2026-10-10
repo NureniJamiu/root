@@ -11,18 +11,32 @@
  *   5. back on the canvas, more findings are gathered with their own
  *      images and sources, and a conclusion is connected by hand;
  *   6. a walkthrough moves the camera from idea to idea;
- *   7. an end card, then the film loops.
+ *   7. a document opens beside the canvas: a title and a section are typed,
+ *      "PETase breaks down PET" is cited through the @ menu, and the
+ *      conclusion card is dragged in; each cited card shows "In 1 doc";
+ *   8. an end card, then the film loops.
  *
  * Cursor positions are worked out in stage coordinates. While the cursor
  * is on the canvas its keys are in world coordinates and follow the camera;
- * while it works in the idea panel they are in stage coordinates.
+ * while it works in the idea panel or the document they are in stage
+ * coordinates.
  */
 
+import { DOC_CLOSED, DOC_W } from './FilmDocument';
+import type { DocContent, DocState } from './FilmDocument';
 import { FILM_CONTENT } from './FilmInspector';
 import type { PanelState } from './FilmInspector';
 import { easeInOutCubic, easeOutBack, easeOutCubic, lerp, range } from './motion';
 import { CARD_H, CARD_W } from './SceneCanvas';
-import type { IdeaType, SceneCamera, SceneEdge, SceneFrame, SceneNode, SceneRipple } from './SceneCanvas';
+import type {
+  IdeaType,
+  SceneCamera,
+  SceneCursor,
+  SceneEdge,
+  SceneFrame,
+  SceneNode,
+  SceneRipple,
+} from './SceneCanvas';
 import type { SpecimenKind } from './Specimen';
 
 const NOTE_TEXT = FILM_CONTENT.note;
@@ -31,7 +45,7 @@ const PANEL_IMAGES = FILM_CONTENT.images;
 
 export const FILM_WIDTH = 960;
 export const FILM_HEIGHT = 540;
-export const FILM_DURATION = 33600;
+export const FILM_DURATION = 42100;
 
 export interface Chapter {
   readonly at: number;
@@ -46,11 +60,12 @@ export const CHAPTERS: readonly Chapter[] = [
   { at: 8200, label: 'Take notes' },
   { at: 10500, label: 'Gather images' },
   { at: 12400, label: 'Cite sources' },
-  { at: 15100, label: 'Attach documents' },
+  { at: 15100, label: 'Attach files' },
   { at: 17900, label: 'Verify & tag' },
   { at: 20900, label: 'Gather as you go' },
   { at: 25500, label: 'Walk through it' },
-  { at: 30600, label: 'Root' },
+  { at: 30400, label: 'Write it up' },
+  { at: 38900, label: 'Root' },
 ];
 
 export function chapterAt(t: number): number {
@@ -61,8 +76,8 @@ export function chapterAt(t: number): number {
   return index;
 }
 
-/** A moment worth showing when the film is not playing: the idea panel, full. */
-export const POSTER_TIME = 19700;
+/** A moment worth showing when the film is not playing: the map and its write-up, side by side. */
+export const POSTER_TIME = 38400;
 
 /* -------------------------------------------------------------------------- */
 /* Cast                                                                       */
@@ -110,7 +125,7 @@ const IMAGE_DROP = 11800;
 const IMAGE_AT: readonly number[] = [11850, 12000, 12150];
 const URL_TYPE = { start: 13150, step: 22 } as const;
 const SOURCE_AT: readonly number[] = [14100, 14700];
-const DOC = { drop: 16700, progressStart: 16800, progressEnd: 17900 } as const;
+const PDF = { drop: 16700, progressStart: 16800, progressEnd: 17900 } as const;
 const VERIFY_AT = 18600;
 const TAG_AT: readonly number[] = [19000, 19200, 19400];
 
@@ -139,11 +154,45 @@ const WALK_STOPS: readonly { readonly id: string; readonly at: number }[] = [
   { id: 'g', at: 28600 },
 ];
 
-const END_CARD = { start: 30600, fadeOut: 33200 } as const;
+/** Writing it up: the document pane and what gets typed into it. */
+const DOC = {
+  open: 30700,
+  openEnd: 31300,
+  title: { start: 31450, step: 34 },
+  heading: { start: 32600, step: 40 },
+  before: { start: 33250, step: 24 },
+  query: { start: 34250, step: 90 },
+  menu: { start: 34300, end: 35100 },
+  cite: 34950,
+  after: { start: 35200, step: 32 },
+  grab: 36400,
+  dropLine: 36850,
+  drop: 37200,
+} as const;
+
+export const FILM_DOC: DocContent = {
+  canvas: 'Plastic-eating enzymes',
+  title: 'Can enzymes recycle plastic?',
+  heading: 'What we know',
+  before: 'Engineered enzymes already work fast: ',
+  query: 'PET',
+  cite: { type: 'finding', title: 'PETase breaks down PET' },
+  others: [{ type: 'topic', title: 'Plastic-eating enzymes' }],
+  after: 'in about a week.',
+  card: {
+    type: 'conclusion',
+    title: 'AI shortens enzyme design',
+    note: 'Structure prediction and ML-picked mutations cut years of lab work down to months.',
+  },
+};
+
+const END_CARD = { start: 38900, fadeOut: 41500 } as const;
 
 const HOME: SceneCamera = { x: 425, y: 252, zoom: 1 };
 /** While the panel is open, the opened card sits in the middle of what is left of the canvas. */
 const OPEN_CAM: SceneCamera = { x: 575, y: 175, zoom: 1.2 };
+/** While the document is open, the whole map sits in the space left of it. */
+const SPLIT_CAM: SceneCamera = { x: 425 + (FILM_WIDTH / 2 - (FILM_WIDTH - DOC_W) / 2) / 0.66, y: 254, zoom: 0.66 };
 
 type Space = 'w' | 's';
 const CURSOR_KEYS: readonly { t: number; x: number; y: number; s: Space }[] = [
@@ -187,14 +236,31 @@ const CURSOR_KEYS: readonly { t: number; x: number; y: number; s: Space }[] = [
   { t: 24300, x: 620, y: 259, s: 'w' },
   { t: 24900, x: 620, y: 259, s: 'w' },
   { t: 25500, x: 920, y: 520, s: 'w' },
+  // Write it up: click into the title, then drag the conclusion card in
+  { t: 30500, x: 940, y: 520, s: 's' },
+  { t: 31200, x: 640, y: 112, s: 's' },
+  { t: 31400, x: 640, y: 112, s: 's' },
+  { t: 31900, x: 905, y: 470, s: 's' },
+  { t: 35700, x: 905, y: 470, s: 's' },
+  { t: 36300, x: 715, y: 259, s: 'w' },
+  { t: DOC.grab, x: 715, y: 259, s: 'w' },
+  { t: DOC.drop - 50, x: 700, y: 290, s: 's' },
+  { t: 37400, x: 700, y: 290, s: 's' },
+  { t: 37900, x: 905, y: 480, s: 's' },
 ];
 
-const CLICKS: readonly number[] = [2400, 4300, 4900, 5500, 7100, 7250, 8300, 13000, 18600, 20100, 21200, 21900, 23200];
-const CARRY: readonly { start: number; end: number; what: 'images' | 'pdf' }[] = [
-  { start: 11000, end: IMAGE_DROP, what: 'images' },
-  { start: 15900, end: DOC.drop, what: 'pdf' },
+const CLICKS: readonly number[] = [
+  2400, 4300, 4900, 5500, 7100, 7250, 8300, 13000, 18600, 20100, 21200, 21900, 23200, 31300,
 ];
-const CURSOR_SHOWN = { start: 1700, end: 25500 } as const;
+const CARRY: readonly { start: number; end: number; what: NonNullable<SceneCursor['carry']> }[] = [
+  { start: 11000, end: IMAGE_DROP, what: 'images' },
+  { start: 15900, end: PDF.drop, what: 'pdf' },
+  { start: DOC.grab, end: DOC.drop, what: { type: 'conclusion', title: 'AI shortens enzyme design' } },
+];
+const CURSOR_SHOWN: readonly { start: number; end: number }[] = [
+  { start: 1700, end: 25500 },
+  { start: 30450, end: 38100 },
+];
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -237,7 +303,13 @@ function cameraAt(t: number): SceneCamera {
     const cam = { x: n.x + CARD_W / 2, y: n.y + heightOf(n.id, t) / 2, zoom: 1.5 };
     keys.push({ t: stop.at + 550, ...cam }, { t: stop.at + 1300, ...cam });
   }
-  keys.push({ t: WALK.end + 400, ...HOME });
+  keys.push(
+    { t: WALK.end + 400, ...HOME },
+    { t: DOC.open + 50, ...HOME },
+    { t: DOC.openEnd + 150, ...SPLIT_CAM },
+    { t: END_CARD.start + 650, ...SPLIT_CAM },
+    { t: END_CARD.start + 700, ...HOME },
+  );
   return {
     x: interpolateKeys(keys, t, (k) => k.x),
     y: interpolateKeys(keys, t, (k) => k.y),
@@ -289,16 +361,57 @@ function panelAt(t: number): PanelState {
     noteChars,
     noteCaret: t >= 8300 && t < 10500 && (noteChars < NOTE_TEXT.length || Math.floor(t / 420) % 2 === 0),
     images: IMAGE_AT.map((at) => pop(t, at, 380)),
-    dropTarget: within(11450, IMAGE_DROP) ? 'images' : within(16350, DOC.drop) ? 'docs' : null,
+    dropTarget: within(11450, IMAGE_DROP) ? 'images' : within(16350, PDF.drop) ? 'docs' : null,
     urlChars: Math.max(0, Math.min(SOURCE_URL.length, Math.floor((t - URL_TYPE.start) / URL_TYPE.step))),
     sources: SOURCE_AT.map((at) => pop(t, at, 350)),
     doc: {
-      appear: pop(t, DOC.drop, 260),
-      progress: easeInOutCubic(range(t, DOC.progressStart, DOC.progressEnd)),
+      appear: pop(t, PDF.drop, 260),
+      progress: easeInOutCubic(range(t, PDF.progressStart, PDF.progressEnd)),
     },
     verified: range(t, VERIFY_AT, VERIFY_AT + 300),
     tags: TAG_AT.map((at) => pop(t, at, 260)),
   };
+}
+
+/** Characters typed at `t`, one every `step` ms from `start`. */
+function typed(t: number, text: string, { start, step }: { start: number; step: number }): number {
+  return Math.max(0, Math.min(text.length, Math.floor((t - start) / step)));
+}
+
+function docAt(t: number): DocState {
+  if (t < DOC.open) return DOC_CLOSED;
+  const queryText = `@${FILM_DOC.query}`;
+  const caret =
+    t < DOC.title.start - 100
+      ? null
+      : t < DOC.heading.start - 100
+        ? 'title'
+        : t < DOC.before.start - 100
+          ? 'heading'
+          : t < DOC.grab
+            ? 'body'
+            : null;
+  return {
+    ...DOC_CLOSED,
+    slide: easeOutCubic(range(t, DOC.open, DOC.openEnd)) * (1 - range(t, END_CARD.start + 650, END_CARD.start + 700)),
+    saving: (t >= DOC.title.start && t < 35900) || (t >= DOC.drop && t < DOC.drop + 600),
+    titleChars: typed(t, FILM_DOC.title, DOC.title),
+    headingChars: typed(t, FILM_DOC.heading, DOC.heading),
+    beforeChars: typed(t, FILM_DOC.before, DOC.before),
+    queryChars: typed(t, queryText, DOC.query),
+    menu: range(t, DOC.menu.start, DOC.menu.start + 150) * (1 - range(t, DOC.menu.end - 150, DOC.menu.end)),
+    cite: pop(t, DOC.cite, 300),
+    afterChars: typed(t, FILM_DOC.after, DOC.after),
+    caret,
+    dropLine: range(t, DOC.dropLine, DOC.dropLine + 150),
+    card: pop(t, DOC.drop, 350),
+  };
+}
+
+function citedOf(id: string, t: number): SceneNode['cited'] {
+  if (id === 'b' && t >= DOC.cite + 100) return { count: 1, p: pop(t, DOC.cite + 100, 400) };
+  if (id === 'g' && t >= DOC.drop + 250) return { count: 1, p: pop(t, DOC.drop + 250, 400) };
+  return undefined;
 }
 
 function thumbsOf(id: string, t: number, panel: PanelState): SceneNode['thumbs'] {
@@ -339,6 +452,7 @@ export interface FilmFrame extends SceneFrame {
   /** Walkthrough bar: which stop, and how visible. */
   readonly walk: { readonly index: number; readonly opacity: number };
   readonly panel: PanelState;
+  readonly doc: DocState;
 }
 
 export function filmFrame(t: number): FilmFrame {
@@ -395,12 +509,14 @@ export function filmFrame(t: number): FilmFrame {
       plus,
       thumbs: thumbsOf(n.id, t, panel),
       attach: attachOf(n.id, t, panel),
+      cited: citedOf(n.id, t),
     };
   });
 
   const pos = cursorAt(t, camera);
-  const cursorOpacity =
-    range(t, CURSOR_SHOWN.start, CURSOR_SHOWN.start + 300) * (1 - range(t, CURSOR_SHOWN.end - 400, CURSOR_SHOWN.end));
+  const cursorOpacity = Math.max(
+    ...CURSOR_SHOWN.map((w) => range(t, w.start, w.start + 300) * (1 - range(t, w.end - 400, w.end))),
+  );
   const carry = CARRY.find((c) => t >= c.start && t < c.end);
   const dragging = t >= DRAG_EDGE.start - 150 && t <= DRAG_EDGE.end;
   const pressed = dragging || !!carry || CLICKS.some((c) => t >= c && t < c + 140);
@@ -420,6 +536,7 @@ export function filmFrame(t: number): FilmFrame {
     cursor: { x: pos.x, y: pos.y, opacity: cursorOpacity, pressed, carry: carry?.what },
     ripples,
     panel,
+    doc: docAt(t),
     title: range(t, 150, 600) * (1 - range(t, 1350, 1800)),
     endCard: range(t, END_CARD.start, END_CARD.start + 600) * (1 - range(t, END_CARD.fadeOut, FILM_DURATION)),
     walk: { index: focused, opacity: walk },

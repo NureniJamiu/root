@@ -30,4 +30,9 @@ export {
 } from './toolbarCallbacks';
 export type { ToolbarCallbacks } from './toolbarCallbacks';
 
+export { MarkdownText } from './MarkdownText';
+export type { MarkdownTextProps } from './MarkdownText';
+
+export { IDEA_DRAG_MIME } from './dragMime';
+
 export * from './icons';

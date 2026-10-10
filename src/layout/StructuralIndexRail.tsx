@@ -10,6 +10,12 @@ export interface ProjectItem {
   readonly updatedAt?: string;
 }
 
+export interface DocumentItem {
+  readonly id: string;
+  readonly title: string;
+  readonly wordCount: number;
+}
+
 export interface RailUser {
   readonly name?: string | undefined;
   readonly email: string;
@@ -26,6 +32,12 @@ export interface StructuralIndexRailProps {
   readonly onNavigateHome?: () => void;
   readonly user?: RailUser | null;
   readonly onSignOut?: () => void;
+  /** Research documents of the open project. */
+  readonly documents?: readonly DocumentItem[];
+  readonly activeDocumentId?: string | null;
+  readonly onOpenDocument?: (id: string) => void;
+  readonly onNewDocument?: (() => void) | undefined;
+  readonly onDeleteDocument?: (id: string) => void;
 }
 
 function initialsFor(user: RailUser): string {
@@ -46,8 +58,14 @@ export function StructuralIndexRail({
   onNavigateHome,
   user,
   onSignOut,
+  documents,
+  activeDocumentId = null,
+  onOpenDocument,
+  onNewDocument,
+  onDeleteDocument,
 }: StructuralIndexRailProps): JSX.Element {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingDocDeleteId, setPendingDocDeleteId] = useState<string | null>(null);
 
   const projectList: readonly ProjectItem[] =
     projects && projects.length > 0
@@ -185,6 +203,106 @@ export function StructuralIndexRail({
           );
         })}
       </nav>
+
+      {/* Documents of the open project */}
+      {documents && onOpenDocument && (
+        <section
+          className="border-t border-rule flex flex-col min-h-0 max-h-[42%] shrink-0"
+          aria-label="Documents"
+          data-testid="rail-documents"
+        >
+          <div className="px-3 pt-3 pb-2 flex items-center justify-between shrink-0">
+            <span className="font-mono text-[10px] font-medium tracking-[0.08em] uppercase text-ink-3">
+              Documents
+            </span>
+            {onNewDocument && (
+              <button
+                type="button"
+                onClick={onNewDocument}
+                className="h-6 px-2 inline-flex items-center gap-1 rounded-[2px] font-mono text-[10px] text-accent hover:bg-sunken-2 transition-colors cursor-pointer"
+                title="New document in this project"
+                data-testid="btn-new-document"
+              >
+                + New
+              </button>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3 flex flex-col gap-px">
+            {documents.length === 0 ? (
+              <p className="px-3 py-1 m-0 font-serif text-[13px] leading-[18px] text-muted">
+                Write up your research next to the canvas. Cite ideas with @.
+              </p>
+            ) : (
+              documents.map((doc) => {
+                const isActive = doc.id === activeDocumentId;
+                const isConfirming = pendingDocDeleteId === doc.id;
+                const title = doc.title || 'Untitled document';
+                return (
+                  <div
+                    key={doc.id}
+                    onClick={() => onOpenDocument(doc.id)}
+                    onMouseLeave={() => isConfirming && setPendingDocDeleteId(null)}
+                    className={`group relative flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-[4px] cursor-pointer transition-colors ${
+                      isActive ? 'bg-sunken-2 text-ink-strong' : 'text-ink-3 hover:bg-subtle hover:text-ink-strong'
+                    }`}
+                    data-testid={`document-item-${doc.id}`}
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <path d="M14 2v6h6" />
+                    </svg>
+                    <button
+                      type="button"
+                      aria-current={isActive ? 'page' : undefined}
+                      className="flex-1 min-w-0 text-left bg-transparent border-0 p-0 cursor-pointer focus-visible:outline focus-visible:outline-1 focus-visible:outline-topic"
+                    >
+                      <span className={`block font-serif text-[14px] leading-[19px] truncate ${isActive ? 'font-medium' : ''}`}>
+                        {title}
+                      </span>
+                    </button>
+                    <span className="font-mono text-[9.5px] text-muted shrink-0 group-hover:hidden">
+                      {doc.wordCount} w
+                    </span>
+                    {onDeleteDocument &&
+                      (isConfirming ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingDocDeleteId(null);
+                            onDeleteDocument(doc.id);
+                          }}
+                          className="shrink-0 h-6 px-2 font-mono text-[9.5px] font-medium rounded-[2px] bg-danger-fill text-on-accent hover:bg-danger-strong transition-colors cursor-pointer"
+                          data-testid={`btn-confirm-delete-document-${doc.id}`}
+                        >
+                          Delete?
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingDocDeleteId(doc.id);
+                          }}
+                          className="shrink-0 w-6 h-6 hidden group-hover:inline-flex items-center justify-center text-muted hover:text-danger hover:bg-sunken-2 rounded-[2px] transition-colors cursor-pointer"
+                          title={`Delete ${title}`}
+                          aria-label={`Delete ${title}`}
+                          data-testid={`btn-delete-document-${doc.id}`}
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 6h18" />
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                          </svg>
+                        </button>
+                      ))}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Account footer: sign out, then the signed-in profile beneath it */}
       {(onSignOut || user) && (

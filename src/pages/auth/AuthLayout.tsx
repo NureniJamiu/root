@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from '../../routing';
-import { RootLogo } from '../../layout';
+import { RootLogo } from '../../layout/Logo';
 import { ThemeToggle } from '../../ui';
 
 interface AuthLayoutProps {

@@ -40,6 +40,8 @@ export default defineConfig({
         AUTH_SERVER_PORT: String(API_PORT),
         VITE_APP_URL: APP_URL,
         BETTER_AUTH_URL: APP_URL,
+        // Keep sent mail in memory so the password reset test can open the link.
+        DEV_MAILBOX: '1',
       },
     },
     {

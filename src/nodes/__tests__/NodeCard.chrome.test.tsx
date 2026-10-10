@@ -57,7 +57,7 @@ describe('NodeCard chrome and labels', () => {
     expect(screen.getByTestId(`node-card-${c.nodes[0]!.id}`)).toHaveAttribute('data-selected', 'true');
   });
 
-  it('shows the whole note and lets CSS clamp it, rather than cutting it mid-word', () => {
+  it('shows the whole note and lets CSS fade it out, rather than cutting it mid-word', () => {
     let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     const body = 'word '.repeat(80).trim();
     c = updateNode(c, c.nodes[0]!.id, { body });
@@ -67,6 +67,20 @@ describe('NodeCard chrome and labels', () => {
 
     const preview = screen.getByTestId('node-body-preview');
     expect(preview.textContent).toBe(body);
-    expect(preview.style.webkitLineClamp || preview.style.getPropertyValue('-webkit-line-clamp')).toBeTruthy();
+    expect(preview.style.maxHeight).toBeTruthy();
+  });
+
+  it('formats Markdown in the note instead of showing the markers', () => {
+    let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
+    c = updateNode(c, c.nodes[0]!.id, { body: '**Calcium** and *phosphate*\n- one\n- two' });
+    canvasActions.loadCanvas(c);
+
+    render(<NodeCard {...props(c.nodes[0]!.id)} />);
+
+    const preview = screen.getByTestId('node-body-preview');
+    expect(preview.textContent).not.toContain('*');
+    expect(preview.querySelector('strong')?.textContent).toBe('Calcium');
+    expect(preview.querySelector('em')?.textContent).toBe('phosphate');
+    expect(preview.querySelectorAll('li')).toHaveLength(2);
   });
 });

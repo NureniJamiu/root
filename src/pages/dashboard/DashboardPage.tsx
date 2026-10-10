@@ -1,4 +1,4 @@
-import { AppShell } from '../../app/App';
+import { AppShell } from '../../app/AppShell';
 import { AuthGuard } from '../../auth';
 
 /**

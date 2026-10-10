@@ -61,6 +61,15 @@ import { typeStyles } from './typeStyles';
 /* Constants                                                                  */
 /* -------------------------------------------------------------------------- */
 
+type NoteFormat = 'bold' | 'italic' | 'list' | 'link';
+
+const NOTE_FORMATS: ReadonlyArray<{ format: NoteFormat; label: string; glyph: string; className?: string }> = [
+  { format: 'bold', label: 'Bold', glyph: 'B', className: 'font-bold' },
+  { format: 'italic', label: 'Italic', glyph: 'I', className: 'italic font-serif text-[13px]' },
+  { format: 'list', label: 'Bulleted list', glyph: '•' },
+  { format: 'link', label: 'Link', glyph: '↗' },
+];
+
 /** Title cap (design.md §Edge Cases; Requirement 4.2). */
 const TITLE_MAX = NODE_TITLE_MAX;
 
@@ -175,6 +184,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const filePickerRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   /* ------------------------------------------------------------------ */
   /* Close plumbing                                                     */
@@ -359,6 +369,43 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
     setDraft((d) => (d === null ? d : { ...d, body }));
   }, []);
 
+  /**
+   * Wrap the selected notes text in Markdown markers (or prefix each selected
+   * line, for lists), keeping the selection on the same words.
+   */
+  const applyFormat = useCallback((format: NoteFormat): void => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const { selectionStart: start, selectionEnd: end, value } = el;
+    let next: string;
+    let selStart: number;
+    let selEnd: number;
+    if (format === 'list') {
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      const block = value.slice(lineStart, end);
+      const listed = block
+        .split('\n')
+        .map((line) => (line.startsWith('- ') ? line : `- ${line}`))
+        .join('\n');
+      next = value.slice(0, lineStart) + listed + value.slice(end);
+      selStart = lineStart;
+      selEnd = lineStart + listed.length;
+    } else {
+      const marker = format === 'bold' ? '**' : format === 'italic' ? '*' : '';
+      const selected = value.slice(start, end) || (format === 'link' ? 'link text' : 'text');
+      const wrapped = format === 'link' ? `[${selected}](https://)` : `${marker}${selected}${marker}`;
+      next = value.slice(0, start) + wrapped + value.slice(end);
+      selStart = start + (format === 'link' ? 1 : marker.length);
+      selEnd = selStart + selected.length;
+    }
+    if (next.length > BODY_MAX) return;
+    setDraft((d) => (d === null ? d : { ...d, body: next }));
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(selStart, selEnd);
+    });
+  }, []);
+
   const onPickType = useCallback((t: NodeType): void => {
     setDraft((d) => (d === null ? d : { ...d, type: t }));
   }, []);
@@ -512,9 +559,11 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
           </div>
 
           {/* Notes */}
-          <label className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5">
             <span className="flex items-baseline justify-between">
-              <span className={FIELD_LABEL}>Notes &amp; details</span>
+              <label htmlFor={`node-editor-body-${nodeId}`} className={FIELD_LABEL}>
+                Notes &amp; details
+              </label>
               <span
                 className="font-mono text-[10px] tabular-nums"
                 style={{ color: counterWarn ? SECONDARY : 'rgb(var(--muted))' }}
@@ -523,7 +572,26 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
                 {bodyLength}/{BODY_MAX}
               </span>
             </span>
+            <div className="flex items-center gap-1" role="toolbar" aria-label="Format notes">
+              {NOTE_FORMATS.map((f) => (
+                <button
+                  key={f.format}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyFormat(f.format)}
+                  title={f.label}
+                  aria-label={f.label}
+                  className="h-6 min-w-6 px-1.5 inline-flex items-center justify-center rounded-[2px] border border-rule bg-panel text-ink-read hover:border-ink-strong hover:text-ink-strong transition-colors cursor-pointer font-mono text-[11px]"
+                  data-testid={`node-editor-format-${f.format}`}
+                >
+                  <span className={f.className}>{f.glyph}</span>
+                </button>
+              ))}
+              <span className="ml-auto font-mono text-[9.5px] text-faint">Markdown works: **bold**, *italic*, - lists</span>
+            </div>
             <textarea
+              id={`node-editor-body-${nodeId}`}
+              ref={bodyRef}
               value={draft.body}
               onChange={onBodyChange}
               maxLength={BODY_MAX}
@@ -532,7 +600,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
               className={`${FIELD_INPUT} px-3 py-2 font-serif text-[14px] leading-[22px] resize-y min-h-[120px]`}
               data-testid="node-editor-body"
             />
-          </label>
+          </div>
 
           {/* Images */}
           <div className="flex flex-col gap-1.5">

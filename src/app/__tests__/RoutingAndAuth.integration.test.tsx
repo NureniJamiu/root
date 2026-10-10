@@ -28,6 +28,17 @@ vi.mock('reactflow', () => ({
 
 vi.mock('reactflow/dist/style.css', () => ({}));
 
+// Documents are not under test here: an empty list for every project.
+vi.mock('../../lib/documents-api', () => ({
+  fetchDocuments: async () => [],
+  fetchBacklinks: async () => ({}),
+  fetchDocument: async () => null,
+  createDocumentApi: async () => null,
+  updateDocumentApi: async () => ({ ok: false, status: 0, message: 'offline' }),
+  deleteDocumentApi: async () => true,
+  uploadAsset: async () => ({ ok: false, message: 'offline' }),
+}));
+
 let mockSession: { data: { user: { id: string; email: string; name?: string } } | null; isPending: boolean } = {
   data: null,
   isPending: false,
@@ -41,6 +52,9 @@ vi.mock('../../lib/auth-client', () => ({
   },
 }));
 
+// Routes load on demand; give the first render of each a moment under a busy test run.
+const LAZY = { timeout: 8000 };
+
 describe('App Router & Auth Gating Structure', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -53,7 +67,7 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    expect(screen.getByText(/Organize your ideas visually/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Map your research. Write it up./i, {}, LAZY)).toBeInTheDocument();
     expect(screen.getByText(/Start Creating/i)).toBeInTheDocument();
   });
 
@@ -63,7 +77,7 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    const signInBtn = screen.getByRole('button', { name: /Sign In/i });
+    const signInBtn = await screen.findByRole('button', { name: /Sign In/i }, LAZY);
     await act(async () => {
       await user.click(signInBtn);
     });
@@ -78,7 +92,7 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    const createAccountBtn = screen.getByRole('button', { name: /Create Account/i });
+    const createAccountBtn = await screen.findByRole('button', { name: /Create Account/i }, LAZY);
     await act(async () => {
       await user.click(createAccountBtn);
     });
@@ -94,7 +108,7 @@ describe('App Router & Auth Gating Structure', () => {
     });
 
     // Should redirect to login since not authenticated
-    expect(screen.getByRole('heading', { name: /Sign In/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Sign In/i }, LAZY)).toBeInTheDocument();
   });
 
   it('allows access to dashboard when user is authenticated', async () => {
@@ -109,7 +123,7 @@ describe('App Router & Auth Gating Structure', () => {
     });
 
     // AppHeader workbench title and the signed-in profile should be visible
-    expect(screen.getByText(/Untitled Project/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Untitled Project/i, {}, LAZY)).toBeInTheDocument();
     expect(screen.getByTestId('rail-user-profile')).toHaveTextContent('test@root.app');
   });
 });

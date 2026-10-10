@@ -9,10 +9,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { RootLogo } from '../../../layout';
+import { RootLogo } from '../../../layout/Logo';
 
 import {
   CHAPTERS,
+  FILM_DOC,
   FILM_DURATION,
   FILM_HEIGHT,
   FILM_WIDTH,
@@ -21,6 +22,7 @@ import {
   chapterAt,
   filmFrame,
 } from './filmScript';
+import { FilmDocument } from './FilmDocument';
 import { FilmInspector } from './FilmInspector';
 import { canObserve, useInView, usePrefersReducedMotion } from './motion';
 import { SceneCanvas } from './SceneCanvas';
@@ -95,7 +97,7 @@ export function ProductFilm(): JSX.Element {
 
       <div
         role="img"
-        aria-label="Product film: a root idea called Plastic-eating enzymes is planted on a canvas and ideas branch from it. One idea is opened and filled with notes, dropped-in images, cited sources, an uploaded PDF, a verified status and tags. More findings are gathered with their own images and sources, a conclusion is connected, and a walkthrough moves from idea to idea."
+        aria-label="Product film: a root idea called Plastic-eating enzymes is planted on a canvas and ideas branch from it. One idea is opened and filled with notes, dropped-in images, cited sources, an uploaded PDF, a verified status and tags. More findings are gathered with their own images and sources, a conclusion is connected, and a walkthrough moves from idea to idea. Then a document opens beside the canvas: it cites one idea through the @ menu, the conclusion card is dragged into it, and both cards show that a document cites them."
         className="bg-canvas"
       >
         <SceneCanvas
@@ -106,6 +108,7 @@ export function ProductFilm(): JSX.Element {
           overlay={
             <>
               <FilmInspector state={frame.panel} />
+              <FilmDocument state={frame.doc} content={FILM_DOC} />
 
               {/* Opening title */}
               {frame.title > 0 && (

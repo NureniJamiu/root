@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["server.ts", "migrate.ts", "src/lib/auth.ts", "src/lib/mailer.ts", "src/lib/document-store.ts", "src/lib/project-store.ts"]
+}

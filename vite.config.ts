@@ -13,6 +13,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  build: {
+    // The document editor (TipTap + ProseMirror) is one lazily loaded chunk of
+    // about 560 kB; everything users load first is far smaller.
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     port: 5173,
     proxy: {

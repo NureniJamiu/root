@@ -24,7 +24,7 @@ import { canvasActions, useCanvasStore } from '../../data/store';
 import type { CanvasState } from '../../data/store';
 import type { Canvas } from '../../data';
 import type { ProjectItem } from '../../layout';
-import { AppShell } from '../App';
+import { AppShell } from '../AppShell';
 
 /* -------------------------------------------------------------------------- */
 /* Module mocks                                                               */
@@ -54,6 +54,17 @@ vi.mock('reactflow', () => ({
 }));
 
 vi.mock('reactflow/dist/style.css', () => ({}));
+
+// Documents are not under test here: an empty list for every project.
+vi.mock('../../lib/documents-api', () => ({
+  fetchDocuments: async () => [],
+  fetchBacklinks: async () => ({}),
+  fetchDocument: async () => null,
+  createDocumentApi: async () => null,
+  updateDocumentApi: async () => ({ ok: false, status: 0, message: 'offline' }),
+  deleteDocumentApi: async () => true,
+  uploadAsset: async () => ({ ok: false, message: 'offline' }),
+}));
 
 // The fake server: canvases by project id, plus the calls made against it.
 const server = vi.hoisted(() => ({
