@@ -10,6 +10,9 @@
  *     idea the surrounding section cites) and cites it in place.
  *   - Dropping an idea from the canvas embeds its card (Alt: cites it inline).
  *   - Outline of the document's headings for jumping around long drafts.
+ *   - With AI set up, "✦ AI" in the bubble rewrites the selection (improve,
+ *     shorten, expand, continue) into a panel to accept or discard, or turns
+ *     it into suggested ideas on the canvas ("Make ideas").
  */
 
 import type { Editor, JSONContent } from '@tiptap/core';
@@ -22,10 +25,14 @@ import type { ReactNode } from 'react';
 import { useCanvasStore } from '../data';
 import { IDEA_DRAG_MIME } from '../nodes';
 
+import { AiRewritePanel, REWRITE_LABELS, readSelection } from './aiRewrite';
+import type { RewriteJob } from './aiRewrite';
 import { placeCursorAfterBlock, setActiveEditor } from './bridge';
 import { useDocumentEditorServices } from './context';
 import { IMAGE_MIME_TYPES, editorExtensions, uploadAndInsert } from './editorExtensions';
 import { IDEA_CARD, IDEA_REF, isAllowedHref } from './schema';
+import { REWRITE_ACTIONS } from '../lib/ai/contracts';
+import type { RewriteAction } from '../lib/ai/contracts';
 
 import './editor.css';
 
@@ -333,9 +340,29 @@ function Toolbar({ editor, onPickImage }: { readonly editor: Editor; readonly on
 /* Selection bubble                                                           */
 /* -------------------------------------------------------------------------- */
 
-function SelectionBubble({ editor }: { readonly editor: Editor }): JSX.Element {
+interface RewriteRequestState {
+  readonly job: RewriteJob;
+  readonly before: string;
+  readonly after: string;
+}
+
+function SelectionBubble({
+  editor,
+  onRewrite,
+}: {
+  readonly editor: Editor;
+  readonly onRewrite: (request: RewriteRequestState) => void;
+}): JSX.Element {
   const services = useDocumentEditorServices();
   const [linkOpen, setLinkOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+
+  const startRewrite = (action: RewriteAction): void => {
+    const read = readSelection(editor);
+    setAiOpen(false);
+    if (!read) return;
+    onRewrite({ job: { ...read.job, action }, before: read.before, after: read.after });
+  };
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -345,6 +372,13 @@ function SelectionBubble({ editor }: { readonly editor: Editor }): JSX.Element {
       link: e.isActive('link'),
     }),
   });
+
+  const makeIdeasWithAi = (): void => {
+    const { from, to } = editor.state.selection;
+    const text = editor.state.doc.textBetween(from, to, '\n\n', ' ').trim();
+    setAiOpen(false);
+    if (text) services.captureIdeas?.(text.slice(0, 8_000));
+  };
 
   const makeIdea = (): void => {
     const { from, to } = editor.state.selection;
@@ -378,6 +412,36 @@ function SelectionBubble({ editor }: { readonly editor: Editor }): JSX.Element {
     >
       {linkOpen ? (
         <LinkForm editor={editor} onDone={() => setLinkOpen(false)} />
+      ) : aiOpen ? (
+        <>
+          {services.captureIdeas && (
+            <button
+              type="button"
+              className="doc-bubble-ai"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={makeIdeasWithAi}
+              title="Suggest several connected ideas from the selected text"
+              data-testid="doc-ai-capture"
+            >
+              Make ideas
+            </button>
+          )}
+          {services.rewrite && REWRITE_ACTIONS.map((action) => (
+            <button
+              key={action}
+              type="button"
+              className="doc-bubble-ai"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => startRewrite(action)}
+              data-testid={`doc-ai-${action}`}
+            >
+              {REWRITE_LABELS[action]}
+            </button>
+          ))}
+          <ToolButton label="Back" onClick={() => setAiOpen(false)}>
+            ←
+          </ToolButton>
+        </>
       ) : (
         <>
           <ToolButton label="Bold" active={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
@@ -407,6 +471,19 @@ function SelectionBubble({ editor }: { readonly editor: Editor }): JSX.Element {
           >
             + Make idea
           </button>
+          {(services.rewrite || services.captureIdeas) && (
+            <button
+              type="button"
+              className="doc-bubble-ai"
+              aria-pressed={false}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setAiOpen(true)}
+              title="AI: make ideas from the selection, or rewrite, shorten, expand or continue it"
+              data-testid="doc-ai-menu"
+            >
+              ✦ AI
+            </button>
+          )}
         </>
       )}
     </BubbleMenu>
@@ -468,6 +545,7 @@ export default function DocumentEditor({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [rewrite, setRewrite] = useState<RewriteRequestState | null>(null);
   const pickImage = useCallback(() => fileInputRef.current?.click(), []);
 
   const extensions = useMemo(() => editorExtensions({ services: () => servicesRef.current, pickImage }), [pickImage]);
@@ -536,7 +614,17 @@ export default function DocumentEditor({
           <EditorContent editor={editor} />
         </div>
       </div>
-      <SelectionBubble editor={editor} />
+      {rewrite && (
+        <AiRewritePanel
+          key={`${rewrite.job.from}:${rewrite.job.to}:${rewrite.job.action}:${rewrite.job.original.length}`}
+          editor={editor}
+          job={rewrite.job}
+          before={rewrite.before}
+          after={rewrite.after}
+          onClose={() => setRewrite(null)}
+        />
+      )}
+      <SelectionBubble editor={editor} onRewrite={setRewrite} />
       <input
         ref={fileInputRef}
         type="file"

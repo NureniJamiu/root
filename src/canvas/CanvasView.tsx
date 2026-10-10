@@ -17,6 +17,8 @@
  *   connector to hand it back to automatic routing. Click selects a
  *   connector; Delete/Backspace or its remove button deletes it.
  * - Double-clicking empty canvas adds an idea there.
+ * - AI suggestions waiting for review render as dashed ghost cards with
+ *   dashed connectors; they are not part of the canvas until accepted.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -41,18 +43,21 @@ import ReactFlow, {
 // React Flow stylesheet
 import 'reactflow/dist/style.css';
 
-import { canvasActions, isDuplicateEdge, useCanvasStore } from '../data';
+import { canvasActions, computeFacingSides, ghostId, isDuplicateEdge, isGhostId, useAiProposalStore, useCanvasStore } from '../data';
 import type { NodeType, Position, Side, UUID } from '../data';
 import { FitViewIcon, NodeCard, ZoomInIcon, ZoomOutIcon } from '../nodes';
 
+import { AiReviewBar } from './AiReviewBar';
 import { BranchToolbarGroup, WalkthroughBar } from './BranchControls';
+import { GHOST_NODE_TYPE, GhostCard } from './GhostCard';
+import type { GhostCardData } from './GhostCard';
 import { ConnectorEdge } from './ConnectorEdge';
-import { CONNECTION_LINE_STYLE, CONNECTOR_EDGE_TYPE } from './edgeStyles';
+import { CONNECTION_LINE_STYLE, CONNECTOR_EDGE_TYPE, EDGE_COLOR_BY_TYPE, EDGE_DASH, EDGE_STROKE_COLOR } from './edgeStyles';
 import { getMeasuredSizes, setMeasuredSize } from './measuredSizes';
 import type { NodeSize } from './measuredSizes';
 import { relayoutEdges, useReactFlowGraph } from './useReactFlowGraph';
 import { useBranchMotion } from './useBranchMotion';
-import { computeFacingSides, connectionToEnds, handleIdToSide, nearestSide } from './reconnect';
+import { connectionToEnds, handleIdToSide, nearestSide, sourceHandleId, targetHandleId } from './reconnect';
 import { NODE_HEIGHT, computeTreeLayout, findFreePosition } from './placement';
 
 /* -------------------------------------------------------------------------- */
@@ -74,7 +79,7 @@ const SNAP_GRID: [number, number] = [20, 20];
 /** Rendered width of a card; used to centre a new card on a point. */
 const CARD_WIDTH = 290;
 
-const NODE_TYPES: NodeTypes = { research: NodeCard };
+const NODE_TYPES: NodeTypes = { research: NodeCard, [GHOST_NODE_TYPE]: GhostCard };
 const EDGE_TYPES: EdgeTypes = { [CONNECTOR_EDGE_TYPE]: ConnectorEdge };
 
 /** Attribute set on a card while a connector hovers over it, naming the side it would attach to. */
@@ -121,6 +126,8 @@ export interface CanvasViewProps {
   readonly onRFPropsMounted?: (props: CanvasViewProbeProps) => void;
   readonly onControlsReady?: (controls: CanvasViewControls) => void;
   readonly onDragChange?: (dragState: DragState | null) => void;
+  /** Stops an AI request in flight (the review bar's Stop button). */
+  readonly onAiCancel?: () => void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -137,6 +144,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     onRFPropsMounted,
     onControlsReady,
     onDragChange,
+    onAiCancel,
   } = props;
 
   const reactFlow = useReactFlow();
@@ -308,6 +316,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     let selectedId: UUID | null = null;
     const selectChanges: Array<{ id: UUID; selected: boolean }> = [];
     for (const change of changes) {
+      if ('id' in change && isGhostId(change.id)) continue;
       if (change.type === 'dimensions' && change.dimensions) {
         if (setMeasuredSize(change.id, change.dimensions)) {
           measured.push([change.id, change.dimensions]);
@@ -359,6 +368,8 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
 
   const handleNodeClick = useCallback(
     (event: React.MouseEvent, node: { id: string }): void => {
+      // Suggested ideas toggle themselves; they are not selectable ideas.
+      if (isGhostId(node.id)) return;
       // Ctrl/⌘-click toggles the card in a multi-selection; React Flow has
       // already reported that through onNodesChange.
       if ((event.metaKey || event.ctrlKey) && !multiSelectedRef.current.has(node.id)) {
@@ -656,9 +667,84 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, [animated.nodes, livePositions, dragState]);
 
   // Automatic connector ends re-route live while a card is dragged.
-  const displayEdges = useMemo(
+  const realEdges = useMemo(
     () => (livePositions ? relayoutEdges(animated.edges, canvas, livePositions) : animated.edges),
     [animated.edges, canvas, livePositions],
+  );
+
+  /* ---------------------------- AI suggestions --------------------------- */
+
+  const proposal = useAiProposalStore((s) => s.proposal);
+  const ghosts = useMemo(() => {
+    if (!proposal) return { nodes: [], edges: [] };
+    const excluded = new Set(proposal.excluded);
+    const byKey = new Map(proposal.ideas.map((i) => [i.key, i]));
+    const anchor = proposal.anchorId ? canvas.nodes.find((n) => n.id === proposal.anchorId) : undefined;
+    const nodes = proposal.ideas.map((idea) => ({
+      id: ghostId(idea.key),
+      type: GHOST_NODE_TYPE,
+      position: idea.position,
+      data: { idea, included: !excluded.has(idea.key) } satisfies GhostCardData,
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      zIndex: 5,
+    }));
+    const edges: RFEdge[] = [];
+    for (const idea of proposal.ideas) {
+      const parent = idea.parentKey !== null ? byKey.get(idea.parentKey) : undefined;
+      const from = parent ? { id: ghostId(parent.key), position: parent.position, type: parent.type } : anchor;
+      if (!from) continue;
+      const { sourceSide, targetSide } = computeFacingSides(from.position, idea.position);
+      const on = !excluded.has(idea.key) && (!parent || !excluded.has(parent.key));
+      edges.push({
+        id: `ai-ghost-edge:${idea.key}`,
+        source: from.id,
+        target: ghostId(idea.key),
+        sourceHandle: sourceHandleId(sourceSide),
+        targetHandle: targetHandleId(targetSide),
+        focusable: false,
+        updatable: false,
+        style: {
+          stroke: on ? EDGE_COLOR_BY_TYPE[from.type] : EDGE_STROKE_COLOR,
+          strokeWidth: 1.5,
+          strokeDasharray: EDGE_DASH,
+          opacity: on ? 0.8 : 0.35,
+        },
+      });
+    }
+    return { nodes, edges };
+  }, [proposal, canvas.nodes]);
+
+  const displayNodesWithGhosts = useMemo(
+    () => (ghosts.nodes.length > 0 ? [...displayNodes, ...ghosts.nodes] : displayNodes),
+    [displayNodes, ghosts.nodes],
+  );
+  const displayEdges = useMemo(
+    () => (ghosts.edges.length > 0 ? [...realEdges, ...ghosts.edges] : realEdges),
+    [realEdges, ghosts.edges],
+  );
+
+  // Bring new suggestions (and the idea they grow from) into view. Toggling
+  // a card keeps the same `ideas`, so only a fresh answer moves the view.
+  const shownIdeas = useRef<unknown>(null);
+  useEffect(() => {
+    const ideas = proposal?.ideas ?? null;
+    if (ideas === shownIdeas.current) return;
+    shownIdeas.current = ideas;
+    if (!proposal) return;
+    const ids = [...proposal.ideas.map((i) => ({ id: ghostId(i.key) })), ...(proposal.anchorId ? [{ id: proposal.anchorId }] : [])];
+    setTimeout(() => reactFlow?.fitView?.({ ...FIT_VIEW_OPTIONS, nodes: ids, duration: 350 }), 30);
+  }, [proposal, reactFlow]);
+
+  const handleAiAccepted = useCallback(
+    (ids: UUID[]) => {
+      const first = ids[0];
+      if (!first) return;
+      canvasActions.select(first);
+      onNodeSelect?.(first);
+    },
+    [onNodeSelect],
   );
 
   /* ------------------------------ keyboard ------------------------------ */
@@ -732,7 +818,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
         onDoubleClick={handleSurfaceDoubleClick}
       >
         <ReactFlow
-          nodes={displayNodes}
+          nodes={displayNodesWithGhosts}
           edges={displayEdges}
           nodeTypes={NODE_TYPES}
           edgeTypes={EDGE_TYPES}
@@ -782,6 +868,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
         </ReactFlow>
 
         <WalkthroughBar onRevealed={handleRevealed} />
+        <AiReviewBar onAccepted={handleAiAccepted} {...(onAiCancel ? { onCancel: onAiCancel } : {})} />
 
         {/* Canvas toolbar — the single home for viewport controls */}
         <div

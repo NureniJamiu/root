@@ -107,6 +107,17 @@ export { parseCanvas, serializeCanvas } from './serialize';
 export type { ParseCanvasResult } from './serialize';
 
 export { canvasActions, useCanvasStore } from './store';
+
+export {
+  aiProposalActions,
+  ghostId,
+  GHOST_ID_PREFIX,
+  includedIdeas,
+  isGhostId,
+  setAiDecisionListener,
+  useAiProposalStore,
+} from './aiProposals';
+export type { AiPending, AiProposal, AiProposalKind, AiProposalState, GhostIdea } from './aiProposals';
 export type { CanvasState, NodeEdits } from './store';
 
 export { docLinksActions, useDocLinksStore } from './docLinks';

@@ -9,6 +9,7 @@
  *   - `collapse` / `expand` — hide or show every connected idea at once.
  *   - reveal arrow — opens `ChildRevealMenu` to show or hide connected
  *                    ideas one at a time, in any order.
+ *   - `expand-ai`  — ask AI for connected ideas (only when AI is set up).
  *   - `delete`     — open the `DeletePrompt`. The prompt itself bypasses
  *                    the modal when nothing hangs only from this idea.
  *
@@ -34,6 +35,7 @@ import {
   CycleIcon,
   PencilIcon,
   PlusIcon,
+  SparkleIcon,
 } from './icons';
 import { useToolbarCallbacks } from './toolbarCallbacks';
 
@@ -74,7 +76,7 @@ export interface HoverToolbarProps {
 }
 
 export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
-  const { onAddChild } = useToolbarCallbacks();
+  const { onAddChild, onExpandWithAi } = useToolbarCallbacks();
   const hasChildren = useCanvasStore(selectHasHideable(node.id));
   const hasAnyChild = useCanvasStore(selectHasChildren(node.id));
   // Collapsed, or showing only some of its connected ideas.
@@ -154,6 +156,11 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
         <ToolbarButton label="Add connected idea" onClick={handleAddChild} testId="btn-add-child">
           <PlusIcon />
         </ToolbarButton>
+        {onExpandWithAi && (
+          <ToolbarButton label="Suggest connected ideas with AI" onClick={() => onExpandWithAi(node.id)} testId="btn-expand-ai">
+            <SparkleIcon />
+          </ToolbarButton>
+        )}
         <ToolbarButton label="Edit (notes and images)" onClick={onEdit} testId="btn-edit">
           <PencilIcon />
         </ToolbarButton>

@@ -704,3 +704,98 @@
 .doc-bubble-idea:hover {
   background: rgb(var(--accent-strong));
 }
+
+/* ------------------------------ AI rewrite ------------------------------ */
+
+.doc-bubble-ai {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgb(var(--rule-2));
+  border-radius: 2px;
+  background: rgb(var(--panel));
+  color: rgb(var(--accent));
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.doc-bubble-ai:hover,
+.doc-bubble-ai[aria-pressed='true'] {
+  background: rgb(var(--sunken));
+  border-color: rgb(var(--accent));
+}
+.doc-ai-panel {
+  margin: 0 auto 16px;
+  width: min(720px, calc(100% - 32px));
+  border: 1px solid rgb(var(--accent));
+  border-radius: 3px;
+  background: rgb(var(--panel));
+  box-shadow: 0 8px 24px rgb(var(--shadow) / 0.12);
+  display: flex;
+  flex-direction: column;
+  max-height: 45%;
+  flex-shrink: 0;
+}
+.doc-ai-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgb(var(--rule));
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: rgb(var(--accent));
+}
+.doc-ai-panel-status {
+  color: rgb(var(--muted));
+}
+.doc-ai-panel-close {
+  border: 0;
+  background: transparent;
+  color: rgb(var(--muted));
+  cursor: pointer;
+}
+.doc-ai-panel-text {
+  padding: 10px 12px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 17px;
+  line-height: 26px;
+  color: rgb(var(--ink));
+}
+.doc-ai-panel-error {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: rgb(var(--danger));
+}
+.doc-ai-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid rgb(var(--rule));
+}
+.doc-ai-panel-actions button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgb(var(--rule-2));
+  border-radius: 2px;
+  background: rgb(var(--panel));
+  color: rgb(var(--ink));
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+.doc-ai-panel-actions button.is-primary {
+  background: rgb(var(--accent));
+  border-color: rgb(var(--accent));
+  color: rgb(var(--on-accent));
+}
+.doc-ai-panel-note {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: rgb(var(--muted));
+}

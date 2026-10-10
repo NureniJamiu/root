@@ -61,7 +61,7 @@ import {
 } from './mutators';
 import type { ConnectorEnds, NodePatch } from './mutators';
 import { emitSaveError } from './storeEvents';
-import { subtreeIds } from './graph';
+import { computeFacingSides, subtreeIds } from './graph';
 import { NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
 import type { Canvas, ImageEntry, NodeType, Position, Side, UUID } from './types';
 
@@ -363,6 +363,86 @@ export const canvasActions = {
       () => ({}),
     );
     return useCanvasStore.getState().canvas.nodes.some((n) => n.id === created) ? created : null;
+  },
+
+  /**
+   * Add several filled-in ideas at once (AI suggestions the person
+   * accepted) as one undo step. Each idea hangs from an earlier one in the
+   * list (`parentKey`), from an idea already on the canvas (`parentId`), or
+   * from nothing. Returns each added idea's id by its key.
+   */
+  addIdeas(
+    items: readonly {
+      key: string;
+      parentKey?: string | null;
+      parentId?: UUID | null;
+      position: Position;
+      title: string;
+      body?: string;
+      type?: NodeType;
+    }[],
+  ): Record<string, UUID> {
+    const ids: Record<string, UUID> = {};
+    commitCanvasWrite(
+      'addIdeas',
+      (s) => {
+        let next = s.canvas;
+        for (const item of items) {
+          const parent =
+            (item.parentKey != null ? ids[item.parentKey] : undefined) ??
+            (item.parentId != null && next.nodes.some((n) => n.id === item.parentId) ? item.parentId : undefined);
+          const added = parent
+            ? mutAddChild(next, parent, { position: item.position })
+            : mutAddNode(next, { position: item.position });
+          const id = findNewNodeId(next, added);
+          if (id === null) continue;
+          ids[item.key] = id;
+          next = mutUpdateNode(added, id, {
+            title: item.title.slice(0, NODE_TITLE_MAX),
+            body: (item.body ?? '').slice(0, NODE_BODY_MAX),
+            type: item.type ?? 'finding',
+          });
+        }
+        return next;
+      },
+      () => ({}),
+    );
+    const present = new Set(useCanvasStore.getState().canvas.nodes.map((n) => n.id));
+    return Object.fromEntries(Object.entries(ids).filter(([, id]) => present.has(id)));
+  },
+
+  /**
+   * Apply several edits at once (new titles or types, new connectors) as one
+   * undo step. Edits naming ideas that no longer exist are skipped. Returns
+   * how many were applied.
+   */
+  applyEdits(edits: {
+    readonly updates: ReadonlyArray<{ readonly id: UUID; readonly patch: NodePatch }>;
+    readonly connections: ReadonlyArray<{ readonly source: UUID; readonly target: UUID }>;
+  }): number {
+    let applied = 0;
+    commitCanvasWrite(
+      'applyEdits',
+      (s) => {
+        let next = s.canvas;
+        for (const { id, patch } of edits.updates) {
+          const after = mutUpdateNode(next, id, patch);
+          if (after !== next) applied += 1;
+          next = after;
+        }
+        for (const { source, target } of edits.connections) {
+          const from = next.nodes.find((n) => n.id === source);
+          const to = next.nodes.find((n) => n.id === target);
+          if (!from || !to) continue;
+          const after = mutConnect(next, { source, target, ...computeFacingSides(from.position, to.position) });
+          if (after !== next) applied += 1;
+          next = after;
+        }
+        return next;
+      },
+      () => ({}),
+    );
+    return applied;
   },
 
   /**

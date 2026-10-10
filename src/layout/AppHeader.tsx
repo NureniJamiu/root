@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { NodeType } from '../data';
 import { Button } from '../ui/Button';
 import { Kbd } from '../ui/Kbd';
@@ -28,6 +29,8 @@ export interface AppHeaderProps {
   /** Canvas only, canvas beside a document, or the document alone. */
   readonly viewMode?: ViewMode;
   readonly onViewModeChange?: (mode: ViewMode) => void;
+  /** The AI menu, when the app provides one. */
+  readonly aiSlot?: ReactNode;
 }
 
 export type ViewMode = 'canvas' | 'split' | 'write';
@@ -84,6 +87,7 @@ export function AppHeader({
   onNavigateHome,
   viewMode,
   onViewModeChange,
+  aiSlot,
 }: AppHeaderProps): JSX.Element {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
@@ -268,6 +272,8 @@ export function AppHeader({
         <ThemeToggle />
 
         <div className="h-4 w-px bg-rule" />
+
+        {aiSlot}
 
         <div className="relative" ref={guideRef}>
           <Button

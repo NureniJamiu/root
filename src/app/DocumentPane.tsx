@@ -45,6 +45,9 @@ export interface DocumentPaneProps {
   /** Title of the selected idea, when one is selected (offers "Draft from"). */
   readonly selectedIdeaTitle: string | null;
   readonly onDraftFromSelected: () => void;
+  /** Have AI write a draft from the selected idea; absent when AI drafting is unavailable. */
+  readonly onDraftWithAiFromSelected?: (() => void) | undefined;
+  readonly isDraftingWithAi?: boolean;
   readonly onClosePane?: () => void;
 }
 
@@ -52,6 +55,8 @@ export function DocumentPane({
   docs,
   selectedIdeaTitle,
   onDraftFromSelected,
+  onDraftWithAiFromSelected,
+  isDraftingWithAi = false,
   onClosePane,
 }: DocumentPaneProps): JSX.Element {
   const { active, conflict } = docs;
@@ -206,6 +211,8 @@ export function DocumentPane({
             onCreate={(title, content) => void docs.create({ ...(title ? { title } : {}), content })}
             selectedIdeaTitle={selectedIdeaTitle}
             onDraftFromSelected={onDraftFromSelected}
+            onDraftWithAiFromSelected={onDraftWithAiFromSelected}
+            isDraftingWithAi={isDraftingWithAi}
           />
         )}
       </div>
@@ -220,6 +227,8 @@ function StartPage({
   onCreate,
   selectedIdeaTitle,
   onDraftFromSelected,
+  onDraftWithAiFromSelected,
+  isDraftingWithAi,
 }: {
   readonly documents: readonly DocumentSummary[];
   readonly isOpening: boolean;
@@ -227,6 +236,8 @@ function StartPage({
   readonly onCreate: (title: string | null, content: ReturnType<(typeof DOCUMENT_TEMPLATES)[number]['content']>) => void;
   readonly selectedIdeaTitle: string | null;
   readonly onDraftFromSelected: () => void;
+  readonly onDraftWithAiFromSelected: (() => void) | undefined;
+  readonly isDraftingWithAi: boolean;
 }): JSX.Element {
   return (
     <div className="h-full overflow-y-auto" data-testid="doc-start">
@@ -249,6 +260,23 @@ function StartPage({
             <span className="block font-mono text-[10px] uppercase tracking-[0.08em] text-accent">Draft from the canvas</span>
             <span className="block mt-1 font-serif text-[17px] text-ink-strong">
               Outline a document from “{selectedIdeaTitle || 'Untitled idea'}” and the ideas below it
+            </span>
+          </button>
+        )}
+
+        {selectedIdeaTitle !== null && onDraftWithAiFromSelected && (
+          <button
+            type="button"
+            onClick={onDraftWithAiFromSelected}
+            disabled={isDraftingWithAi}
+            className="text-left p-4 rounded-[2px] border border-rule-2 bg-panel hover:border-accent hover:bg-sunken transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-70"
+            data-testid="btn-start-draft-with-ai"
+          >
+            <span className="block font-mono text-[10px] uppercase tracking-[0.08em] text-accent">
+              {isDraftingWithAi ? 'Drafting…' : '✦ Draft with AI'}
+            </span>
+            <span className="block mt-1 font-serif text-[17px] text-ink-strong">
+              Have AI write a first draft from “{selectedIdeaTitle || 'Untitled idea'}”, citing each idea
             </span>
           </button>
         )}
