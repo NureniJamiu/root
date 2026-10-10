@@ -109,5 +109,8 @@ export type { ParseCanvasResult } from './serialize';
 export { canvasActions, useCanvasStore } from './store';
 export type { CanvasState, NodeEdits } from './store';
 
+export { docLinksActions, useDocLinksStore } from './docLinks';
+export type { DocLinksState } from './docLinks';
+
 export { emitSaveError, onSaveError } from './storeEvents';
 export type { SaveErrorDetail } from './storeEvents';

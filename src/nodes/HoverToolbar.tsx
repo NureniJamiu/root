@@ -26,6 +26,7 @@ import { canvasActions, descendantCount, hasHiddenChildren, useCanvasStore } fro
 import type { Node, NodeType, UUID } from '../data';
 
 import { ChildRevealMenu } from './ChildRevealMenu';
+import { IDEA_DRAG_MIME } from './dragMime';
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -129,6 +130,27 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
         className="flex flex-row items-center gap-1 rounded-[4px] bg-panel p-[3px]"
         style={{ border: '1px solid rgb(var(--rule-2))', boxShadow: '0 4px 12px rgb(var(--shadow) / 0.10)' }}
       >
+        <span
+          draggable
+          onDragStart={(e) => {
+            e.stopPropagation();
+            e.dataTransfer.setData(IDEA_DRAG_MIME, node.id);
+            e.dataTransfer.setData('text/plain', node.title || 'Untitled idea');
+            e.dataTransfer.effectAllowed = 'copy';
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="nodrag inline-flex items-center justify-center rounded-[2px] text-muted hover:text-ink-strong hover:bg-sunken cursor-grab"
+          style={{ width: 16, height: 22 }}
+          title="Drag into a document"
+          aria-label="Drag into a document"
+          data-testid="btn-drag-to-doc"
+        >
+          <svg width="8" height="12" viewBox="0 0 8 12" fill="currentColor" aria-hidden="true">
+            <circle cx="2" cy="2" r="1" /><circle cx="6" cy="2" r="1" />
+            <circle cx="2" cy="6" r="1" /><circle cx="6" cy="6" r="1" />
+            <circle cx="2" cy="10" r="1" /><circle cx="6" cy="10" r="1" />
+          </svg>
+        </span>
         <ToolbarButton label="Add connected idea" onClick={handleAddChild} testId="btn-add-child">
           <PlusIcon />
         </ToolbarButton>

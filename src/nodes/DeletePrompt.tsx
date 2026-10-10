@@ -29,7 +29,7 @@
 
 import { useEffect, useRef } from 'react';
 
-import { descendantCount, useCanvasStore } from '../data';
+import { descendantCount, useCanvasStore, useDocLinksStore } from '../data';
 import type { Node, UUID } from '../data';
 import { Button } from '../ui';
 
@@ -76,6 +76,7 @@ export function DeletePrompt({
   const node = useCanvasStore(selectNode(nodeId));
   const hasChildren = useCanvasStore(selectHasDependents(nodeId));
   const branchCount = useCanvasStore((s) => descendantCount(s.canvas, nodeId));
+  const citedIn = useDocLinksStore((s) => s.byIdea[nodeId]?.length ?? 0);
 
   // Keep the latest `onConfirm` in a ref so the leaf-bypass effect only
   // depends on the target's identity, not on a callback whose reference
@@ -161,6 +162,11 @@ export function DeletePrompt({
               <p id="delete-prompt-body" className="font-serif text-[14px] leading-[21px] text-ink-read m-0">
                 Some ideas hang only from this one. What should happen to them?
               </p>
+              {citedIn > 0 && (
+                <p className="font-serif text-[13px] leading-[19px] text-ink-3 m-0" data-testid="delete-prompt-docs">
+                  It is cited in {citedIn} {citedIn === 1 ? 'document' : 'documents'}; those citations will show it as removed.
+                </p>
+              )}
             </div>
           </div>
         </div>

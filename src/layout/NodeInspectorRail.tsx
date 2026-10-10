@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { canvasActions, nodeLabel, nodeOrdinals, useCanvasStore } from '../data';
+import { canvasActions, nodeLabel, nodeOrdinals, useCanvasStore, useDocLinksStore } from '../data';
 import type { Edge, Node, NodeType, Side, UUID } from '../data';
 import type { DragState } from '../canvas';
 import type { SaveStatus } from '../lib/save-queue';
 import { Button } from '../ui/Button';
+import { IDEA_DRAG_MIME, MarkdownText } from '../nodes';
 import { ImageMosaic } from './ImageGallery';
 
 export interface NodeInspectorRailProps {
@@ -14,6 +15,12 @@ export interface NodeInspectorRailProps {
   readonly dragInfo?: DragState | null;
   /** State of the project's save pipeline; drives the "Saved" indicator. */
   readonly saveStatus?: SaveStatus;
+  /** Open a document and show where it cites `nodeId`. */
+  readonly onOpenDocumentAt?: (documentId: string, nodeId: UUID) => void;
+  /** Insert the idea's card into the open document (set only while one is open). */
+  readonly onInsertInDocument?: ((nodeId: UUID) => void) | undefined;
+  /** Start a new document from this idea and the ideas below it. */
+  readonly onDraftFromBranch?: ((nodeId: UUID) => void) | undefined;
 }
 
 const SAVE_LABELS: Record<SaveStatus, string> = {
@@ -154,6 +161,9 @@ export function NodeInspectorRail({
   onClose,
   dragInfo,
   saveStatus = 'saved',
+  onOpenDocumentAt,
+  onInsertInDocument,
+  onDraftFromBranch,
 }: NodeInspectorRailProps): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const selectionId = useCanvasStore((s) => s.selection.nodeId);
@@ -169,6 +179,8 @@ export function NodeInspectorRail({
   );
 
   const selectedNode: Node | undefined = selectionId ? byId.get(selectionId) : undefined;
+  const citingDocs = useDocLinksStore((st) => (selectionId ? st.byIdea[selectionId] : undefined));
+  const docTitles = useDocLinksStore((st) => st.titles);
   const selectedEdge: Edge | undefined =
     !selectedNode && selectedEdgeId ? canvas.edges.find((e) => e.id === selectedEdgeId) : undefined;
   const labelOf = (node: Node): string => nodeLabel(node, ordinals);
@@ -239,7 +251,14 @@ export function NodeInspectorRail({
                 {type.label}
               </span>
               <h2
-                className={`m-0 font-serif text-[26px] font-medium leading-[1.2] break-words ${
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(IDEA_DRAG_MIME, selectedNode.id);
+                  e.dataTransfer.setData('text/plain', nameOf(selectedNode));
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
+                title="Drag into a document to embed this idea"
+                className={`m-0 font-serif text-[26px] font-medium leading-[1.2] break-words cursor-grab ${
                   selectedNode.title ? 'text-ink-strong' : 'text-faint italic'
                 }`}
                 data-testid="inspector-title"
@@ -252,12 +271,11 @@ export function NodeInspectorRail({
             <section className="flex flex-col gap-2">
               <SectionLabel>Notes</SectionLabel>
               {selectedNode.body.trim() ? (
-                <p
-                  className="m-0 font-serif text-[14px] leading-[22px] text-ink whitespace-pre-wrap break-words"
-                  data-testid="inspector-notes"
-                >
-                  {selectedNode.body}
-                </p>
+                <MarkdownText
+                  source={selectedNode.body}
+                  className="m-0 font-serif text-[14px] leading-[22px] text-ink break-words"
+                  testId="inspector-notes"
+                />
               ) : (
                 <p className="m-0 font-serif text-[13px] italic text-faint" data-testid="inspector-notes">
                   No notes yet.
@@ -270,6 +288,60 @@ export function NodeInspectorRail({
               <section className="flex flex-col gap-2" data-testid="inspector-images">
                 <SectionLabel>Images</SectionLabel>
                 <ImageMosaic key={selectedNode.id} images={selectedNode.images} />
+              </section>
+            )}
+
+            {/* Documents that cite this idea */}
+            {(onOpenDocumentAt || onInsertInDocument || onDraftFromBranch) && (
+              <section className="flex flex-col gap-2" data-testid="inspector-documents">
+                <SectionLabel>In documents</SectionLabel>
+                {citingDocs && citingDocs.length > 0 ? (
+                  <ul className="m-0 p-0 list-none flex flex-col gap-1">
+                    {citingDocs.map((docId) => (
+                      <li key={docId}>
+                        <button
+                          type="button"
+                          onClick={() => onOpenDocumentAt?.(docId, selectedNode.id)}
+                          className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-[2px] border border-rule bg-paper hover:border-ink hover:bg-sunken transition-colors cursor-pointer font-serif text-[14px] text-ink"
+                          data-testid="inspector-document-link"
+                        >
+                          <svg className="w-3.5 h-3.5 shrink-0 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <path d="M14 2v6h6" />
+                          </svg>
+                          <span className="truncate">{docTitles[docId] || 'Untitled document'}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="m-0 font-serif text-[13px] italic text-faint">Not cited in any document yet.</p>
+                )}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {onInsertInDocument && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onInsertInDocument(selectedNode.id)}
+                      className="font-mono text-[10px] h-7"
+                      data-testid="btn-insert-in-document"
+                    >
+                      Insert in document
+                    </Button>
+                  )}
+                  {onDraftFromBranch && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onDraftFromBranch(selectedNode.id)}
+                      className="font-mono text-[10px] h-7"
+                      title="Start a document outlined from this idea and the ideas connected below it"
+                      data-testid="btn-draft-from-branch"
+                    >
+                      Draft a document from here
+                    </Button>
+                  )}
+                </div>
               </section>
             )}
 

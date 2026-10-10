@@ -107,6 +107,8 @@ export interface CanvasViewControls {
   readonly fitView: () => void;
   /** Centre of the visible canvas, in canvas coordinates. */
   readonly getViewportCenter: () => Position;
+  /** Bring an idea into view (only pans when it is off screen). */
+  readonly focusNode: (id: UUID) => void;
 }
 
 export interface CanvasViewProps {
@@ -690,8 +692,8 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   }, []);
 
   useEffect(() => {
-    onControlsReady?.({ fitView: handleFitView, getViewportCenter });
-  }, [handleFitView, getViewportCenter, onControlsReady]);
+    onControlsReady?.({ fitView: handleFitView, getViewportCenter, focusNode: handleRevealed });
+  }, [handleFitView, getViewportCenter, handleRevealed, onControlsReady]);
 
   useEffect(() => {
     if (onRFPropsMounted === undefined) return;

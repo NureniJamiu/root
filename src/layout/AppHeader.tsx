@@ -25,7 +25,18 @@ export interface AppHeaderProps {
   readonly activeTypeFilter?: NodeType | null;
   readonly onSelectTypeFilter?: (type: NodeType | null) => void;
   readonly onNavigateHome?: () => void;
+  /** Canvas only, canvas beside a document, or the document alone. */
+  readonly viewMode?: ViewMode;
+  readonly onViewModeChange?: (mode: ViewMode) => void;
 }
+
+export type ViewMode = 'canvas' | 'split' | 'write';
+
+const VIEW_MODES: ReadonlyArray<{ mode: ViewMode; label: string; hint: string }> = [
+  { mode: 'canvas', label: 'Canvas', hint: 'Canvas only (Alt+1)' },
+  { mode: 'split', label: 'Split', hint: 'Canvas and document side by side (Alt+2)' },
+  { mode: 'write', label: 'Write', hint: 'Document only (Alt+3)' },
+];
 
 const TYPE_LABELS: Record<NodeType, string> = {
   topic: 'Topic',
@@ -52,6 +63,7 @@ const GUIDE_ITEMS: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
   { keys: ['N'], label: 'Add an idea in the middle of the view' },
   { keys: ['Ctrl/⌘', 'Z'], label: 'Undo the last change' },
   { keys: ['Ctrl/⌘', 'Shift', 'Z'], label: 'Redo' },
+  { keys: ['Alt', '1 2 3'], label: 'Canvas, split or write view' },
 ];
 
 export function AppHeader({
@@ -70,6 +82,8 @@ export function AppHeader({
   activeTypeFilter,
   onSelectTypeFilter,
   onNavigateHome,
+  viewMode,
+  onViewModeChange,
 }: AppHeaderProps): JSX.Element {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
@@ -186,7 +200,33 @@ export function AppHeader({
 
       {/* Right: type highlight, help, primary action, inspector toggle */}
       <div className="flex items-center gap-2 shrink-0">
-        {onSelectTypeFilter && (
+        {viewMode && onViewModeChange && (
+          <div
+            className="flex items-center h-8 border border-rule-2 rounded-[4px] p-0.5 bg-panel"
+            role="radiogroup"
+            aria-label="View"
+            data-testid="view-mode"
+          >
+            {VIEW_MODES.map(({ mode, label, hint }) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={viewMode === mode}
+                title={hint}
+                onClick={() => onViewModeChange(mode)}
+                className={`h-full px-2.5 rounded-[2px] font-mono text-[11px] transition-colors cursor-pointer ${
+                  viewMode === mode ? 'bg-inverse text-on-inverse' : 'text-muted hover:text-ink-strong hover:bg-sunken'
+                }`}
+                data-testid={`view-mode-${mode}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {onSelectTypeFilter && viewMode !== 'write' && (
           <label className="relative flex items-center gap-2" data-testid="type-filter">
             <span className="relative inline-flex items-center">
               <span

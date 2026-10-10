@@ -4,6 +4,7 @@
  */
 import Database from 'better-sqlite3';
 import { DB_PATH, ensureDbDirectory } from './src/lib/db-path';
+import { ensureDocumentSchema } from './src/lib/document-store';
 import { ensureProjectSchema } from './src/lib/project-store';
 
 ensureDbDirectory();
@@ -59,5 +60,6 @@ db.exec(`
 `);
 
 ensureProjectSchema(db);
+ensureDocumentSchema(db);
 
 console.log(`✅  Migration complete — tables created in ${DB_PATH}.`);

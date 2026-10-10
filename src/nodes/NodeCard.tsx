@@ -26,11 +26,12 @@ import { Fragment, memo } from 'react';
 import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
-import { formatNodeLabel, hasHiddenChildren, hiddenDescendantCount, nodeOrdinal, useCanvasStore } from '../data';
+import { formatNodeLabel, hasHiddenChildren, hiddenDescendantCount, nodeOrdinal, useCanvasStore, useDocLinksStore } from '../data';
 import type { Node, Side, UUID } from '../data';
 
 import { CollapseBadge } from './CollapseBadge';
 import { HoverToolbar } from './HoverToolbar';
+import { MarkdownText } from './MarkdownText';
 import { SELECTION_BORDER_COLOR, typeStyles } from './typeStyles';
 
 /**
@@ -164,7 +165,10 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
 
         {/* Card Footer: Metadata, Branch Stats, and Clean Collapsed Badge */}
         <div className="flex items-center justify-between pt-1.5 border-t border-rule font-mono text-[9px] text-muted tracking-wide select-none">
-          <span>{shortId}</span>
+          <span className="inline-flex items-center gap-2">
+            {shortId}
+            <DocCountBadge nodeId={node.id} />
+          </span>
           {node.collapsed || showsHiddenBadge ? (
             <CollapseBadge nodeId={node.id} />
           ) : (
@@ -323,6 +327,25 @@ function TypeBadge({ type }: { readonly type: Node['type'] }): JSX.Element {
   );
 }
 
+/** "In 2 docs": how many research documents cite this idea. */
+function DocCountBadge({ nodeId }: { readonly nodeId: UUID }): JSX.Element | null {
+  const count = useDocLinksStore((s) => s.byIdea[nodeId]?.length ?? 0);
+  if (count === 0) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1 rounded-[2px] bg-sunken text-ink-3"
+      title={`Cited in ${count} ${count === 1 ? 'document' : 'documents'}`}
+      data-testid="node-doc-count"
+    >
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6" />
+      </svg>
+      In {count} {count === 1 ? 'doc' : 'docs'}
+    </span>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /* BodyPreview                                                                */
 /* -------------------------------------------------------------------------- */
@@ -333,23 +356,23 @@ interface BodyPreviewProps {
 }
 
 function BodyPreview({ body, isConclusion }: BodyPreviewProps): JSX.Element | null {
-  if (body.length === 0) return null;
+  if (body.trim().length === 0) return null;
   return (
-    <p
-      className={`mt-0.5 whitespace-pre-wrap leading-[20px] font-serif ${isConclusion ? 'italic' : ''}`}
+    <div
+      className={`mt-0.5 leading-[20px] font-serif ${isConclusion ? 'italic' : ''}`}
       data-testid="node-body-preview"
       style={{
         fontSize: '13px',
         color: 'rgb(var(--ink-read))',
-        // Clamp to three lines at a word boundary instead of cutting mid-word.
-        display: '-webkit-box',
-        WebkitLineClamp: 3,
-        WebkitBoxOrient: 'vertical',
+        // About three lines; longer notes fade out rather than cut mid-line.
+        maxHeight: 62,
         overflow: 'hidden',
         overflowWrap: 'anywhere',
+        WebkitMaskImage: 'linear-gradient(to bottom, black 70%, transparent)',
+        maskImage: 'linear-gradient(to bottom, black 70%, transparent)',
       }}
     >
-      {body}
-    </p>
+      <MarkdownText source={body} />
+    </div>
   );
 }

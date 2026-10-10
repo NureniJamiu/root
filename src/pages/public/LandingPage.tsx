@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import type { CSSProperties } from 'react';
 
-import { RootLogo } from '../../layout';
+import { RootLogo } from '../../layout/Logo';
 import { useRouter } from '../../routing';
 
 import { ProductFilm } from './landing/ProductFilm';
@@ -68,10 +68,10 @@ const WASH_LINES: readonly string[] = [
 
 const MADE_FOR: readonly { type: IdeaType; label: string }[] = [
   { type: 'topic', label: 'Research' },
-  { type: 'finding', label: 'Video scripts' },
-  { type: 'question', label: 'Articles' },
-  { type: 'conclusion', label: 'Product plans' },
-  { type: 'topic', label: 'Lectures' },
+  { type: 'finding', label: 'Literature reviews' },
+  { type: 'question', label: 'Theses' },
+  { type: 'conclusion', label: 'Articles' },
+  { type: 'topic', label: 'Interviews' },
   { type: 'finding', label: 'Strategy' },
 ];
 
@@ -109,15 +109,16 @@ function Hero(): JSX.Element {
             style={{ fontSize: 'clamp(42px, 6.4vw, 100px)', textWrap: 'balance' } as CSSProperties}
           >
             <span className="lp-line" style={delay(100)}>
-              <span>Organize your ideas visually.</span>
+              <span>Map your research. Write it up.</span>
             </span>
           </h1>
           <p
             className="lp-fade-up font-serif text-[18px] md:text-[21px] leading-[1.55] text-ink-2 max-w-xl lg:pb-3"
             style={delay(380)}
           >
-            Plan a video, outline an article or map a research question. Root gives you a clean canvas where ideas
-            branch, questions stay open and the evidence lives inside the point it supports.
+            Root is a canvas for research. Ideas branch, questions stay open and the evidence lives inside the point it
+            supports. When the picture is clear, write it up in a document beside the canvas that cites your ideas as
+            you go.
           </p>
         </div>
 
@@ -266,9 +267,9 @@ function Statement(): JSX.Element {
 
 const DETAILS: readonly { kicker: string; title: string; body: string }[] = [
   {
-    kicker: 'Saved as you go',
-    title: 'Pick up anywhere.',
-    body: 'Every change saves to your account, so your canvas is waiting in any browser you sign in from.',
+    kicker: 'Write beside it',
+    title: 'From map to draft.',
+    body: 'Open a document next to the canvas. Type @ to cite an idea, drag a card in, or select a sentence and make it a new idea. Every citation stays linked both ways.',
   },
   {
     kicker: 'Collapse & reveal',
@@ -278,7 +279,7 @@ const DETAILS: readonly { kicker: string; title: string; body: string }[] = [
   {
     kicker: 'Images & notes',
     title: 'Keep the evidence close.',
-    body: 'Attach images and notes to any idea so the proof sits right next to the point it supports.',
+    body: 'Attach images and formatted notes to any idea so the proof sits next to the point it supports. Everything saves to your account as you go.',
   },
 ];
 
@@ -321,10 +322,10 @@ function FinalCta(): JSX.Element {
           </div>
         </Reveal>
         <Reveal as="h2" variant="mask" delay={100} className="font-serif font-light text-[40px] md:text-[72px] leading-[1.02] tracking-[-0.03em] mb-6">
-          Give your next idea <span className="italic text-[#b1c5ff]">room to branch.</span>
+          Give your next question <span className="italic text-[#b1c5ff]">room to branch.</span>
         </Reveal>
         <Reveal as="p" delay={220} className="font-serif text-[18px] md:text-[20px] leading-[1.6] text-rule-strong max-w-xl mb-12">
-          Free while in beta. No setup, no templates to learn. Just a canvas and your first idea.
+          Free while in beta. Map the question, gather the evidence and write it up, without leaving the page.
         </Reveal>
         <Reveal delay={320}>
           <button
