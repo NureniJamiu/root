@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import { RootLogo } from '../../layout/Logo';
 import { useRouter } from '../../routing';
 
+import { EvidenceScene, FoldScene, WriteScene } from './landing/DetailScenes';
 import { ProductFilm } from './landing/ProductFilm';
 import { IdeaTypes } from './landing/IdeaTypes';
 import { SiteFooter } from './landing/SiteFooter';
@@ -265,21 +266,24 @@ function Statement(): JSX.Element {
 /* Details                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const DETAILS: readonly { kicker: string; title: string; body: string }[] = [
+const DETAILS: readonly { kicker: string; title: string; body: string; scene: () => JSX.Element }[] = [
   {
     kicker: 'Write beside it',
-    title: 'From map to draft.',
-    body: 'Open a document next to the canvas. Type @ to cite an idea, drag a card in, or select a sentence and make it a new idea. Every citation stays linked both ways.',
+    title: 'Citations that link back.',
+    body: 'Click a citation to find the idea on the canvas, and every card lists the documents that cite it. Or draft a whole outline from a branch in one click.',
+    scene: WriteScene,
   },
   {
     kicker: 'Collapse & reveal',
     title: 'See only what matters.',
     body: 'Fold a branch to a single card, or reveal its ideas one at a time while you talk them through.',
+    scene: FoldScene,
   },
   {
     kicker: 'Images & notes',
     title: 'Keep the evidence close.',
     body: 'Attach images and formatted notes to any idea so the proof sits next to the point it supports. Everything saves to your account as you go.',
+    scene: EvidenceScene,
   },
 ];
 
@@ -293,6 +297,7 @@ function Details(): JSX.Element {
             delay={i * 130}
             className={`pt-8 pb-4 md:pr-8 ${i > 0 ? 'md:pl-8 md:border-l border-rule' : ''}`}
           >
+            <d.scene />
             <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted mb-4">
               <span className="text-topic">0{i + 1}</span> · {d.kicker}
             </p>

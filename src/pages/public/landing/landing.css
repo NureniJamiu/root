@@ -479,6 +479,22 @@ a:hover > .lp-logo .lp-logo-mouth,
 }
 
 /* -------------------------------------------------------------------------- */
+/* Details: the citation and its card light up together once.                */
+/* -------------------------------------------------------------------------- */
+
+.lp-link-pulse {
+  border-radius: 2px;
+}
+.is-shown .lp-link-pulse {
+  animation: lp-link-pulse 1.4s ease-out calc(var(--lp-delay, 0ms) + 700ms) 1 both;
+}
+@keyframes lp-link-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(var(--finding) / 0); }
+  30% { box-shadow: 0 0 0 4px rgb(var(--finding) / 0.22); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--finding) / 0); }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Reduced motion: everything lands in its finished state.                    */
 /* -------------------------------------------------------------------------- */
 
@@ -502,7 +518,8 @@ a:hover > .lp-logo .lp-logo-mouth,
   .lp-scroll-cue,
   .lp-caption,
   .lp-wash-blob > span,
-  .lp-rule {
+  .lp-rule,
+  .is-shown .lp-link-pulse {
     animation: none;
   }
   .lp-wash-line {

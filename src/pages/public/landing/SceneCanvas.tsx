@@ -61,6 +61,8 @@ export interface SceneNode {
   readonly thumbs?: readonly { readonly kind: SpecimenKind; readonly p: number }[] | undefined;
   /** Attachment counts shown in the footer instead of `footer`. */
   readonly attach?: { readonly images: number; readonly sources: number; readonly docs: number } | undefined;
+  /** "In N docs": documents that cite the idea, with a 0..1 reveal. */
+  readonly cited?: { readonly count: number; readonly p: number } | undefined;
 }
 
 export interface SceneEdge {
@@ -78,8 +80,14 @@ export interface SceneCursor {
   readonly y: number;
   readonly opacity: number;
   readonly pressed: boolean;
-  /** Something being dragged along with the cursor. */
-  readonly carry?: 'images' | 'pdf' | undefined;
+  /** Something being dragged along with the cursor: files, or an idea card. */
+  readonly carry?: 'images' | 'pdf' | SceneCarryCard | undefined;
+}
+
+/** An idea card dragged off the canvas (into a document). */
+export interface SceneCarryCard {
+  readonly type: IdeaType;
+  readonly title: string;
 }
 
 /** A click ring, in stage coordinates. */
@@ -363,7 +371,10 @@ function MiniNode({ node }: { readonly node: SceneNode }): JSX.Element | null {
             </div>
           )}
           <div className="mt-auto flex items-center justify-between pt-1 border-t border-rule font-mono text-muted" style={{ fontSize: 7.5 }}>
-            <span>{node.label}</span>
+            <span className="inline-flex items-center gap-1.5">
+              {node.label}
+              {node.cited && node.cited.p > 0 && <CitedBadge cited={node.cited} />}
+            </span>
             {node.attach ? (
               <AttachCounts attach={node.attach} />
             ) : node.badge ? (
@@ -428,10 +439,60 @@ function AttachCounts({ attach }: { readonly attach: NonNullable<SceneNode['atta
   );
 }
 
+/** After the app's "In N docs" badge on a card. */
+function CitedBadge({ cited }: { readonly cited: NonNullable<SceneNode['cited']> }): JSX.Element {
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 px-1 rounded-[2px] bg-sunken text-ink-2"
+      style={{
+        opacity: cited.p,
+        transform: `scale(${0.7 + 0.3 * cited.p})`,
+        boxShadow: `0 0 0 ${3 * Math.sin(cited.p * Math.PI)}px rgb(var(--topic) / 0.25)`,
+      }}
+    >
+      <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6" />
+      </svg>
+      In {cited.count} {cited.count === 1 ? 'doc' : 'docs'}
+    </span>
+  );
+}
+
+/** The ghost of an idea card while it is dragged into a document. */
+function CarriedCard({ card }: { readonly card: SceneCarryCard }): JSX.Element {
+  const color = TYPE_COLOR[card.type];
+  return (
+    <div
+      className="flex w-[170px] bg-panel border border-rule-strong rounded-[2px] overflow-hidden"
+      style={{ boxShadow: '0 10px 22px rgb(var(--shadow) / 0.2)', transform: 'rotate(-3deg)' }}
+    >
+      <div className="w-[3px] shrink-0" style={{ background: color }} />
+      <div className="flex-1 min-w-0 px-2 py-1.5">
+        <div className="font-mono font-semibold" style={{ fontSize: 7.5, letterSpacing: '0.06em', color }}>
+          {BADGE_LABEL[card.type]}
+        </div>
+        <div
+          className={`font-serif text-ink-strong truncate ${card.type === 'conclusion' ? 'italic' : ''}`}
+          style={{ fontSize: 13, fontWeight: 500 }}
+        >
+          {card.title}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Cursor({ cursor }: { readonly cursor: SceneCursor }): JSX.Element {
+  const card = typeof cursor.carry === 'object' ? cursor.carry : undefined;
   return (
     <>
-    {cursor.carry && (
+    {card && (
+      <div className="absolute pointer-events-none" style={{ left: cursor.x - 40, top: cursor.y + 12, opacity: cursor.opacity * 0.94 }}>
+        <CarriedCard card={card} />
+      </div>
+    )}
+    {cursor.carry && !card && (
       <div
         className="absolute pointer-events-none"
         style={{

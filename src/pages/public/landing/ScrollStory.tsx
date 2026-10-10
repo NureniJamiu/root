@@ -1,17 +1,19 @@
 /**
  * "How it works": a pinned, full-width canvas scrubbed by the scroll
- * position. Five steps: plant a root, branch out, name what each idea is,
- * open an idea and fill it (notes, images, sources, documents), then fold a
- * branch and focus.
+ * position. Six steps: plant a root, branch out, name what each idea is,
+ * open an idea and fill it (notes, images, sources, files), fold a branch
+ * and focus, then write it up in a document beside the canvas.
  *
  * On wide screens the canvas runs edge to edge under a floating step card,
- * and the idea panel docks on the right exactly as it does in the app. On
+ * and the idea panel and the document dock on the right as they do in the app. On
  * phones the step text sits above a framed canvas. With reduced motion the
  * section is not pinned: the steps read as a list beside a finished canvas.
  */
 
 import { useLayoutEffect, useRef, useState } from 'react';
 
+import { DOC_CLOSED, FilmDocument } from './FilmDocument';
+import type { DocContent, DocState } from './FilmDocument';
 import { FilmInspector } from './FilmInspector';
 import type { PanelContent, PanelState } from './FilmInspector';
 import {
@@ -25,7 +27,7 @@ import {
   useScrollProgress,
 } from './motion';
 import { CARD_H, CARD_W, SceneCanvas } from './SceneCanvas';
-import type { IdeaType, SceneCamera, SceneEdge, SceneFrame, SceneNode } from './SceneCanvas';
+import type { IdeaType, SceneCamera, SceneCursor, SceneEdge, SceneFrame, SceneNode, SceneRipple } from './SceneCanvas';
 
 interface Step {
   readonly kicker: string;
@@ -52,17 +54,29 @@ const STEPS: readonly Step[] = [
   {
     kicker: 'Open an idea',
     title: 'Keep the evidence inside the idea.',
-    body: 'Open any card to write notes, drop in images, cite sources and attach documents. What you gather stays with the point it supports.',
+    body: 'Open any card to write notes, drop in images, cite sources and attach files. What you gather stays with the point it supports.',
   },
   {
     kicker: 'Focus',
     title: 'Fold away the noise.',
     body: 'Collapse a branch you are done with, then walk through the rest one idea at a time when it is time to present.',
   },
+  {
+    kicker: 'Write it up',
+    title: 'Turn the map into a draft.',
+    body: 'Open a document beside the canvas. Type @ to cite an idea, drag a card in, or select a sentence and send it to the map as a new idea.',
+  },
 ];
 
+/**
+ * The canvas scenes (steps one to five) run over the first `SCENE_END` of
+ * the scroll; their keyframes below are in that scene time. Writing it up
+ * takes the rest.
+ */
+const SCENE_END = 0.8;
+
 /** Scroll progress where each step begins (the last entry closes the final step). */
-const STEP_AT: readonly number[] = [0, 0.18, 0.38, 0.55, 0.83, 1];
+const STEP_AT: readonly number[] = [...[0, 0.18, 0.38, 0.55, 0.83].map((at) => at * SCENE_END), SCENE_END, 1];
 
 function stepIndex(p: number): number {
   let index = 0;
@@ -189,9 +203,10 @@ function mixCam(a: SceneCamera, b: SceneCamera, t: number): SceneCamera {
   return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), zoom: lerp(a.zoom, b.zoom, t) };
 }
 
-export function storyFrame(p: number, layout: StoryLayout): SceneFrame & { readonly panel: PanelState } {
+/** Steps one to five at scene time `p`; `release` (0..1) lets go of the final focus. */
+function sceneFrame(p: number, layout: StoryLayout, release: number): SceneFrame & { readonly panel: PanelState } {
   const fold = easeInOutCubic(range(p, FOLD.start, FOLD.end));
-  const focus = easeInOutCubic(range(p, FOCUS.start, FOCUS.end));
+  const focus = easeInOutCubic(range(p, FOCUS.start, FOCUS.end)) * (1 - release);
   const panel = panelAt(p, layout);
   const grow = easeInOutCubic(range(p, IMAGE_AT[0] as number, (IMAGE_AT[2] as number) + 0.015));
 
@@ -264,6 +279,197 @@ export function storyFrame(p: number, layout: StoryLayout): SceneFrame & { reado
   camera = mixCam(camera, focusCam, focus);
 
   return { nodes, edges, camera, panel };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Write it up                                                                */
+/* -------------------------------------------------------------------------- */
+
+const STORY_DOC: DocContent = {
+  canvas: 'Launch video',
+  title: 'Launch video: what to fix',
+  heading: 'Why viewers leave',
+  before: 'Most of the audience is gone early: ',
+  query: 'View',
+  cite: { type: 'finding', title: 'Viewers drop at 0:08' },
+  others: [{ type: 'finding', title: 'Comment themes' }],
+  after: 'the demo only starts at 0:21.',
+  card: { type: 'conclusion', title: 'Lead with the demo', note: 'Show the product in the first five seconds, then explain it.' },
+  next: 'Shorten the cold open.',
+};
+
+/** The idea made from the selected sentence. */
+const MADE: StoryNode = {
+  id: 'n',
+  type: 'finding',
+  title: 'Shorten the cold open.',
+  label: 'F-04',
+  x: 720,
+  y: 300,
+  parent: 'k',
+  at: 0,
+  tintAt: 0,
+};
+
+/** What the camera frames while the document is open: the cited ideas and the new one. */
+const WRITE_TREE = { x: 584, y: 275, w: 700, h: 470 } as const;
+
+/** Writing keyframes, 0..1 through the last step. */
+const WRITE = {
+  open: 0.02,
+  openEnd: 0.1,
+  title: [0.1, 0.19],
+  heading: [0.2, 0.24],
+  before: [0.25, 0.33],
+  query: [0.34, 0.37],
+  menu: [0.345, 0.43],
+  cite: 0.42,
+  after: [0.44, 0.5],
+  grab: 0.57,
+  dropLine: 0.61,
+  drop: 0.64,
+  next: [0.68, 0.75],
+  select: [0.77, 0.82],
+  bubble: 0.82,
+  click: 0.885,
+  made: 0.89,
+} as const;
+
+const typedIn = (text: string, w: number, [a, b]: readonly [number, number]): number =>
+  Math.round(text.length * range(w, a, b));
+
+function docAt(w: number): DocState {
+  if (w <= WRITE.open) return DOC_CLOSED;
+  const caret =
+    w < WRITE.heading[0] - 0.005
+      ? 'title'
+      : w < WRITE.before[0] - 0.005
+        ? 'heading'
+        : w < WRITE.grab
+          ? 'body'
+          : w > WRITE.next[0] - 0.01 && w < WRITE.select[0]
+            ? 'next'
+            : null;
+  return {
+    slide: easeOutCubic(range(w, WRITE.open, WRITE.openEnd)),
+    saving: w > WRITE.title[0] && w < 0.93,
+    titleChars: typedIn(STORY_DOC.title, w, WRITE.title),
+    headingChars: typedIn(STORY_DOC.heading, w, WRITE.heading),
+    beforeChars: typedIn(STORY_DOC.before, w, WRITE.before),
+    queryChars: typedIn(`@${STORY_DOC.query}`, w, WRITE.query),
+    menu: range(w, WRITE.menu[0], WRITE.menu[0] + 0.01) * (1 - range(w, WRITE.menu[1] - 0.01, WRITE.menu[1])),
+    cite: pop(w, WRITE.cite, 0.02),
+    afterChars: typedIn(STORY_DOC.after, w, WRITE.after),
+    caret,
+    dropLine: range(w, WRITE.dropLine, WRITE.dropLine + 0.01),
+    card: pop(w, WRITE.drop, 0.025),
+    nextChars: typedIn(STORY_DOC.next ?? '', w, WRITE.next),
+    select: range(w, WRITE.select[0], WRITE.select[1]),
+    bubble: pop(w, WRITE.bubble, 0.015),
+    made: pop(w, WRITE.made, 0.02),
+  };
+}
+
+/** Stage point of a world point under `cam`. */
+function toStage(layout: StoryLayout, cam: SceneCamera, x: number, y: number): { x: number; y: number } {
+  return { x: layout.w / 2 + (x - cam.x) * cam.zoom, y: layout.h / 2 + (y - cam.y) * cam.zoom };
+}
+
+/** Where the cursor goes while writing, in stage units. */
+function writeCursor(w: number, layout: StoryLayout, cam: SceneCamera): { x: number; y: number } {
+  const k = BY_ID.get(FOCUS.id) as StoryNode;
+  const card = toStage(layout, cam, k.x + CARD_W / 2, k.y + CARD_H / 2);
+  // The document's lines, measured from the pane's top: header, toolbar, title, heading, paragraph.
+  const lines = layout.panelW < 380 ? 3 : 2;
+  const cardTop = 182 + lines * 20 + 12;
+  const nextTop = cardTop + 80 + 12;
+  const drop = { x: layout.w - layout.panelW + 150, y: cardTop + 4 };
+  const bubble = { x: layout.w - layout.panelW + 134, y: nextTop - 18 };
+  const park = { x: layout.w - 70, y: layout.h - 90 };
+  const keys: readonly [number, { x: number; y: number }][] = [
+    [0.5, park],
+    [0.555, card],
+    [WRITE.grab, card],
+    [WRITE.drop, drop],
+    [0.66, drop],
+    [0.7, park],
+    [WRITE.bubble, park],
+    [0.87, bubble],
+    [0.9, bubble],
+    [0.96, park],
+  ];
+  let at = (keys[0] as [number, { x: number; y: number }])[1];
+  for (let i = 0; i < keys.length; i += 1) {
+    const [t, pos] = keys[i] as [number, { x: number; y: number }];
+    const next = keys[i + 1];
+    if (w >= t) {
+      at = next
+        ? (() => {
+            const e = easeInOutCubic(range(w, t, next[0]));
+            return { x: lerp(pos.x, next[1].x, e), y: lerp(pos.y, next[1].y, e) };
+          })()
+        : pos;
+    }
+  }
+  return at;
+}
+
+export function storyFrame(
+  p: number,
+  layout: StoryLayout,
+): SceneFrame & { readonly panel: PanelState; readonly doc: DocState } {
+  const w = range(p, SCENE_END, 1);
+  const release = easeInOutCubic(range(w, 0, WRITE.openEnd));
+  const base = sceneFrame(range(p, 0, SCENE_END), layout, release);
+  if (w <= 0) return { ...base, doc: DOC_CLOSED };
+
+  const doc = docAt(w);
+  const cited = (id: string): SceneNode['cited'] => {
+    if (id === 'a' && w >= WRITE.cite + 0.01) return { count: 1, p: pop(w, WRITE.cite + 0.01, 0.025) };
+    if (id === FOCUS.id && w >= WRITE.drop + 0.02) return { count: 1, p: pop(w, WRITE.drop + 0.02, 0.025) };
+    return undefined;
+  };
+  const appear = range(w, WRITE.made + 0.01, WRITE.made + 0.05);
+  const nodes: SceneNode[] = [
+    ...base.nodes.map((n) => ({ ...n, cited: cited(n.id) })),
+    {
+      id: MADE.id,
+      type: MADE.type,
+      title: MADE.title,
+      label: MADE.label,
+      x: MADE.x,
+      y: MADE.y,
+      opacity: easeOutCubic(appear),
+      scale: 0.86 + 0.14 * easeOutBack(appear),
+      cited: appear > 0 ? { count: 1, p: pop(w, WRITE.made + 0.03, 0.025) } : undefined,
+    },
+  ];
+  const edges: SceneEdge[] = [
+    ...base.edges,
+    { id: `${FOCUS.id}-${MADE.id}`, from: FOCUS.id, to: MADE.id, progress: easeOutCubic(range(w, WRITE.made + 0.01, WRITE.made + 0.06)) },
+  ];
+
+  // The map moves into the space between the step card and the document.
+  const free = layout.w - layout.left - layout.panelW;
+  const fit = (free - 60) / WRITE_TREE.w;
+  const zoom = Math.min(1.1, Math.max(0.56, fit), (layout.h - 100) / WRITE_TREE.h);
+  const writeCam = aim(layout, zoom > fit ? 640 : WRITE_TREE.x, WRITE_TREE.y, layout.left + free / 2, layout.h / 2, zoom);
+  const camera = mixCam(base.camera, writeCam, release);
+
+  const pos = writeCursor(w, layout, writeCam);
+  const dragging = w >= WRITE.grab && w < WRITE.drop;
+  const cursor: SceneCursor = {
+    ...pos,
+    opacity: range(w, 0.5, 0.52) * (1 - range(w, 0.95, 0.97)),
+    pressed: dragging || (w >= WRITE.click && w < WRITE.click + 0.008),
+    carry: dragging ? { type: STORY_DOC.card.type, title: STORY_DOC.card.title } : undefined,
+  };
+  const ripples: SceneRipple[] =
+    w >= WRITE.click && w < WRITE.click + 0.03
+      ? [{ ...writeCursor(WRITE.click, layout, writeCam), age: range(w, WRITE.click, WRITE.click + 0.03) }]
+      : [];
+
+  return { nodes, edges, camera, cursor, ripples, panel: base.panel, doc };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -363,7 +569,7 @@ function StoryPinned(): JSX.Element {
   const frame = storyFrame(p, layout);
 
   return (
-    <section ref={ref} id="how-it-works" className="relative border-y border-rule" style={{ height: '620vh' }}>
+    <section ref={ref} id="how-it-works" className="relative border-y border-rule" style={{ height: '760vh' }}>
       <div className="sticky top-0 h-screen overflow-hidden bg-canvas">
         {/* Wide: the canvas fills everything below the header. */}
         <div ref={stageRef} className="absolute inset-x-0 top-16 bottom-0 hidden md:block">
@@ -374,7 +580,12 @@ function StoryPinned(): JSX.Element {
               height={layout.h}
               idPrefix="story"
               fill={{ scale }}
-              overlay={<FilmInspector state={frame.panel} content={STORY_CONTENT} width={layout.panelW} />}
+              overlay={
+                <>
+                  <FilmInspector state={frame.panel} content={STORY_CONTENT} width={layout.panelW} />
+                  <FilmDocument state={frame.doc} content={STORY_DOC} width={layout.panelW} />
+                </>
+              }
             />
           )}
           {/* Soft edges so the grid melts into the page. */}
@@ -406,7 +617,12 @@ function StoryPinned(): JSX.Element {
                 width={MOBILE_LAYOUT.w}
                 height={MOBILE_LAYOUT.h}
                 idPrefix="story-m"
-                overlay={<FilmInspector state={frame.panel} content={STORY_CONTENT} width={MOBILE_LAYOUT.panelW} />}
+                overlay={
+                  <>
+                    <FilmInspector state={frame.panel} content={STORY_CONTENT} width={MOBILE_LAYOUT.panelW} />
+                    <FilmDocument state={frame.doc} content={STORY_DOC} width={MOBILE_LAYOUT.panelW} />
+                  </>
+                }
               />
             )}
           </div>
@@ -417,7 +633,7 @@ function StoryPinned(): JSX.Element {
 }
 
 function StoryStill(): JSX.Element {
-  const frame = storyFrame(0.79, MOBILE_LAYOUT);
+  const frame = storyFrame(0.79 * SCENE_END, MOBILE_LAYOUT);
   return (
     <section id="how-it-works" className="py-24 md:py-32">
       <div className="max-w-6xl mx-auto px-6 md:px-8 grid md:grid-cols-2 gap-12 items-center">
