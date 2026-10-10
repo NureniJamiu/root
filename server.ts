@@ -6,6 +6,7 @@
  *   - /api/projects/*                     Projects and their canvases
  *   - /api/projects/:pid/documents/*      Research documents
  *   - /api/projects/:pid/assets/*         Images pasted into documents
+ *   - /api/ai/*                           AI features, settings and usage
  *   - /api/health                         Liveness check for the host
  *   - everything else (production)        The built app from `dist/`
  *
@@ -28,6 +29,11 @@ import { db } from './src/lib/db';
 import { createDocumentStore, DocumentError } from './src/lib/document-store';
 import { devMailboxEnabled, lastMailTo } from './src/lib/mailer';
 import { createProjectStore, ProjectError } from './src/lib/project-store';
+import { createRateLimiter, createSqliteAiStore } from './src/lib/ai/ai-store';
+import { deriveKeyFromSecret } from './src/lib/ai/keys';
+import { isPlan } from './src/lib/ai/plans';
+import { readAiEnv } from './src/lib/ai/providers';
+import { createAiRouter } from './src/lib/ai/routes';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? process.env.AUTH_SERVER_PORT ?? 3001);
@@ -263,6 +269,27 @@ app.get('/api/projects/:pid/assets/:id', (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
+/* AI API Routes                                                              */
+/* -------------------------------------------------------------------------- */
+
+const aiEnv = readAiEnv(process.env);
+// Everyone is on Pro in development so every feature can be tried; Free in production.
+const aiDefaultPlan = isPlan(process.env.AI_DEFAULT_PLAN) ? process.env.AI_DEFAULT_PLAN : IS_PRODUCTION ? 'free' : 'pro';
+app.use(
+  '/api/ai',
+  requireUser,
+  createAiRouter({
+    store: createSqliteAiStore(db),
+    env: aiEnv,
+    cryptoKey: await deriveKeyFromSecret(
+      process.env.AI_KEY_SECRET || process.env.BETTER_AUTH_SECRET || 'root-development-only-secret',
+    ),
+    defaultPlan: aiDefaultPlan,
+    limiter: createRateLimiter(10, 60_000),
+  }),
+);
+
+/* -------------------------------------------------------------------------- */
 /* Development mailbox (e2e tests follow password reset links through it)     */
 /* -------------------------------------------------------------------------- */
 
@@ -310,5 +337,7 @@ app.listen(PORT, () => {
   console.log(`Server running → http://localhost:${PORT}`);
   console.log(`  Auth API:    http://localhost:${PORT}/api/auth`);
   console.log(`  Project API: http://localhost:${PORT}/api/projects`);
+  const aiProviders = Object.keys(aiEnv.appKeys);
+  console.log(`  AI:          ${aiProviders.length ? aiProviders.join(', ') : 'no app keys (people can add their own)'}`);
   if (SERVE_APP) console.log(`  App:         http://localhost:${PORT}/`);
 });

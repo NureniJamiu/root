@@ -21,6 +21,10 @@ export interface NodeInspectorRailProps {
   readonly onInsertInDocument?: ((nodeId: UUID) => void) | undefined;
   /** Start a new document from this idea and the ideas below it. */
   readonly onDraftFromBranch?: ((nodeId: UUID) => void) | undefined;
+  /** Have AI write a document from this idea and the ideas below it. */
+  readonly onDraftWithAi?: ((nodeId: UUID) => void) | undefined;
+  /** An AI draft is being written. */
+  readonly isDraftingWithAi?: boolean;
 }
 
 const SAVE_LABELS: Record<SaveStatus, string> = {
@@ -164,6 +168,8 @@ export function NodeInspectorRail({
   onOpenDocumentAt,
   onInsertInDocument,
   onDraftFromBranch,
+  onDraftWithAi,
+  isDraftingWithAi = false,
 }: NodeInspectorRailProps): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const selectionId = useCanvasStore((s) => s.selection.nodeId);
@@ -339,6 +345,19 @@ export function NodeInspectorRail({
                       data-testid="btn-draft-from-branch"
                     >
                       Draft a document from here
+                    </Button>
+                  )}
+                  {onDraftWithAi && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onDraftWithAi(selectedNode.id)}
+                      disabled={isDraftingWithAi}
+                      className="font-mono text-[10px] h-7"
+                      title="Have AI write a first draft from this idea and the ideas connected below it, citing each one"
+                      data-testid="btn-draft-with-ai"
+                    >
+                      {isDraftingWithAi ? 'Drafting…' : '✦ Draft with AI'}
                     </Button>
                   )}
                 </div>

@@ -36,6 +36,11 @@ export interface ToolbarCallbacks {
    * against unknown ids, so callers can dispatch unconditionally.
    */
   readonly onAddChild: (parentId: UUID) => void;
+  /**
+   * Ask AI for ideas that connect from `nodeId`, shown as suggestions to
+   * accept. Absent when AI is not set up, so the toolbar hides the button.
+   */
+  readonly onExpandWithAi?: ((nodeId: UUID) => void) | undefined;
 }
 
 /**

@@ -10,6 +10,13 @@ interface Toast {
 
 let toastCounter = 0;
 
+const noticeListeners = new Set<(message: string) => void>();
+
+/** Show a short message in the toast surface (for example, why an AI request failed). */
+export function showNotice(message: string): void {
+  for (const listener of noticeListeners) listener(message);
+}
+
 /** How long (ms) before a toast auto-dismisses. */
 const TOAST_LIFETIME_MS = 4_000;
 
@@ -45,7 +52,9 @@ export function ToastSurface(): JSX.Element {
     const unsubLoad = onLoadError((detail) => {
       addToast(detail.message);
     });
+    noticeListeners.add(addToast);
     return () => {
+      noticeListeners.delete(addToast);
       unsubStore();
       unsubPersistSave();
       unsubLoad();

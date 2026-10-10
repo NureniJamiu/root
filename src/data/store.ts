@@ -366,6 +366,52 @@ export const canvasActions = {
   },
 
   /**
+   * Add several filled-in ideas at once (AI suggestions the person
+   * accepted) as one undo step. Each idea hangs from an earlier one in the
+   * list (`parentKey`), from an idea already on the canvas (`parentId`), or
+   * from nothing. Returns each added idea's id by its key.
+   */
+  addIdeas(
+    items: readonly {
+      key: string;
+      parentKey?: string | null;
+      parentId?: UUID | null;
+      position: Position;
+      title: string;
+      body?: string;
+      type?: NodeType;
+    }[],
+  ): Record<string, UUID> {
+    const ids: Record<string, UUID> = {};
+    commitCanvasWrite(
+      'addIdeas',
+      (s) => {
+        let next = s.canvas;
+        for (const item of items) {
+          const parent =
+            (item.parentKey != null ? ids[item.parentKey] : undefined) ??
+            (item.parentId != null && next.nodes.some((n) => n.id === item.parentId) ? item.parentId : undefined);
+          const added = parent
+            ? mutAddChild(next, parent, { position: item.position })
+            : mutAddNode(next, { position: item.position });
+          const id = findNewNodeId(next, added);
+          if (id === null) continue;
+          ids[item.key] = id;
+          next = mutUpdateNode(added, id, {
+            title: item.title.slice(0, NODE_TITLE_MAX),
+            body: (item.body ?? '').slice(0, NODE_BODY_MAX),
+            type: item.type ?? 'finding',
+          });
+        }
+        return next;
+      },
+      () => ({}),
+    );
+    const present = new Set(useCanvasStore.getState().canvas.nodes.map((n) => n.id));
+    return Object.fromEntries(Object.entries(ids).filter(([, id]) => present.has(id)));
+  },
+
+  /**
    * Shallow-patch `title` / `body` / `type` on the node identified by
    * `id`. Position, images, and collapse state have dedicated actions.
    */

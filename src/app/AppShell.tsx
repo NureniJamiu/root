@@ -25,12 +25,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { AiMenu, AiRequestError, AiSettingsDialog, StartFromTopic, aiActions, aiApi, aiConfigActions, useAiEnabled } from '../ai';
 import { CanvasView, computeChildPosition, findFreePosition, getMeasuredSizes } from '../canvas';
 import type { CanvasViewControls, DragState } from '../canvas';
 import {
   CANVAS_TITLE_MAX,
+  aiProposalActions,
   canvasActions,
   incomingIndex,
+  useAiProposalStore,
   useCanvasStore,
   visibleNodeIds,
 } from '../data';
@@ -38,6 +41,7 @@ import type { NodeType, UUID } from '../data';
 import { DocumentEditorContext } from '../editor/context';
 import type { DocumentEditorServices } from '../editor/context';
 import { insertIdeaIntoDocument, revealIdeaInDocument } from '../editor/bridge';
+import { aiDraftToDocument } from '../editor/aiDraft';
 import { draftFromBranch } from '../editor/draftFromBranch';
 import { uploadAsset } from '../lib/documents-api';
 import {
@@ -60,7 +64,7 @@ import {
 import { useOptionalAuth } from '../auth';
 
 import { DocumentPane } from './DocumentPane';
-import { ToastSurface } from './Toasts';
+import { ToastSurface, showNotice } from './Toasts';
 import { useDocuments } from './useDocuments';
 import { useProjects } from './useProjects';
 
@@ -265,6 +269,8 @@ export function AppShell(): JSX.Element {
     [],
   );
 
+  const aiEnabled = useAiEnabled();
+
   const editorServices = useMemo<DocumentEditorServices>(
     () => ({
       focusIdea,
@@ -293,8 +299,17 @@ export function AppShell(): JSX.Element {
         emitSaveError({ message: `Image not added: ${result.message}` });
         return null;
       },
+      rewrite: aiEnabled
+        ? async (req, onText, signal) => {
+            try {
+              return await aiApi.rewrite(req, onText, signal);
+            } finally {
+              void aiConfigActions.load(true);
+            }
+          }
+        : undefined,
     }),
-    [activeProjectId, focusIdea],
+    [activeProjectId, focusIdea, aiEnabled],
   );
 
   const handleOpenDocument = useCallback(
@@ -327,6 +342,54 @@ export function AppShell(): JSX.Element {
       void createDocument({ title: draft.title, content: draft.content });
     },
     [createDocument, showDocuments],
+  );
+
+  /* ------------------------------- AI ---------------------------------- */
+
+  const aiBusy = useAiProposalStore((s) => s.pending !== null || s.proposal !== null);
+  const [isAiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [draftingWithAi, setDraftingWithAi] = useState(false);
+
+  useEffect(() => {
+    void aiConfigActions.load();
+  }, []);
+
+  // Suggestions belong to the project they were made for.
+  useEffect(() => {
+    aiActions.cancel();
+    aiProposalActions.clear();
+  }, [activeProjectId]);
+
+  const callbacks = useMemo<ToolbarCallbacks>(
+    () =>
+      aiEnabled
+        ? { ...toolbarCallbacks, onExpandWithAi: (id: UUID) => void aiActions.expandIdea(id) }
+        : toolbarCallbacks,
+    [aiEnabled],
+  );
+
+  const handleMapTopic = useCallback((topic: string) => {
+    const center = canvasControlsRef.current?.getViewportCenter() ?? { x: 400, y: 300 };
+    void aiActions.mapTopic(topic, center);
+  }, []);
+
+  const handleDraftWithAi = useCallback(
+    async (nodeId: UUID) => {
+      if (draftingWithAi) return;
+      setDraftingWithAi(true);
+      try {
+        const res = await aiActions.draft(nodeId);
+        const doc = aiDraftToDocument(useCanvasStore.getState().canvas, nodeId, res.draft);
+        if (!doc) return;
+        showDocuments();
+        await createDocument({ title: doc.title, content: doc.content });
+      } catch (error) {
+        showNotice(error instanceof AiRequestError ? error.message : 'The AI draft failed.');
+      } finally {
+        setDraftingWithAi(false);
+      }
+    },
+    [createDocument, draftingWithAi, showDocuments],
   );
 
   const handleInsertInDocument = useCallback((nodeId: UUID) => {
@@ -508,7 +571,7 @@ export function AppShell(): JSX.Element {
 
   return (
     <DocumentEditorContext.Provider value={editorServices}>
-    <ToolbarCallbacksProvider value={toolbarCallbacks}>
+    <ToolbarCallbacksProvider value={callbacks}>
       <div
         id="root-app"
         className="w-screen h-screen flex bg-canvas overflow-hidden select-none"
@@ -569,6 +632,7 @@ export function AppShell(): JSX.Element {
             onNavigateHome={() => navigateTo('/')}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            aiSlot={<AiMenu onMapTopic={handleMapTopic} onOpenSettings={() => setAiSettingsOpen(true)} disabled={!isReady} />}
           />
 
           <div ref={workRef} className="flex-1 min-h-0 w-full flex overflow-hidden relative">
@@ -585,7 +649,12 @@ export function AppShell(): JSX.Element {
                 isPanActive={isPanActive}
                 onTogglePan={() => setIsPanActive((prev) => !prev)}
                 highlightType={activeTypeFilter}
+                onAiCancel={aiActions.cancel}
               />
+
+              {isReady && aiEnabled && canvas.nodes.length === 0 && !aiBusy && (
+                <StartFromTopic onMapTopic={handleMapTopic} />
+              )}
 
               {/* The projects could not be loaded: nothing can be saved, so say so. */}
               {!isLoading && !isReady && (
@@ -635,6 +704,10 @@ export function AppShell(): JSX.Element {
                     docs={docs}
                     selectedIdeaTitle={selectedIdea ? selectedIdea.title : null}
                     onDraftFromSelected={() => selectedIdea && handleDraftFromBranch(selectedIdea.id)}
+                    onDraftWithAiFromSelected={
+                      aiEnabled && selectedIdea ? () => void handleDraftWithAi(selectedIdea.id) : undefined
+                    }
+                    isDraftingWithAi={draftingWithAi}
                     onClosePane={() => setViewMode('canvas')}
                   />
                 </div>
@@ -656,6 +729,8 @@ export function AppShell(): JSX.Element {
                 onOpenDocumentAt={handleOpenDocumentAt}
                 onInsertInDocument={showDocs && activeDocument ? handleInsertInDocument : undefined}
                 onDraftFromBranch={isReady ? handleDraftFromBranch : undefined}
+                onDraftWithAi={isReady && aiEnabled ? (id) => void handleDraftWithAi(id) : undefined}
+                isDraftingWithAi={draftingWithAi}
               />
             </div>
           </div>
@@ -675,6 +750,8 @@ export function AppShell(): JSX.Element {
             onConfirm={handleDeleteConfirm}
           />
         )}
+
+        {isAiSettingsOpen && <AiSettingsDialog onClose={() => setAiSettingsOpen(false)} />}
 
         {/* Toast surface — subscribes to error buses and renders toasts. */}
         <ToastSurface />
