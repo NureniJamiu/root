@@ -10,17 +10,17 @@ import { IDEA_CARD, IDEA_REF } from './links';
 
 let active: Editor | null = null;
 let activeDocumentId: string | null = null;
-let pendingReveal: { nodeId: string; documentId: string | null } | null = null;
+let pendingReveal: { nodeId: string; documentId: string | null; block?: boolean } | null = null;
 const listeners = new Set<() => void>();
 
 export function setActiveEditor(editor: Editor | null, documentId: string | null = null): void {
   active = editor;
   activeDocumentId = editor ? documentId : null;
   if (editor && pendingReveal && (pendingReveal.documentId === null || pendingReveal.documentId === documentId)) {
-    const { nodeId } = pendingReveal;
+    const { nodeId, block } = pendingReveal;
     pendingReveal = null;
     // Let the first render settle so scrolling lands on the right block.
-    requestAnimationFrame(() => revealIdeaInDocument(nodeId));
+    requestAnimationFrame(() => (block ? revealBlockInDocument(nodeId) : revealIdeaInDocument(nodeId)));
   }
   listeners.forEach((fn) => fn());
 }
@@ -88,6 +88,34 @@ export function revealIdeaInDocument(nodeId: string, documentId: string | null =
   if (found === null) return false;
   editor.chain().focus().setNodeSelection(found).scrollIntoView().run();
   const dom = editor.view.nodeDOM(found);
+  if (dom instanceof HTMLElement) dom.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  return true;
+}
+
+/**
+ * Scroll to the block with id `blockId` and put the cursor in it. Like
+ * `revealIdeaInDocument`, it waits for `documentId` to open when needed.
+ */
+export function revealBlockInDocument(blockId: string, documentId: string | null = null): boolean {
+  const editor = getActiveEditor();
+  if (!editor || (documentId !== null && documentId !== activeDocumentId)) {
+    pendingReveal = { nodeId: blockId, documentId, block: true };
+    return false;
+  }
+  let found: number | null = null;
+  editor.state.doc.descendants((node, pos) => {
+    if (found !== null) return false;
+    if (node.attrs.id === blockId) {
+      found = pos;
+      return false;
+    }
+    return true;
+  });
+  if (found === null) return false;
+  const pos: number = found;
+  if (editor.state.doc.nodeAt(pos)?.isTextblock) editor.chain().focus().setTextSelection(pos + 1).run();
+  else editor.chain().focus().setNodeSelection(pos).run();
+  const dom = editor.view.nodeDOM(pos);
   if (dom instanceof HTMLElement) dom.scrollIntoView({ block: 'center', behavior: 'smooth' });
   return true;
 }

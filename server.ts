@@ -32,8 +32,10 @@ import { createProjectStore, ProjectError } from './src/lib/project-store';
 import { createRateLimiter, createSqliteAiStore } from './src/lib/ai/ai-store';
 import { deriveKeyFromSecret } from './src/lib/ai/keys';
 import { isPlan } from './src/lib/ai/plans';
+import { toPromptCanvas } from './src/lib/ai/project-content';
 import { readAiEnv } from './src/lib/ai/providers';
 import { createAiRouter } from './src/lib/ai/routes';
+import { createSearchIndex } from './src/lib/ai/search-index';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? process.env.AUTH_SERVER_PORT ?? 3001);
@@ -165,7 +167,10 @@ app.delete('/api/projects/:id', (req, res) => {
   try {
     const removed = db.transaction(() => {
       const gone = projects.remove(res.locals.userId, req.params.id);
-      if (gone) documents.removeProject(req.params.id);
+      if (gone) {
+        documents.removeProject(req.params.id);
+        searchIndex.removeProject(req.params.id);
+      }
       return gone;
     })();
     if (!removed) return res.status(404).json({ error: 'Project not found' });
@@ -273,6 +278,7 @@ app.get('/api/projects/:pid/assets/:id', (req, res) => {
 /* -------------------------------------------------------------------------- */
 
 const aiEnv = readAiEnv(process.env);
+const searchIndex = createSearchIndex(db);
 // Everyone is on Pro in development so every feature can be tried; Free in production.
 const aiDefaultPlan = isPlan(process.env.AI_DEFAULT_PLAN) ? process.env.AI_DEFAULT_PLAN : IS_PRODUCTION ? 'free' : 'pro';
 app.use(
@@ -286,6 +292,20 @@ app.use(
     ),
     defaultPlan: aiDefaultPlan,
     limiter: createRateLimiter(10, 60_000),
+    index: searchIndex,
+    // Ask and the gap check read the saved project: canvas and documents, never images.
+    loadProject: async (userId, projectId) => {
+      const project = projects.get(userId, projectId);
+      if (!project) return null;
+      return {
+        title: project.title,
+        canvas: toPromptCanvas(project.canvas),
+        documents: documents.list(userId, projectId).flatMap((summary) => {
+          const doc = documents.get(userId, projectId, summary.id);
+          return doc ? [{ id: doc.id, title: doc.title, content: doc.content }] : [];
+        }),
+      };
+    },
   }),
 );
 

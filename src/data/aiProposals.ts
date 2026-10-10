@@ -25,7 +25,7 @@ export interface GhostIdea {
   readonly position: Position;
 }
 
-export type AiProposalKind = 'map' | 'expand';
+export type AiProposalKind = 'map' | 'expand' | 'capture';
 
 export interface AiProposal {
   readonly kind: AiProposalKind;
@@ -84,6 +84,14 @@ export function includedIdeas(proposal: AiProposal): Array<GhostIdea & { readonl
     .map((i) => ({ ...i, parentKey: nearestIncluded(i.parentKey) }));
 }
 
+/** Told how many suggestions were shown and kept, each time a proposal is added or dropped. */
+type DecisionListener = (kind: AiProposalKind, offered: number, accepted: number) => void;
+let decisionListener: DecisionListener | null = null;
+
+export function setAiDecisionListener(listener: DecisionListener | null): void {
+  decisionListener = listener;
+}
+
 export const aiProposalActions = {
   start(pending: AiPending): void {
     useAiProposalStore.setState({ pending, error: null, proposal: null });
@@ -106,8 +114,9 @@ export const aiProposalActions = {
   accept(): Record<string, UUID> {
     const { proposal } = useAiProposalStore.getState();
     if (!proposal) return {};
+    const included = includedIdeas(proposal);
     const ids = canvasActions.addIdeas(
-      includedIdeas(proposal).map((i) => ({
+      included.map((i) => ({
         key: i.key,
         parentKey: i.parentKey,
         parentId: proposal.anchorId,
@@ -118,11 +127,14 @@ export const aiProposalActions = {
       })),
     );
     useAiProposalStore.setState({ proposal: null });
+    decisionListener?.(proposal.kind, proposal.ideas.length, included.length);
     return ids;
   },
   /** Drop the proposal, any request in flight and any error. */
   clear(): void {
+    const { proposal } = useAiProposalStore.getState();
     useAiProposalStore.setState({ proposal: null, pending: null, error: null });
+    if (proposal) decisionListener?.(proposal.kind, proposal.ideas.length, 0);
   },
   dismissError(): void {
     useAiProposalStore.setState({ error: null });

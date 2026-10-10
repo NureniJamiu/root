@@ -11,7 +11,8 @@
  *   - Dropping an idea from the canvas embeds its card (Alt: cites it inline).
  *   - Outline of the document's headings for jumping around long drafts.
  *   - With AI set up, "✦ AI" in the bubble rewrites the selection (improve,
- *     shorten, expand, continue) into a panel to accept or discard.
+ *     shorten, expand, continue) into a panel to accept or discard, or turns
+ *     it into suggested ideas on the canvas ("Make ideas").
  */
 
 import type { Editor, JSONContent } from '@tiptap/core';
@@ -372,6 +373,13 @@ function SelectionBubble({
     }),
   });
 
+  const makeIdeasWithAi = (): void => {
+    const { from, to } = editor.state.selection;
+    const text = editor.state.doc.textBetween(from, to, '\n\n', ' ').trim();
+    setAiOpen(false);
+    if (text) services.captureIdeas?.(text.slice(0, 8_000));
+  };
+
   const makeIdea = (): void => {
     const { from, to } = editor.state.selection;
     const text = editor.state.doc.textBetween(from, to, ' ', ' ').replace(/\s+/g, ' ').trim();
@@ -406,7 +414,19 @@ function SelectionBubble({
         <LinkForm editor={editor} onDone={() => setLinkOpen(false)} />
       ) : aiOpen ? (
         <>
-          {REWRITE_ACTIONS.map((action) => (
+          {services.captureIdeas && (
+            <button
+              type="button"
+              className="doc-bubble-ai"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={makeIdeasWithAi}
+              title="Suggest several connected ideas from the selected text"
+              data-testid="doc-ai-capture"
+            >
+              Make ideas
+            </button>
+          )}
+          {services.rewrite && REWRITE_ACTIONS.map((action) => (
             <button
               key={action}
               type="button"
@@ -451,14 +471,14 @@ function SelectionBubble({
           >
             + Make idea
           </button>
-          {services.rewrite && (
+          {(services.rewrite || services.captureIdeas) && (
             <button
               type="button"
               className="doc-bubble-ai"
               aria-pressed={false}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setAiOpen(true)}
-              title="Rewrite, shorten, expand or continue the selected text with AI"
+              title="AI: make ideas from the selection, or rewrite, shorten, expand or continue it"
               data-testid="doc-ai-menu"
             >
               ✦ AI

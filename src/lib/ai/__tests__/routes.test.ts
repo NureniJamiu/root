@@ -13,7 +13,9 @@ import type { AiStore } from '../ai-store';
 import { deriveKeyFromSecret } from '../keys';
 import type { AiModel } from '../models';
 import { readAiEnv } from '../providers';
+import type { ProjectContent } from '../project-content';
 import { createAiRouter } from '../routes';
+import { createSearchIndex } from '../search-index';
 import { jsonModel, streamModel } from './mock';
 
 const servers: Server[] = [];
@@ -28,7 +30,8 @@ interface Setup {
   limit?: number;
   /** Pick a model per catalog entry; wins over `model`. */
   modelFor?: (model: AiModel) => LanguageModel;
-  timeouts?: Partial<Record<'suggest' | 'draft' | 'rewrite' | 'test', number>>;
+  timeouts?: Partial<Record<'suggest' | 'draft' | 'rewrite' | 'test' | 'ask' | 'review', number>>;
+  projects?: Record<string, ProjectContent>;
 }
 
 /** A model whose every call fails the way a provider's HTTP error does. */
@@ -83,6 +86,9 @@ async function start(setup: Setup = {}) {
       defaultPlan: setup.plan ?? 'pro',
       limiter: createRateLimiter(setup.limit ?? 100, 60_000),
       ...(setup.timeouts ? { timeouts: setup.timeouts } : {}),
+      index: createSearchIndex(new Database(':memory:')),
+      loadProject: async (userId, projectId) => (userId === 'user-1' ? setup.projects?.[projectId] ?? null : null),
+      buildEmbedder: (modelId) => ({ modelId, embed: async (values) => values.map(() => [1, 0]) }),
       buildModel: (model, apiKey) => {
         calls.push({ model, apiKey });
         if (setup.modelFor) return setup.modelFor(model);
@@ -272,5 +278,76 @@ describe('/api/ai', () => {
     expect(results[1]).toMatchObject({ role: 'smart', modelId: PRO, ok: false });
     expect(results[1].message).toContain('Quota exceeded');
     expect(await store.countActions('user-1', '2000-01-01T00:00:00.000Z')).toBe(0);
+  });
+
+  describe('phase 2', () => {
+    const PROJECT = '00000000-0000-4000-8000-0000000000aa';
+    const IDEA = '00000000-0000-4000-8000-0000000000a1';
+    const CONCLUSION = '00000000-0000-4000-8000-0000000000a2';
+    const projects: Record<string, ProjectContent> = {
+      [PROJECT]: {
+        title: 'Sleep',
+        canvas: {
+          title: 'Sleep',
+          nodes: [
+            { id: IDEA, title: 'REM consolidates skills', body: '', type: 'finding' },
+            { id: CONCLUSION, title: 'Sleep matters', body: '', type: 'conclusion' },
+          ],
+          edges: [],
+        },
+        documents: [],
+      },
+    };
+
+    it('answers a question with citations to real ideas', async () => {
+      const { call, store } = await start({ projects, model: streamModel(['Skills [[I1]] and ', 'more [[I7]].']) });
+      const res = await call('/ask', { body: { projectId: PROJECT, question: 'What helps skills?' } });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('x-ai-search')).toBe('whole');
+      expect(await res.text()).toBe(`Skills [[idea:${IDEA}]] and more .`);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(await store.countActions('user-1', '2000-01-01T00:00:00.000Z')).toBe(1);
+    });
+
+    it('will not read another person\'s project', async () => {
+      const { call } = await start({ projects });
+      const res = await call('/ask', { body: { projectId: PROJECT, question: 'Hi' }, user: 'user-2' });
+      expect(res.status).toBe(404);
+    });
+
+    it('checks for gaps with rules and the model, on Pro only', async () => {
+      const model = jsonModel({ issues: [{ kind: 'gap', refs: [], message: 'Nothing on naps.', suggestion: 'Add one.' }] });
+      const { call } = await start({ projects, model });
+      const res = await call('/review', { body: { projectId: PROJECT } });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.issues.map((i: { kind: string; rule: boolean }) => [i.kind, i.rule])).toEqual([
+        ['unsupported', true],
+        ['gap', false],
+      ]);
+      const free = await start({ projects, model, plan: 'free' });
+      expect((await free.call('/review', { body: { projectId: PROJECT } })).status).toBe(403);
+    });
+
+    it('makes ideas from text and suggests tidying', async () => {
+      const capture = await start({ projects });
+      const ideas = await capture.call('/capture', { body: { text: 'Naps help.', canvas: projects[PROJECT]!.canvas } });
+      expect((await ideas.json()).ideas).toHaveLength(1);
+      const tidy = await start({
+        model: jsonModel({ suggestions: [{ kind: 'connect', ref: 'I1', type: null, title: null, to: 'I2', reason: 'Supports it.' }] }),
+      });
+      const res = await tidy.call('/tidy', { body: { canvas: projects[PROJECT]!.canvas } });
+      expect((await res.json()).suggestions).toEqual([{ kind: 'connect', sourceId: IDEA, targetId: CONCLUSION, reason: 'Supports it.' }]);
+    });
+
+    it('records accept rates without counting them as actions', async () => {
+      const { call, store } = await start();
+      expect((await call('/feedback', { body: { feature: 'ai.expand', offered: 5, accepted: 3 } })).status).toBe(204);
+      await call('/feedback', { body: { feature: 'ai.expand', offered: 4, accepted: 9 } });
+      const config = await (await call('/config')).json();
+      expect(config.acceptRates).toEqual([{ feature: 'ai.expand', offered: 9, accepted: 7 }]);
+      expect(config.semanticSearch).toBe(true);
+      expect(await store.countActions('user-1', '2000-01-01T00:00:00.000Z')).toBe(0);
+    });
   });
 });

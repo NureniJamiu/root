@@ -10,15 +10,18 @@ import { findModel } from '../lib/ai/models';
 import { SparkleIcon } from '../nodes';
 import { Button } from '../ui/Button';
 import { useAiConfigStore } from './aiConfig';
+import type { AiPanelTab } from './AiPanel';
 
 export interface AiMenuProps {
   readonly onMapTopic: (topic: string) => void;
   readonly onOpenSettings: () => void;
+  /** Open the AI panel at a tool (Ask, Gap check, Tidy). */
+  readonly onOpenPanel?: (tab: AiPanelTab) => void;
   /** No project is open, so nothing can be added. */
   readonly disabled?: boolean;
 }
 
-export function AiMenu({ onMapTopic, onOpenSettings, disabled = false }: AiMenuProps): JSX.Element {
+export function AiMenu({ onMapTopic, onOpenSettings, onOpenPanel, disabled = false }: AiMenuProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -117,6 +120,32 @@ export function AiMenu({ onMapTopic, onOpenSettings, disabled = false }: AiMenuP
                   Suggests a starting tree of ideas. You choose which to keep.
                 </span>
               </form>
+              {onOpenPanel && (
+                <div className="flex flex-col gap-1" data-testid="ai-menu-tools">
+                  {(
+                    [
+                      ['ask', 'Ask your project', 'Answers that cite your ideas and documents'],
+                      ['review', 'Gap check', 'Unsupported conclusions, uncited claims, contradictions'],
+                      ['tidy', 'Tidy suggestions', 'Better types, titles and missing connectors'],
+                    ] as const
+                  ).map(([tab, label, hint]) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => {
+                        setOpen(false);
+                        onOpenPanel(tab);
+                      }}
+                      className="flex flex-col items-start text-left px-2 py-1.5 rounded-[2px] border border-rule hover:border-ink cursor-pointer disabled:opacity-50 disabled:cursor-default"
+                      data-testid={`ai-open-${tab}`}
+                    >
+                      <span className="font-serif text-[13px] text-ink-strong">{label}</span>
+                      <span className="font-serif text-[11.5px] text-ink-3">{hint}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <p className="m-0 font-serif text-[12.5px] leading-[18px] text-ink-read">
                 Hover an idea and press <SparkleIcon className="inline w-3 h-3 align-[-1px]" /> to suggest connected
                 ideas.

@@ -9,12 +9,18 @@ import type {
   AiErrorBody,
   AiErrorCode,
   AiTestResult,
+  AskRequest,
+  CaptureRequest,
   DraftRequest,
   DraftResponse,
   ExpandRequest,
+  FeedbackRequest,
   MapRequest,
+  ReviewResponse,
   RewriteRequest,
   SuggestionsResponse,
+  TidyRequest,
+  TidyResponse,
 } from '../lib/ai/contracts';
 import type { KeyedProvider } from '../lib/ai/models';
 import { FEATURE_LABELS, cheapestPlanFor, PLAN_DEFINITIONS } from '../lib/ai/plans';
@@ -142,36 +148,73 @@ export const aiApi = {
     json<SuggestionsResponse>('/expand', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
   draft: (req: DraftRequest, signal?: AbortSignal) =>
     json<DraftResponse>('/draft', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
+  capture: (req: CaptureRequest, signal?: AbortSignal) =>
+    json<SuggestionsResponse>('/capture', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
+  tidy: (req: TidyRequest, signal?: AbortSignal) =>
+    json<TidyResponse>('/tidy', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
+  review: (projectId: string, signal?: AbortSignal) =>
+    json<ReviewResponse>('/review', { method: 'POST', body: { projectId }, ...(signal ? { signal } : {}) }),
+  /** Note how many suggestions were kept. Best-effort: failures are ignored. */
+  feedback: (req: FeedbackRequest): void => {
+    void send('/feedback', { method: 'POST', body: req })
+      .then(({ deadline }) => deadline.clear())
+      .catch(() => undefined);
+  },
   /** Ask each configured model for a one-word reply, to check keys and models work. */
   test: () => json<{ results: AiTestResult[] }>('/test', { method: 'POST', body: {} }),
 
   /** Stream rewritten text; `onText` gets everything received so far. Resolves with the full text. */
-  async rewrite(req: RewriteRequest, onText: (text: string) => void, signal?: AbortSignal): Promise<string> {
-    const { res, deadline } = await send('/rewrite', { method: 'POST', body: req, ...(signal ? { signal } : {}) });
-    let text = '';
-    const decoder = new TextDecoder();
-    try {
-      if (!res.body) {
-        text = await res.text();
-        onText(text);
-        return text;
-      }
-      const reader = res.body.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value, { stream: true });
-        onText(text);
-      }
-    } catch (err) {
-      if (deadline.timedOut()) throw new AiRequestError(TIMED_OUT_MESSAGE, 'timeout', 0);
-      if (isAbort(err) || deadline.signal.aborted) throw new AiRequestError('Stopped.', 'aborted', 0);
-      throw new AiRequestError('The answer was cut off. Try again.', 'network', 0);
-    } finally {
-      deadline.clear();
-    }
-    text += decoder.decode();
-    onText(text);
-    return text;
+  rewrite(req: RewriteRequest, onText: (text: string) => void, signal?: AbortSignal): Promise<string> {
+    return streamText('/rewrite', req, onText, signal).then((r) => r.text);
+  },
+
+  /**
+   * Stream an answer about a project; `onText` gets everything received so
+   * far, with citations as `[[idea:<id>]]` / `[[doc:<id>#<block>]]`.
+   */
+  ask(
+    req: AskRequest,
+    onText: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<{ text: string; model: string | null; search: string | null }> {
+    return streamText('/ask', req, onText, signal);
   },
 };
+
+/** POST `body` and read the plain-text answer as it streams. */
+async function streamText(
+  path: string,
+  body: unknown,
+  onText: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<{ text: string; model: string | null; search: string | null }> {
+  const { res, deadline } = await send(path, { method: 'POST', body, ...(signal ? { signal } : {}) });
+  const header = res.headers.get('X-AI-Model');
+  const model = header ? decodeURIComponent(header) : null;
+  const search = res.headers.get('X-AI-Search');
+  let text = '';
+  const decoder = new TextDecoder();
+  try {
+    if (!res.body) {
+      text = await res.text();
+      onText(text);
+      return { text, model, search };
+    }
+    const reader = res.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+      onText(text);
+    }
+  } catch (err) {
+    if (deadline.timedOut()) throw new AiRequestError(TIMED_OUT_MESSAGE, 'timeout', 0);
+    if (isAbort(err) || deadline.signal.aborted) throw new AiRequestError('Stopped.', 'aborted', 0);
+    throw new AiRequestError('The answer was cut off. Try again.', 'network', 0);
+  } finally {
+    deadline.clear();
+  }
+  text += decoder.decode();
+  onText(text);
+  return { text, model, search };
+}

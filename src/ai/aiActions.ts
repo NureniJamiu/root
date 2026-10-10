@@ -3,7 +3,7 @@
  * suggestions placed on the canvas (see `data/aiProposals.ts`).
  */
 
-import { aiProposalActions, useAiProposalStore, useCanvasStore } from '../data';
+import { aiProposalActions, setAiDecisionListener, useAiProposalStore, useCanvasStore } from '../data';
 import type { GhostIdea, Position, UUID } from '../data';
 import { layoutExpansion, layoutMap } from '../canvas/ghostLayout';
 import { getMeasuredSizes } from '../canvas/measuredSizes';
@@ -13,6 +13,11 @@ import { AiRequestError, aiApi } from './api';
 import { toPromptCanvas } from './promptCanvas';
 
 let controller: AbortController | null = null;
+
+// Every suggestion kept or dropped counts towards the feature's accept rate.
+setAiDecisionListener((kind, offered, accepted) => {
+  if (offered > 0) aiApi.feedback({ feature: `ai.${kind}`, offered, accepted });
+});
 
 function begin(): AbortSignal {
   controller?.abort();
@@ -92,6 +97,37 @@ export const aiActions = {
       );
       aiProposalActions.propose({
         kind: 'map',
+        anchorId: null,
+        ideas: toGhosts(res.ideas, positions),
+        excluded: [],
+        modelLabel: res.model.label,
+      });
+    } catch (error) {
+      const message = messageFor(error);
+      if (message) aiProposalActions.fail(message);
+      else aiProposalActions.clear();
+    }
+  },
+
+  /** Turn selected document text into suggested ideas near `viewCenter`. */
+  async captureFromText(text: string, viewCenter: Position, documentTitle?: string): Promise<void> {
+    const signal = begin();
+    aiProposalActions.start({ kind: 'capture', anchorId: null });
+    try {
+      const canvas = useCanvasStore.getState().canvas;
+      const res = await aiApi.capture(
+        { text, canvas: toPromptCanvas(canvas), ...(documentTitle ? { documentTitle: documentTitle.slice(0, 200) } : {}) },
+        signal,
+      );
+      settle(res);
+      const positions = layoutMap(
+        useCanvasStore.getState().canvas,
+        res.ideas.map((i) => ({ key: i.key, type: i.type, parentKey: i.parent })),
+        viewCenter,
+        getMeasuredSizes(),
+      );
+      aiProposalActions.propose({
+        kind: 'capture',
         anchorId: null,
         ideas: toGhosts(res.ideas, positions),
         excluded: [],

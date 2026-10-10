@@ -114,6 +114,7 @@ export {
   GHOST_ID_PREFIX,
   includedIdeas,
   isGhostId,
+  setAiDecisionListener,
   useAiProposalStore,
 } from './aiProposals';
 export type { AiPending, AiProposal, AiProposalKind, AiProposalState, GhostIdea } from './aiProposals';

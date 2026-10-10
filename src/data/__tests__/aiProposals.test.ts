@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { aiProposalActions, includedIdeas, useAiProposalStore } from '../aiProposals';
+import { aiProposalActions, includedIdeas, setAiDecisionListener, useAiProposalStore } from '../aiProposals';
 import type { AiProposal, GhostIdea } from '../aiProposals';
 import { emptyCanvas } from '../mutators';
 import { canvasActions, useCanvasStore } from '../store';
@@ -79,5 +79,43 @@ describe('AI proposals', () => {
     expect(useAiProposalStore.getState().pending).not.toBeNull();
     aiProposalActions.fail('Nope');
     expect(useAiProposalStore.getState()).toMatchObject({ pending: null, error: 'Nope' });
+  });
+
+  it('reports how many suggestions were kept', () => {
+    const decisions: Array<[string, number, number]> = [];
+    setAiDecisionListener((kind, offered, accepted) => decisions.push([kind, offered, accepted]));
+    aiProposalActions.propose(proposal({ excluded: ['c'] }));
+    aiProposalActions.accept();
+    aiProposalActions.propose(proposal({ kind: 'capture' }));
+    aiProposalActions.clear();
+    aiProposalActions.clear();
+    setAiDecisionListener(null);
+    expect(decisions).toEqual([
+      ['map', 3, 2],
+      ['capture', 3, 0],
+    ]);
+  });
+
+  it('applies several edits as one undo step', () => {
+    aiProposalActions.propose(proposal());
+    const ids = aiProposalActions.accept();
+    const before = canvas();
+    const applied = canvasActions.applyEdits({
+      updates: [
+        { id: ids.a!, patch: { type: 'question' } },
+        { id: ids.b!, patch: { title: 'Renamed' } },
+        { id: 'missing', patch: { title: 'x' } },
+      ],
+      connections: [
+        { source: ids.a!, target: ids.c! },
+        { source: ids.a!, target: 'missing' },
+      ],
+    });
+    expect(applied).toBe(3);
+    expect(canvas().nodes.find((n) => n.id === ids.a)!.type).toBe('question');
+    expect(canvas().nodes.find((n) => n.id === ids.b)!.title).toBe('Renamed');
+    expect(canvas().edges).toHaveLength(3);
+    canvasActions.undo();
+    expect(canvas()).toEqual(before);
   });
 });

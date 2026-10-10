@@ -10,6 +10,7 @@
 import crypto from 'node:crypto';
 import type Database from 'better-sqlite3';
 
+import type { AcceptRate, FeedbackFeature } from './contracts';
 import type { AiProvider, KeyedProvider } from './models';
 import type { SealedKey } from './keys';
 import { isPlan } from './plans';
@@ -45,6 +46,10 @@ export interface AiStore {
   recordUsage(entry: UsageEntry): Promise<void>;
   /** Calls on the app's keys since `sinceIso`. */
   countActions(userId: string, sinceIso: string): Promise<number>;
+  /** Note how many suggestions were shown and how many kept. */
+  recordFeedback(userId: string, feature: FeedbackFeature, offered: number, accepted: number): Promise<void>;
+  /** Suggestions shown and kept since `sinceIso`, per feature. */
+  acceptRates(userId: string, sinceIso: string): Promise<AcceptRate[]>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -127,6 +132,17 @@ export function ensureAiSchema(db: Database.Database): void {
       PRIMARY KEY ("userId", "provider")
     );
 
+    CREATE TABLE IF NOT EXISTS "ai_feedback" (
+      "id"        TEXT PRIMARY KEY NOT NULL,
+      "userId"    TEXT NOT NULL,
+      "feature"   TEXT NOT NULL,
+      "offered"   INTEGER NOT NULL,
+      "accepted"  INTEGER NOT NULL,
+      "createdAt" TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS "idx_ai_feedback_userId_createdAt" ON "ai_feedback" ("userId", "createdAt");
+
     CREATE TABLE IF NOT EXISTS "user_plan" (
       "userId"    TEXT PRIMARY KEY NOT NULL,
       "plan"      TEXT NOT NULL,
@@ -168,6 +184,13 @@ export function createSqliteAiStore(db: Database.Database): AiStore {
       `INSERT INTO "ai_usage"
          ("id", "userId", "feature", "provider", "model", "inputTokens", "outputTokens", "costMicros", "ownKey", "createdAt")
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ),
+    recordFeedback: db.prepare(
+      'INSERT INTO "ai_feedback" ("id", "userId", "feature", "offered", "accepted", "createdAt") VALUES (?, ?, ?, ?, ?, ?)',
+    ),
+    acceptRates: db.prepare<[string, string], { feature: FeedbackFeature; offered: number; accepted: number }>(
+      `SELECT "feature", SUM("offered") AS "offered", SUM("accepted") AS "accepted" FROM "ai_feedback"
+        WHERE "userId" = ? AND "createdAt" >= ? GROUP BY "feature" ORDER BY "feature"`,
     ),
     countActions: db.prepare<[string, string], { n: number }>(
       'SELECT COUNT(*) AS "n" FROM "ai_usage" WHERE "userId" = ? AND "ownKey" = 0 AND "createdAt" >= ?',
@@ -216,6 +239,19 @@ export function createSqliteAiStore(db: Database.Database): AiStore {
     },
     async countActions(userId, sinceIso) {
       return stmt.countActions.get(userId, sinceIso)?.n ?? 0;
+    },
+    async recordFeedback(userId, feature, offered, accepted) {
+      stmt.recordFeedback.run(
+        crypto.randomUUID(),
+        userId,
+        feature,
+        offered,
+        Math.min(accepted, offered),
+        new Date().toISOString(),
+      );
+    },
+    async acceptRates(userId, sinceIso) {
+      return stmt.acceptRates.all(userId, sinceIso);
     },
   };
 }

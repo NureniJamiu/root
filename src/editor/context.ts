@@ -18,6 +18,13 @@ export interface DocumentEditorServices {
    * Absent when AI is not set up, which hides the AI actions.
    */
   readonly rewrite?: ((req: RewriteRequest, onText: (text: string) => void, signal: AbortSignal) => Promise<string>) | undefined;
+  /**
+   * Turn selected text into suggested ideas on the canvas. Absent when AI is
+   * not set up or the plan does not include it.
+   */
+  readonly captureIdeas?: ((text: string) => void) | undefined;
+  /** Note whether an AI rewrite was kept, for its accept rate. */
+  readonly rewriteDecided?: ((kept: boolean) => void) | undefined;
 }
 
 const noop: DocumentEditorServices = {

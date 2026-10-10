@@ -24,24 +24,55 @@ import { keySourceFor, modelOptions, resolveModel } from './access';
 import type { AccessInput } from './access';
 import { monthWindow } from './ai-store';
 import type { AiStore, RateLimiter } from './ai-store';
+import { createCitationRewriter } from './citations';
 import {
+  askRequestSchema,
+  captureRequestSchema,
   draftRequestSchema,
   expandRequestSchema,
+  feedbackRequestSchema,
   keyRequestSchema,
   mapRequestSchema,
+  reviewRequestSchema,
   rewriteRequestSchema,
   settingsRequestSchema,
+  tidyRequestSchema,
 } from './contracts';
-import type { AiAllowance, AiConfig, AiErrorBody, AiErrorCode, AiResultMeta, AiTestResult } from './contracts';
-import { AiInputError, draftDocument, pingModel, streamRewrite, suggestExpansion, suggestMap } from './features';
+import type {
+  AiAllowance,
+  AiConfig,
+  AiErrorBody,
+  AiErrorCode,
+  AiResultMeta,
+  AiTestResult,
+  ReviewIssue,
+} from './contracts';
+import {
+  AiInputError,
+  captureIdeas,
+  draftDocument,
+  pingModel,
+  reviewProject,
+  ruleIssues,
+  streamAnswer,
+  streamRewrite,
+  suggestExpansion,
+  suggestMap,
+  suggestTidy,
+} from './features';
 import type { TokenUsage } from './features';
 import { lastFour, openKey, sealKey } from './keys';
 import { AI_PROVIDERS, KEYED_PROVIDERS, PROVIDER_LABELS, estimateCostMicros, findModel, modelCatalog } from './models';
 import type { AiModel, AiProvider, KeyedProvider, ModelRole } from './models';
 import { PLAN_DEFINITIONS } from './plans';
 import type { AiFeature, Plan } from './plans';
-import { languageModelFor } from './providers';
+import { embeddingModelFor, embeddingProviderOf, languageModelFor } from './providers';
 import type { AiEnv } from './providers';
+import { buildChunks, chunksSize, numberChunks } from './project-content';
+import type { ProjectContent } from './project-content';
+import { gatherContext, sdkEmbedder, withinBudget } from './retrieval';
+import type { Embedder } from './retrieval';
+import type { SearchIndex } from './search-index';
 
 export interface AiRouterOptions {
   readonly store: AiStore;
@@ -55,10 +86,31 @@ export interface AiRouterOptions {
   readonly buildModel?: (model: AiModel, apiKey: string, env: AiEnv) => LanguageModel;
   readonly now?: () => Date;
   /** Time limits in milliseconds; shorter in tests. */
-  readonly timeouts?: Partial<Record<'suggest' | 'draft' | 'rewrite' | 'test', number>>;
+  readonly timeouts?: Partial<Record<keyof typeof DEFAULT_TIMEOUTS, number>>;
+  /**
+   * Reads a project the person owns (its canvas and documents), for features
+   * that look at the whole project. Without it, Ask and the gap check are off.
+   */
+  readonly loadProject?: (userId: string, projectId: string) => Promise<ProjectContent | null>;
+  /** The project search index. Without it, Ask and the gap check read what fits from the top. */
+  readonly index?: SearchIndex;
+  /** Swappable for tests: builds the embedder for the search index. */
+  readonly buildEmbedder?: (modelId: string, apiKey: string) => Embedder | null;
 }
 
-const DEFAULT_TIMEOUTS = { suggest: 60_000, draft: 120_000, rewrite: 60_000, test: 30_000 } as const;
+const DEFAULT_TIMEOUTS = {
+  suggest: 60_000,
+  draft: 120_000,
+  rewrite: 60_000,
+  test: 30_000,
+  ask: 90_000,
+  review: 120_000,
+} as const;
+
+/** Most characters of project text an answer may read. */
+const ASK_BUDGET = 40_000;
+/** Most characters of project text a gap check may read. */
+const REVIEW_BUDGET = 60_000;
 
 class AiHttpError extends Error {
   constructor(
@@ -267,7 +319,36 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
       activeModels: { fast: fast?.id ?? null, smart: smart?.id ?? null },
       keys: await opts.store.listKeys(userId),
       appProviders: [...appProviders],
+      acceptRates: await opts.store.acceptRates(userId, monthWindow(now()).start),
+      semanticSearch: !!opts.index && (await embedderFor(userId)) !== null,
     };
+  }
+
+  /** The embedder for the search index, on the person's own key when they have one. */
+  async function embedderFor(userId: string): Promise<Embedder | null> {
+    const modelId = opts.env.embeddingModelId;
+    const provider = embeddingProviderOf(modelId);
+    if (!modelId || !provider) return null;
+    let apiKey = opts.env.appKeys[provider] ?? '';
+    const sealed = await opts.store.getKey(userId, provider);
+    if (sealed) {
+      try {
+        apiKey = await openKey(opts.cryptoKey, userId, sealed);
+      } catch {
+        /* fall back to the app's key */
+      }
+    }
+    if (!apiKey) return null;
+    if (opts.buildEmbedder) return opts.buildEmbedder(modelId, apiKey);
+    const model = embeddingModelFor(modelId, apiKey);
+    return model ? sdkEmbedder(modelId, model) : null;
+  }
+
+  async function projectFor(userId: string, projectId: string): Promise<ProjectContent> {
+    if (!opts.loadProject) throw new AiHttpError(503, 'no-model', 'This server cannot read projects for AI.');
+    const content = await opts.loadProject(userId, projectId);
+    if (!content) throw new AiHttpError(404, 'invalid', 'That project was not found.');
+    return content;
   }
 
   interface Prepared {
@@ -494,57 +575,224 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
     }
   });
 
+  interface TextStream {
+    readonly stream: AsyncIterable<{ readonly type: string; readonly text?: string; readonly error?: unknown }>;
+    /** Tokens used, once the model finishes. */
+    readonly usage: () => TokenUsage | null;
+    /** Rewrites text on its way out (citations). */
+    readonly transform?: { push(text: string): string; flush(): string };
+    readonly headers?: Record<string, string>;
+  }
+
   /**
-   * Streams plain text. Headers wait for the first words, so a refused key or
-   * an empty answer still gets a proper JSON error instead of an empty 200.
+   * Gate, then stream a model's text to the browser as plain text. Headers
+   * wait for the first words, so a refused key or an empty answer still gets
+   * a proper JSON error instead of an empty 200.
    */
-  router.post('/rewrite', json, async (req, res) => {
+  async function streamFeature(
+    req: Request,
+    res: Response,
+    feature: AiFeature,
+    ms: number,
+    begin: (p: Prepared, signal: AbortSignal) => Promise<TextStream>,
+  ): Promise<void> {
     let prepared: Prepared | null = null;
     let call: ReturnType<typeof callSignal> | null = null;
     try {
-      limit(res);
-      const body = parse(rewriteRequestSchema, req.body);
-      const p = await prepare(res, 'ai.rewrite', 'fast');
+      const p = await prepare(res, feature, 'fast');
       prepared = p;
-      call = callSignal(req, res, timeouts.rewrite);
-      let usage: TokenUsage | null = null;
-      const result = streamRewrite(p.languageModel, body, {
-        signal: call.signal,
-        onUsage: (u) => {
-          usage = u;
-        },
-      });
+      call = callSignal(req, res, ms);
+      const out = await begin(p, call.signal);
       let started = false;
-      for await (const part of result.stream) {
+      const write = (text: string): void => {
+        if (!text) return;
+        if (!started) {
+          started = true;
+          res.status(200);
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('X-AI-Model', encodeURIComponent(p.model.label));
+          for (const [name, value] of Object.entries(out.headers ?? {})) res.setHeader(name, value);
+        }
+        res.write(text);
+      };
+      for await (const part of out.stream) {
         if (part.type === 'text-delta' && part.text) {
-          if (!started) {
-            started = true;
-            res.status(200);
-            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('X-AI-Model', p.model.label);
-          }
-          res.write(part.text);
+          write(out.transform ? out.transform.push(part.text) : part.text);
         } else if (part.type === 'error') {
           throw part.error;
         }
       }
+      if (out.transform) write(out.transform.flush());
       if (call.signal.aborted && call.signal.reason instanceof TimeoutReached) throw call.signal.reason;
       if (!started) throw new AiHttpError(502, 'bad-output', 'The model returned no text. Try again.');
       res.end();
-      await record(p, 'ai.rewrite', usage ?? NO_USAGE);
+      await record(p, feature, out.usage() ?? NO_USAGE);
     } catch (error) {
       const reason = call?.signal.aborted && call.signal.reason instanceof TimeoutReached ? call.signal.reason : error;
-      logFailure('ai.rewrite', prepared?.model, reason);
+      logFailure(feature, prepared?.model, reason);
       if (res.headersSent) {
         // Text already went out, so the action counts even though it stopped early.
         res.end();
-        if (prepared) await record(prepared, 'ai.rewrite', NO_USAGE).catch(() => undefined);
+        if (prepared) await record(prepared, feature, NO_USAGE).catch(() => undefined);
       } else {
         fail(res, reason, prepared?.model);
       }
     } finally {
       call?.done();
+    }
+  }
+
+  router.post('/rewrite', json, async (req, res) => {
+    try {
+      limit(res);
+      const body = parse(rewriteRequestSchema, req.body);
+      await streamFeature(req, res, 'ai.rewrite', timeouts.rewrite, async (p, signal) => {
+        let usage: TokenUsage | null = null;
+        const result = streamRewrite(p.languageModel, body, {
+          signal,
+          onUsage: (u) => {
+            usage = u;
+          },
+        });
+        return { stream: result.stream, usage: () => usage };
+      });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  /** The parts of a project a prompt reads, from the search index when there is one. */
+  async function projectContext(
+    userId: string,
+    projectId: string,
+    content: ProjectContent,
+    query: string | null,
+    budget: number,
+    signal?: AbortSignal,
+  ) {
+    const gathered = opts.index
+      ? await gatherContext({
+          index: opts.index,
+          userId,
+          projectId,
+          content,
+          query,
+          embedder: query === null ? null : await embedderFor(userId),
+          budget,
+          ...(signal ? { signal } : {}),
+          onEmbedError: (error) => logFailure('search index embedding', undefined, error),
+        })
+      : null;
+    const chunks = gathered?.chunks ?? withinBudget(buildChunks(content), budget);
+    const partial = gathered ? gathered.mode === 'search' : chunksSize(buildChunks(content)) > budget;
+    const intro = `Project: ${content.title.trim() || 'Untitled project'}${
+      partial ? '\n(Only part of the project is shown: the parts that best match.)' : ''
+    }`;
+    return {
+      context: numberChunks(chunks, intro),
+      search: !partial ? 'whole' : gathered?.semantic ? 'meaning' : 'words',
+    } as const;
+  }
+
+  /**
+   * Answer a question about a project, streamed. Citations arrive as
+   * `[[idea:<id>]]` and `[[doc:<document id>#<block id>]]`, only for ideas
+   * and passages that exist. `X-AI-Search` says how the material was found:
+   * `whole` (the project fit), `meaning` or `words`.
+   */
+  router.post('/ask', json, async (req, res) => {
+    try {
+      limit(res);
+      const body = parse(askRequestSchema, req.body);
+      const userId = res.locals.userId as string;
+      const content = await projectFor(userId, body.projectId);
+      await streamFeature(req, res, 'ai.ask', timeouts.ask, async (p, signal) => {
+        // A follow-up is searched together with the question before it.
+        const query = [...(body.history ?? []).slice(-1).map((t) => t.question), body.question].join('\n');
+        const { context, search } = await projectContext(userId, body.projectId, content, query, ASK_BUDGET, signal);
+        let usage: TokenUsage | null = null;
+        const result = streamAnswer(
+          p.languageModel,
+          { question: body.question, history: body.history, context: context.text },
+          {
+            signal,
+            onUsage: (u) => {
+              usage = u;
+            },
+          },
+        );
+        return {
+          stream: result.stream,
+          usage: () => usage,
+          transform: createCitationRewriter(context.refs),
+          headers: { 'X-AI-Search': search },
+        };
+      });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  /** Check a project for weak spots: Root's own rules, then the model's review. */
+  router.post('/review', json, async (req, res) => {
+    try {
+      limit(res);
+      const body = parse(reviewRequestSchema, req.body);
+      const userId = res.locals.userId as string;
+      const content = await projectFor(userId, body.projectId);
+      const { context } = await projectContext(userId, body.projectId, content, null, REVIEW_BUDGET);
+      const rules = ruleIssues(content.canvas);
+      const { p, result } = await runFeature(req, res, 'ai.review', 'smart', timeouts.review, (model, signal) =>
+        reviewProject(model, context, signal),
+      );
+      // Root's rules already flag conclusions with no findings; skip the model saying the same.
+      const flagged = new Set(rules.flatMap((r) => r.sources.map((s) => (s.kind === 'idea' ? s.ideaId : ''))));
+      const fromModel = result.output.filter(
+        (i) =>
+          !(i.kind === 'unsupported' && i.sources.length === 1 && i.sources[0]!.kind === 'idea' && flagged.has(i.sources[0]!.ideaId)),
+      );
+      const issues: ReviewIssue[] = [...rules, ...fromModel];
+      res.json({ issues, ...(await meta(p)) });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  router.post('/capture', json, async (req, res) => {
+    try {
+      limit(res);
+      const body = parse(captureRequestSchema, req.body);
+      const { p, result } = await runFeature(req, res, 'ai.capture', 'fast', timeouts.suggest, (model, signal) =>
+        captureIdeas(model, body, signal),
+      );
+      res.json({ ideas: result.output, ...(await meta(p)) });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  router.post('/tidy', json, async (req, res) => {
+    try {
+      limit(res);
+      const body = parse(tidyRequestSchema, req.body);
+      const { p, result } = await runFeature(req, res, 'ai.tidy', 'fast', timeouts.suggest, (model, signal) =>
+        suggestTidy(model, body, signal),
+      );
+      res.json({ suggestions: result.output, ...(await meta(p)) });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  /** How many suggestions the person kept; not rate limited or counted. */
+  router.post('/feedback', json, async (req, res) => {
+    try {
+      const body = parse(feedbackRequestSchema, req.body);
+      await opts.store.recordFeedback(res.locals.userId as string, body.feature, body.offered, body.accepted);
+      res.status(204).end();
+    } catch (error) {
+      fail(res, error);
     }
   });
 

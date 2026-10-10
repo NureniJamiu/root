@@ -76,6 +76,51 @@ export const rewriteRequestSchema = z.object({
 });
 export type RewriteRequest = z.infer<typeof rewriteRequestSchema>;
 
+/** One earlier turn of an Ask conversation, so follow-up questions make sense. */
+export const askTurnSchema = z.object({
+  question: z.string().max(2_000),
+  answer: z.string().max(8_000),
+});
+
+export const askRequestSchema = z.object({
+  projectId: z.string().uuid(),
+  question: z.string().trim().min(1).max(2_000),
+  /** Earlier turns, oldest first; only the last few are sent to the model. */
+  history: z.array(askTurnSchema).max(10).optional(),
+});
+export type AskRequest = z.infer<typeof askRequestSchema>;
+
+export const reviewRequestSchema = z.object({
+  projectId: z.string().uuid(),
+});
+export type ReviewRequest = z.infer<typeof reviewRequestSchema>;
+
+export const captureRequestSchema = z.object({
+  text: z.string().trim().min(1).max(8_000),
+  documentTitle: z.string().max(200).optional(),
+  /** The canvas, so new ideas fit what is already there and do not repeat it. */
+  canvas: promptCanvasSchema,
+});
+export type CaptureRequest = z.infer<typeof captureRequestSchema>;
+
+export const tidyRequestSchema = z.object({
+  canvas: promptCanvasSchema,
+});
+export type TidyRequest = z.infer<typeof tidyRequestSchema>;
+
+/** Features whose suggestions the person accepts or not, for accept rates. */
+export const FEEDBACK_FEATURES = ['ai.map', 'ai.expand', 'ai.capture', 'ai.rewrite', 'ai.tidy'] as const;
+export type FeedbackFeature = (typeof FEEDBACK_FEATURES)[number];
+
+export const feedbackRequestSchema = z.object({
+  feature: z.enum(FEEDBACK_FEATURES),
+  /** Suggestions shown. */
+  offered: z.number().int().min(0).max(100),
+  /** Suggestions kept. */
+  accepted: z.number().int().min(0).max(100),
+});
+export type FeedbackRequest = z.infer<typeof feedbackRequestSchema>;
+
 export const settingsRequestSchema = z.object({
   modelId: z.string().max(200).nullable(),
 });
@@ -117,6 +162,43 @@ export const draftOutputSchema = z.object({
 });
 export type DraftOutput = z.infer<typeof draftOutputSchema>;
 
+/**
+ * What a gap check finds. `refs` name ideas ("I3") and document passages
+ * ("D2") from the numbered context the model was given.
+ */
+export const REVIEW_KINDS = ['unsupported', 'uncited', 'contradiction', 'gap'] as const;
+export type ReviewKind = (typeof REVIEW_KINDS)[number];
+
+export const reviewOutputSchema = z.object({
+  issues: z.array(
+    z.object({
+      kind: z.enum(REVIEW_KINDS),
+      refs: z.array(z.string()),
+      message: z.string(),
+      suggestion: z.string(),
+    }),
+  ),
+});
+export type ReviewOutput = z.infer<typeof reviewOutputSchema>;
+
+/** Tidy suggestions as the model writes them, with ideas named by ref ("I3"). */
+export const tidyOutputSchema = z.object({
+  suggestions: z.array(
+    z.object({
+      kind: z.enum(['retype', 'retitle', 'connect']),
+      ref: z.string(),
+      /** retype: the better type. */
+      type: nodeTypeSchema.nullable(),
+      /** retitle: the better title. */
+      title: z.string().nullable(),
+      /** connect: the idea to connect to (ref is the one it leads from). */
+      to: z.string().nullable(),
+      reason: z.string(),
+    }),
+  ),
+});
+export type TidyOutput = z.infer<typeof tidyOutputSchema>;
+
 /* -------------------------------------------------------------------------- */
 /* Responses                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -144,6 +226,40 @@ export interface DraftResponse extends AiResultMeta {
   readonly draft: DraftOutput;
 }
 
+/** Something an answer or a finding points at: an idea, or a passage of a document. */
+export type AiSource =
+  | { readonly kind: 'idea'; readonly ideaId: string }
+  | { readonly kind: 'doc'; readonly documentId: string; readonly blockId: string | null };
+
+export interface ReviewIssue {
+  readonly kind: ReviewKind;
+  readonly message: string;
+  readonly suggestion: string;
+  readonly sources: AiSource[];
+  /** Found by Root's own rules rather than by the model. */
+  readonly rule: boolean;
+}
+
+export interface ReviewResponse extends AiResultMeta {
+  readonly issues: ReviewIssue[];
+}
+
+export type TidySuggestion =
+  | { readonly kind: 'retype'; readonly ideaId: string; readonly type: z.infer<typeof nodeTypeSchema>; readonly reason: string }
+  | { readonly kind: 'retitle'; readonly ideaId: string; readonly title: string; readonly reason: string }
+  | { readonly kind: 'connect'; readonly sourceId: string; readonly targetId: string; readonly reason: string };
+
+export interface TidyResponse extends AiResultMeta {
+  readonly suggestions: TidySuggestion[];
+}
+
+/** How often suggestions were kept this month, per feature. */
+export interface AcceptRate {
+  readonly feature: FeedbackFeature;
+  readonly offered: number;
+  readonly accepted: number;
+}
+
 export interface AiModelOption extends AiModel {
   /** A key exists for its provider (the app's or the person's). */
   readonly available: boolean;
@@ -167,6 +283,10 @@ export interface AiConfig {
   readonly keys: Array<{ readonly provider: KeyedProvider; readonly last4: string }>;
   /** Providers the app itself has a key for. */
   readonly appProviders: AiProvider[];
+  /** Suggestions kept this month, per feature. */
+  readonly acceptRates: AcceptRate[];
+  /** Ask can search by meaning (an embedding model and key exist), not only by words. */
+  readonly semanticSearch: boolean;
 }
 
 /** One model checked by `POST /api/ai/test`. */

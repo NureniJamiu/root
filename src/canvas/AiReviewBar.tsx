@@ -6,7 +6,13 @@
 import { useEffect } from 'react';
 
 import { aiProposalActions, useAiProposalStore } from '../data';
-import type { UUID } from '../data';
+import type { AiProposalKind, UUID } from '../data';
+
+const PENDING_LABELS: Record<AiProposalKind, string> = {
+  map: 'Mapping the topic…',
+  expand: 'Thinking of connected ideas…',
+  capture: 'Turning the text into ideas…',
+};
 
 export interface AiReviewBarProps {
   /** Called with the new ideas' ids after Add. */
@@ -58,7 +64,7 @@ export function AiReviewBar({ onAccepted, onCancel }: AiReviewBarProps): JSX.Ele
       {pending && (
         <>
           <span className="inline-block w-2 h-2 rounded-full bg-topic animate-pulse" aria-hidden="true" />
-          <span>{pending.kind === 'map' ? 'Mapping the topic…' : 'Thinking of connected ideas…'}</span>
+          <span>{PENDING_LABELS[pending.kind]}</span>
           <BarButton onClick={() => onCancel?.()} testId="ai-cancel">
             Stop
           </BarButton>

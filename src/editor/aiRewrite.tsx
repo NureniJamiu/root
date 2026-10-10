@@ -81,6 +81,18 @@ export function AiRewritePanel({ editor, job, before, after, onClose }: AiRewrit
   const [status, setStatus] = useState<'writing' | 'done' | 'error'>('writing');
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const decidedRef = useRef(false);
+
+  /** Tell the app once whether the suggestion was kept. */
+  const decide = (kept: boolean): void => {
+    if (decidedRef.current || !text.trim()) return;
+    decidedRef.current = true;
+    services.rewriteDecided?.(kept);
+  };
+  const discard = (): void => {
+    decide(false);
+    onClose();
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -118,6 +130,7 @@ export function AiRewritePanel({ editor, job, before, after, onClose }: AiRewrit
     const at = doc.resolve(Math.min(job.to, doc.content.size));
     const pos = at.depth === 0 ? at.pos : at.after(1);
     editor.chain().focus().insertContentAt(pos, blocks).run();
+    decide(true);
     onClose();
   };
 
@@ -128,6 +141,7 @@ export function AiRewritePanel({ editor, job, before, after, onClose }: AiRewrit
     }
     const { content } = rewriteToContent(text);
     editor.chain().focus().insertContentAt({ from: job.from, to: job.to }, content).run();
+    decide(true);
     onClose();
   };
 
@@ -140,7 +154,7 @@ export function AiRewritePanel({ editor, job, before, after, onClose }: AiRewrit
           ✦ {REWRITE_LABELS[job.action]}
           {status === 'writing' && <span className="doc-ai-panel-status"> · writing…</span>}
         </span>
-        <button type="button" className="doc-ai-panel-close" onClick={onClose} aria-label="Discard suggestion">
+        <button type="button" className="doc-ai-panel-close" onClick={discard} aria-label="Discard suggestion">
           ✕
         </button>
       </div>
@@ -176,7 +190,7 @@ export function AiRewritePanel({ editor, job, before, after, onClose }: AiRewrit
                 Insert below
               </button>
             )}
-            <button type="button" onClick={onClose} data-testid="doc-ai-discard">
+            <button type="button" onClick={discard} data-testid="doc-ai-discard">
               Discard
             </button>
           </>

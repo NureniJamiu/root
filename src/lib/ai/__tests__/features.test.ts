@@ -117,3 +117,61 @@ describe('features', () => {
     expect(reported).toEqual({ inputTokens: 40, outputTokens: 20 });
   });
 });
+
+describe('phase 2 features', () => {
+  it('reviews a project, keeping only issues that point at something real', async () => {
+    const { numberChunks, buildChunks } = await import('../project-content');
+    const { reviewProject, ruleIssues } = await import('../features');
+    const context = numberChunks(buildChunks({ title: 'Sleep', canvas, documents: [] }), 'Project: Sleep');
+    const model = jsonModel({
+      issues: [
+        { kind: 'contradiction', refs: ['I2', 'I3'], message: 'These disagree.', suggestion: 'Check.' },
+        { kind: 'unsupported', refs: ['I99'], message: 'Made up.', suggestion: '' },
+        { kind: 'gap', refs: [], message: 'Nothing on age.', suggestion: 'Add a question.' },
+      ],
+    });
+    const result = await reviewProject(model, context);
+    expect(result.output.map((i) => i.kind)).toEqual(['contradiction', 'gap']);
+    expect(result.output[0]!.sources).toEqual([
+      { kind: 'idea', ideaId: B },
+      { kind: 'idea', ideaId: C },
+    ]);
+    const withConclusion = { ...canvas, nodes: [...canvas.nodes, { id: '00000000-0000-4000-8000-00000000000d', title: 'So sleep matters', body: '', type: 'conclusion' as const }] };
+    expect(ruleIssues(withConclusion)).toHaveLength(1);
+  });
+
+  it('turns text into connected ideas', async () => {
+    const { captureIdeas } = await import('../features');
+    const model = jsonModel({ ideas: [idea('a', null), idea('b', 'a'), idea('c', 'nope')] });
+    const result = await captureIdeas(model, { text: 'Some passage.', canvas });
+    expect(result.output.map((i) => i.parent)).toEqual([null, 'a', 'a']);
+  });
+
+  it('keeps only tidy suggestions that change something', async () => {
+    const { suggestTidy } = await import('../features');
+    const model = jsonModel({
+      suggestions: [
+        { kind: 'retype', ref: 'I3', type: 'question', title: null, to: null, reason: 'Already a question.' },
+        { kind: 'retype', ref: 'I2', type: 'conclusion', title: null, to: null, reason: 'It judges.' },
+        { kind: 'retitle', ref: 'I3', type: null, title: 'Do naps help memory?', to: null, reason: 'Clearer.' },
+        { kind: 'connect', ref: 'I1', type: null, title: null, to: 'I2', reason: 'Already connected.' },
+        { kind: 'connect', ref: 'I2', type: null, title: null, to: 'I3', reason: 'Related.' },
+        { kind: 'connect', ref: 'I2', type: null, title: null, to: 'I40', reason: 'Unknown.' },
+      ],
+    });
+    const result = await suggestTidy(model, { canvas });
+    expect(result.output).toEqual([
+      { kind: 'retype', ideaId: B, type: 'conclusion', reason: 'It judges.' },
+      { kind: 'retitle', ideaId: C, title: 'Do naps help memory?', reason: 'Clearer.' },
+      { kind: 'connect', sourceId: B, targetId: C, reason: 'Related.' },
+    ]);
+  });
+
+  it('streams an answer from the numbered context', async () => {
+    const { streamAnswer } = await import('../features');
+    const result = streamAnswer(streamModel(['REM helps ', '[[I2]].']), { question: 'Why?', context: 'I2: REM' });
+    let text = '';
+    for await (const part of result.stream) if (part.type === 'text-delta') text += part.text;
+    expect(text).toBe('REM helps [[I2]].');
+  });
+});

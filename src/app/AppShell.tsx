@@ -25,7 +25,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { AiMenu, AiRequestError, AiSettingsDialog, StartFromTopic, aiActions, aiApi, aiConfigActions, useAiEnabled } from '../ai';
+import {
+  AiMenu,
+  AiPanel,
+  AiRequestError,
+  AiSettingsDialog,
+  StartFromTopic,
+  aiActions,
+  aiApi,
+  aiConfigActions,
+  useAiEnabled,
+  useAiFeature,
+} from '../ai';
+import type { AiPanelTab } from '../ai';
 import { CanvasView, computeChildPosition, findFreePosition, getMeasuredSizes } from '../canvas';
 import type { CanvasViewControls, DragState } from '../canvas';
 import {
@@ -40,7 +52,7 @@ import {
 import type { NodeType, UUID } from '../data';
 import { DocumentEditorContext } from '../editor/context';
 import type { DocumentEditorServices } from '../editor/context';
-import { insertIdeaIntoDocument, revealIdeaInDocument } from '../editor/bridge';
+import { insertIdeaIntoDocument, revealBlockInDocument, revealIdeaInDocument } from '../editor/bridge';
 import { aiDraftToDocument } from '../editor/aiDraft';
 import { draftFromBranch } from '../editor/draftFromBranch';
 import { uploadAsset } from '../lib/documents-api';
@@ -270,6 +282,21 @@ export function AppShell(): JSX.Element {
   );
 
   const aiEnabled = useAiEnabled();
+  const captureAllowed = useAiFeature('ai.capture');
+  const activeDocumentTitle = activeDocument?.title ?? '';
+
+  /** Turn document text into suggested ideas, with the canvas in view to show them. */
+  const captureIdeas = useCallback(
+    (text: string) => {
+      setViewModeState((mode) => (mode === 'write' ? 'split' : mode));
+      // Let the canvas take its place before asking where its centre is.
+      setTimeout(() => {
+        const center = canvasControlsRef.current?.getViewportCenter() ?? { x: 400, y: 300 };
+        void aiActions.captureFromText(text, center, activeDocumentTitle);
+      }, 80);
+    },
+    [activeDocumentTitle],
+  );
 
   const editorServices = useMemo<DocumentEditorServices>(
     () => ({
@@ -308,8 +335,10 @@ export function AppShell(): JSX.Element {
             }
           }
         : undefined,
+      captureIdeas: aiEnabled && captureAllowed ? captureIdeas : undefined,
+      rewriteDecided: (kept) => aiApi.feedback({ feature: 'ai.rewrite', offered: 1, accepted: kept ? 1 : 0 }),
     }),
-    [activeProjectId, focusIdea, aiEnabled],
+    [activeProjectId, focusIdea, aiEnabled, captureAllowed, captureIdeas],
   );
 
   const handleOpenDocument = useCallback(
@@ -348,6 +377,22 @@ export function AppShell(): JSX.Element {
 
   const aiBusy = useAiProposalStore((s) => s.pending !== null || s.proposal !== null);
   const [isAiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [aiPanel, setAiPanel] = useState<{ open: boolean; tab: AiPanelTab }>({ open: false, tab: 'ask' });
+  const openAiPanel = useCallback((tab: AiPanelTab) => setAiPanel({ open: true, tab }), []);
+
+  /** Where an AI citation leads: an idea on the canvas, or a passage in a document. */
+  const sourceNav = useMemo(
+    () => ({
+      onIdea: (id: string) => focusIdea(id),
+      onPassage: (documentId: string, blockId: string | null) => {
+        showDocuments();
+        if (blockId) revealBlockInDocument(blockId, documentId);
+        void openDocument(documentId);
+      },
+      documentTitle: (id: string) => docs.documents.find((d) => d.id === id)?.title ?? null,
+    }),
+    [focusIdea, showDocuments, openDocument, docs.documents],
+  );
   const [draftingWithAi, setDraftingWithAi] = useState(false);
 
   useEffect(() => {
@@ -632,7 +677,14 @@ export function AppShell(): JSX.Element {
             onNavigateHome={() => navigateTo('/')}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
-            aiSlot={<AiMenu onMapTopic={handleMapTopic} onOpenSettings={() => setAiSettingsOpen(true)} disabled={!isReady} />}
+            aiSlot={
+              <AiMenu
+                onMapTopic={handleMapTopic}
+                onOpenSettings={() => setAiSettingsOpen(true)}
+                onOpenPanel={openAiPanel}
+                disabled={!isReady}
+              />
+            }
           />
 
           <div ref={workRef} className="flex-1 min-h-0 w-full flex overflow-hidden relative">
@@ -733,6 +785,18 @@ export function AppShell(): JSX.Element {
                 isDraftingWithAi={draftingWithAi}
               />
             </div>
+
+            {isReady && aiEnabled && (
+              <AiPanel
+                key={activeProjectId}
+                projectId={activeProjectId}
+                open={aiPanel.open}
+                tab={aiPanel.tab}
+                onTabChange={(tab) => setAiPanel({ open: true, tab })}
+                onClose={() => setAiPanel((p) => ({ ...p, open: false }))}
+                nav={sourceNav}
+              />
+            )}
           </div>
         </div>
 

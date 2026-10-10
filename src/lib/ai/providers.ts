@@ -9,7 +9,7 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogle } from '@ai-sdk/google';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import type { LanguageModel } from 'ai';
+import type { EmbeddingModel, LanguageModel } from 'ai';
 
 import type { AiModel, AiProvider, ModelEnv } from './models';
 
@@ -23,6 +23,23 @@ export interface AiEnv extends ModelEnv {
   readonly defaultModelId: string | undefined;
   /** Default model for longer writing (drafts). */
   readonly smartModelId: string | undefined;
+  /**
+   * The one embedding model the search index uses, as `provider:model`, or
+   * null for word search only. Changing it re-embeds every project.
+   */
+  readonly embeddingModelId: string | null;
+}
+
+/** Providers that offer an embedding model Root can use. */
+export const EMBEDDING_PROVIDERS = ['google'] as const;
+export type EmbeddingProvider = (typeof EMBEDDING_PROVIDERS)[number];
+
+/** Vector length stored per passage; smaller vectors keep the index light. */
+export const EMBEDDING_DIMENSIONS = 768;
+
+export function embeddingProviderOf(modelId: string | null): EmbeddingProvider | null {
+  const provider = modelId?.split(':')[0];
+  return (EMBEDDING_PROVIDERS as readonly string[]).includes(provider ?? '') ? (provider as EmbeddingProvider) : null;
 }
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -50,7 +67,21 @@ export function readAiEnv(env: Record<string, string | undefined>): AiEnv {
     ollamaModel: nonEmpty(env.OLLAMA_MODEL),
     defaultModelId: nonEmpty(env.AI_DEFAULT_MODEL) ?? 'google:gemini-3.8-flash',
     smartModelId: nonEmpty(env.AI_SMART_MODEL) ?? 'google:gemini-3.8-flash',
+    embeddingModelId: embeddingSetting(env.AI_EMBEDDING_MODEL),
   };
+}
+
+function embeddingSetting(value: string | undefined): string | null {
+  const id = nonEmpty(value) ?? 'google:gemini-embedding-2';
+  return id === 'none' || !embeddingProviderOf(id) ? null : id;
+}
+
+/** A callable embedding model for `modelId` (`provider:model`), or null when unsupported. */
+export function embeddingModelFor(modelId: string, apiKey: string): EmbeddingModel | null {
+  const [provider, ...rest] = modelId.split(':');
+  const name = rest.join(':');
+  if (provider === 'google' && name) return createGoogle({ apiKey }).embedding(name);
+  return null;
 }
 
 /** A callable model for `model`, using `apiKey` (the app's or the person's). */

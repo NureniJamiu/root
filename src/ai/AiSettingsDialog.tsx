@@ -95,6 +95,23 @@ export function AiSettingsDialog({ onClose }: AiSettingsDialogProps): JSX.Elemen
               </ul>
             </Section>
 
+            {(config.acceptRates ?? []).some((r) => r.offered > 0) && (
+              <Section title="Suggestions kept this month">
+                <ul className="m-0 p-0 list-none grid grid-cols-2 gap-x-3 gap-y-1" data-testid="ai-accept-rates">
+                  {(config.acceptRates ?? [])
+                    .filter((r) => r.offered > 0)
+                    .map((r) => (
+                      <li key={r.feature} className="font-serif text-[13px] text-ink">
+                        {FEATURE_LABELS[r.feature]}{' '}
+                        <span className="font-mono text-[10px] text-muted">
+                          {r.accepted} of {r.offered} · {Math.round((r.accepted / r.offered) * 100)}%
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              </Section>
+            )}
+
             <Section title="Model">
               <div className="flex flex-col gap-1" role="radiogroup" aria-label="Model">
                 <ModelRow

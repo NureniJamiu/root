@@ -22,6 +22,14 @@ export const FEATURES = [
   'ai.rewrite',
   /** Write a whole document from a branch of the canvas. */
   'ai.draft',
+  /** Answer questions about a project, citing its ideas and documents. */
+  'ai.ask',
+  /** Check a project for unsupported conclusions, uncited claims and contradictions. */
+  'ai.review',
+  /** Turn selected document text into several connected ideas. */
+  'ai.capture',
+  /** Suggest better types, titles and missing connectors for ideas. */
+  'ai.tidy',
   /** Use premium models (such as Claude) on the app's keys. */
   'models.premium',
 ] as const;
@@ -40,12 +48,22 @@ export interface PlanDefinition {
 export const PLAN_DEFINITIONS: Record<Plan, PlanDefinition> = {
   free: {
     label: 'Free',
-    features: ['ai.map', 'ai.expand', 'ai.rewrite'],
+    features: ['ai.map', 'ai.expand', 'ai.rewrite', 'ai.ask', 'ai.capture', 'ai.tidy'],
     monthlyActions: 30,
   },
   pro: {
     label: 'Pro',
-    features: ['ai.map', 'ai.expand', 'ai.rewrite', 'ai.draft', 'models.premium'],
+    features: [
+      'ai.map',
+      'ai.expand',
+      'ai.rewrite',
+      'ai.ask',
+      'ai.capture',
+      'ai.tidy',
+      'ai.draft',
+      'ai.review',
+      'models.premium',
+    ],
     monthlyActions: 1000,
   },
 };
@@ -68,5 +86,9 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   'ai.expand': 'Expand an idea',
   'ai.rewrite': 'Rewrite text',
   'ai.draft': 'Draft with AI',
+  'ai.ask': 'Ask your project',
+  'ai.review': 'Gap check',
+  'ai.capture': 'Make ideas from text',
+  'ai.tidy': 'Tidy suggestions',
   'models.premium': 'Premium models',
 };

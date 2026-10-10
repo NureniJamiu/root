@@ -11,16 +11,27 @@ import { generateText, Output, streamText } from 'ai';
 import type { LanguageModel } from 'ai';
 
 import { NODE_BODY_MAX, NODE_TITLE_MAX } from '../../data/limits';
-import { describeBranch, describeExpandContext } from './context';
-import { draftOutputSchema, ideaSuggestionsSchema } from './contracts';
+import { resolveRefs } from './citations';
+import { describeBranch, describeExpandContext, describeOverview } from './context';
+import { draftOutputSchema, ideaSuggestionsSchema, reviewOutputSchema, tidyOutputSchema } from './contracts';
 import type {
+  AskRequest,
+  CaptureRequest,
   DraftOutput,
   DraftRequest,
   ExpandRequest,
   IdeaSuggestion,
   MapRequest,
+  PromptCanvas,
+  ReviewIssue,
   RewriteRequest,
+  TidyRequest,
+  TidySuggestion,
 } from './contracts';
+import { neighbours } from './project-content';
+import type { NumberedContext } from './project-content';
+
+type AskTurn = NonNullable<AskRequest['history']>[number];
 
 export interface TokenUsage {
   readonly inputTokens: number;
@@ -88,12 +99,21 @@ export function cleanSuggestions(
   return out;
 }
 
+/**
+ * How long models think before answering. Thinking models (Gemini 3 thinks
+ * hard by default) can take minutes on free tiers; suggestions and rewrites
+ * need little of it, drafts a bit more.
+ */
+const QUICK_REASONING = 'low';
+const DRAFT_REASONING = 'medium';
+
 /** A tiny call that proves a model and key work, for AI settings. */
 export async function pingModel(model: LanguageModel, signal?: AbortSignal): Promise<string> {
   const result = await generateText({
     model,
     prompt: 'Reply with the single word OK.',
     maxRetries: 0,
+    reasoning: 'minimal',
     ...(signal ? { abortSignal: signal } : {}),
   });
   return result.text.trim();
@@ -120,6 +140,7 @@ ${TYPES_GUIDE}
 ${STYLE_GUIDE}`,
     prompt: `Topic: ${req.topic}${req.guidance ? `\n\nWhat the researcher wants to focus on:\n${req.guidance}` : ''}`,
     maxRetries: 1,
+    reasoning: QUICK_REASONING,
     ...(signal ? { abortSignal: signal } : {}),
   });
   const ideas = cleanSuggestions(result.output.ideas, { max: MAP_IDEAS_MAX, anchorAll: false });
@@ -150,6 +171,7 @@ ${TYPES_GUIDE}
 ${STYLE_GUIDE}`,
     prompt: `${context}${req.guidance ? `\n\nThe researcher asks for:\n${req.guidance}` : ''}`,
     maxRetries: 1,
+    reasoning: QUICK_REASONING,
     ...(signal ? { abortSignal: signal } : {}),
   });
   const ideas = cleanSuggestions(result.output.ideas, { max: EXPAND_IDEAS_MAX, anchorAll: true });
@@ -183,6 +205,7 @@ Write plain Markdown paragraphs: no headings (the document adds them), no lists 
 Write in the same language as the outline.`,
     prompt: `Outline:\n${branch.text}${req.guidance ? `\n\nThe researcher asks for:\n${req.guidance}` : ''}`,
     maxRetries: 1,
+    reasoning: DRAFT_REASONING,
     ...(signal ? { abortSignal: signal } : {}),
   });
   const known = new Set(branch.ids);
@@ -239,8 +262,213 @@ Keep any [[...]] citation markers you find, unchanged, next to the words they su
 Write in the same language as the selected text.`,
     prompt: context,
     maxRetries: 1,
+    reasoning: QUICK_REASONING,
     ...(hooks.signal ? { abortSignal: hooks.signal } : {}),
     onFinish: ({ totalUsage }) => hooks.onUsage?.(toUsage(totalUsage)),
     onError: ({ error }) => hooks.onError?.(error),
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Ask your project                                                           */
+/* -------------------------------------------------------------------------- */
+
+/** Earlier turns of a conversation included with a question. */
+const ASK_HISTORY_MAX = 4;
+
+/**
+ * Stream an answer to a question about the project. `context` is the
+ * numbered material (see `numberChunks`); the answer cites it as `[[I3]]`.
+ */
+export function streamAnswer(
+  model: LanguageModel,
+  req: { readonly question: string; readonly history?: readonly AskTurn[] | undefined; readonly context: string },
+  hooks: {
+    readonly onUsage?: (usage: TokenUsage) => void;
+    readonly signal?: AbortSignal;
+  } = {},
+) {
+  const history = (req.history ?? [])
+    .slice(-ASK_HISTORY_MAX)
+    .map((t) => `Researcher: ${t.question}\nYou: ${t.answer.replace(/\[\[[^\]]*\]\]/g, '').slice(0, 2_000)}`)
+    .join('\n\n');
+  return streamText({
+    model,
+    system: `You answer questions about a research project in Root, a tool where ideas sit on a canvas and documents are written from them.
+Answer only from the project material you are given. Each idea and passage has a reference such as I3 (an idea) or D2 (a document passage).
+Cite the material every time you use it: put its reference in double brackets right after the words that rely on it, like [[I3]] or [[I3]][[D2]]. Only cite references that appear in the material.
+If the material does not answer the question, say so plainly, say what is missing, and suggest an idea or question the researcher could add. Never invent facts, numbers, quotes or sources.
+Be concise: short paragraphs or a short "-" list. No headings. Write in the same language as the question.`,
+    prompt: `${req.context}${history ? `\n\nThe conversation so far:\n${history}` : ''}\n\nQuestion: ${req.question}`,
+    maxRetries: 1,
+    reasoning: QUICK_REASONING,
+    ...(hooks.signal ? { abortSignal: hooks.signal } : {}),
+    onFinish: ({ totalUsage }) => hooks.onUsage?.(toUsage(totalUsage)),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Gap check                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** Most issues a gap check reports from the model. */
+export const REVIEW_ISSUES_MAX = 12;
+
+/**
+ * Root's own checks, which need no model: conclusions with no finding
+ * connected to them.
+ */
+export function ruleIssues(canvas: PromptCanvas): ReviewIssue[] {
+  const links = neighbours(canvas);
+  const byId = new Map(canvas.nodes.map((n) => [n.id, n]));
+  return canvas.nodes
+    .filter((n) => n.type === 'conclusion')
+    .filter((n) => !(links.get(n.id) ?? []).some((id) => byId.get(id)?.type === 'finding'))
+    .slice(0, 8)
+    .map((n) => ({
+      kind: 'unsupported' as const,
+      message: `“${n.title.trim() || 'Untitled idea'}” is a conclusion with no finding connected to it.`,
+      suggestion: 'Connect the findings that support it, or add a question for the evidence still needed.',
+      sources: [{ kind: 'idea' as const, ideaId: n.id }],
+      rule: true,
+    }));
+}
+
+/** Ask the model for weak spots in the project; issues cite what they are about. */
+export async function reviewProject(
+  model: LanguageModel,
+  context: NumberedContext,
+  signal?: AbortSignal,
+): Promise<AiCallResult<ReviewIssue[]>> {
+  const result = await generateText({
+    model,
+    output: Output.object({ schema: reviewOutputSchema }),
+    system: `You review a research project for weak spots, the way a careful supervisor would.
+Each idea and passage has a reference such as I3 (an idea) or D2 (a document passage).
+Report only real problems, most important first, at most ${REVIEW_ISSUES_MAX}:
+- unsupported: a conclusion or claim that the findings do not support, or support only weakly
+- uncited: a document passage that makes a factual claim without citing any idea or source
+- contradiction: two ideas or passages that disagree (cite both)
+- gap: an obvious open question or missing piece of evidence the project should address
+For each, give refs (the references it is about), message (one sentence saying what is wrong) and suggestion (one sentence saying what to do).
+Return an empty list if the project has no real problems. Never invent facts. Write in the same language as the project.`,
+    prompt: context.text,
+    maxRetries: 1,
+    reasoning: DRAFT_REASONING,
+    ...(signal ? { abortSignal: signal } : {}),
+  });
+  const issues: ReviewIssue[] = [];
+  for (const issue of result.output.issues) {
+    if (issues.length >= REVIEW_ISSUES_MAX) break;
+    const message = issue.message.trim();
+    if (!message) continue;
+    const sources = issue.refs.flatMap((r) => resolveRefs(r, context.refs));
+    // Everything but a gap must point at something real.
+    if (sources.length === 0 && issue.kind !== 'gap') continue;
+    issues.push({ kind: issue.kind, message, suggestion: issue.suggestion.trim(), sources, rule: false });
+  }
+  return { output: issues, usage: toUsage(result.usage) };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Make ideas from text                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** Most ideas made from one selection. */
+export const CAPTURE_IDEAS_MAX = 8;
+
+export async function captureIdeas(
+  model: LanguageModel,
+  req: CaptureRequest,
+  signal?: AbortSignal,
+): Promise<AiCallResult<IdeaSuggestion[]>> {
+  const result = await generateText({
+    model,
+    output: Output.object({ schema: ideaSuggestionsSchema }),
+    system: `You turn a passage from a research document into ideas for a canvas.
+Return between 2 and ${CAPTURE_IDEAS_MAX} ideas that capture the passage's distinct points: its claims as findings, its open issues as questions, its judgements as conclusions, and the subject they share as a topic when there is one.
+Connect them: give each idea a parent (another idea's key) when it follows from or supports it; the first idea's parent is null.
+Use only what the passage says. Do not repeat ideas that are already on the canvas.
+Give each idea a short unique key such as "i1", "i2".
+${TYPES_GUIDE}
+${STYLE_GUIDE}`,
+    prompt: `${req.documentTitle ? `Document: ${req.documentTitle}\n\n` : ''}Passage:\n${req.text}\n\nAlready on the canvas:\n${describeOverview(req.canvas)}`,
+    maxRetries: 1,
+    reasoning: QUICK_REASONING,
+    ...(signal ? { abortSignal: signal } : {}),
+  });
+  return {
+    output: cleanSuggestions(result.output.ideas, { max: CAPTURE_IDEAS_MAX, anchorAll: false }),
+    usage: toUsage(result.usage),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tidy suggestions                                                           */
+/* -------------------------------------------------------------------------- */
+
+/** Most ideas shown to the model, and most suggestions kept. */
+const TIDY_IDEAS_MAX = 150;
+export const TIDY_SUGGESTIONS_MAX = 12;
+
+export async function suggestTidy(
+  model: LanguageModel,
+  req: TidyRequest,
+  signal?: AbortSignal,
+): Promise<AiCallResult<TidySuggestion[]>> {
+  const nodes = req.canvas.nodes.slice(0, TIDY_IDEAS_MAX);
+  const refOf = new Map(nodes.map((n, i) => [n.id, `I${i + 1}`]));
+  const idOf = new Map(nodes.map((n, i) => [`I${i + 1}`, n]));
+  const connected = new Set<string>();
+  const edgeLines: string[] = [];
+  for (const e of req.canvas.edges) {
+    const a = refOf.get(e.source);
+    const b = refOf.get(e.target);
+    if (!a || !b) continue;
+    connected.add(`${e.source}|${e.target}`).add(`${e.target}|${e.source}`);
+    edgeLines.push(`${a} → ${b}`);
+  }
+  const lines = nodes.map((n) => {
+    const notes = n.body.trim().replace(/\s+/g, ' ').slice(0, 300);
+    return `${refOf.get(n.id)}: [${n.type}] ${n.title.trim() || '(no title)'}${notes ? ` | notes: ${notes}` : ''}`;
+  });
+  const result = await generateText({
+    model,
+    output: Output.object({ schema: tidyOutputSchema }),
+    system: `You help keep a research canvas tidy. Suggest only clear improvements, at most ${TIDY_SUGGESTIONS_MAX}, most useful first:
+- retype: an idea whose type is clearly wrong (for example a question typed as a finding). Give the better type.
+- retitle: an idea with no title or a vague one, where its notes say what it is about. Give a better title (under 12 words).
+- connect: two related ideas that are not connected yet. ref is the idea it leads from, to the idea it leads to.
+For every suggestion give a one-sentence reason. Leave type, title and to null when they do not apply.
+Return an empty list when the canvas is already tidy. Write in the same language as the canvas.
+${TYPES_GUIDE}`,
+    prompt: `Ideas:\n${lines.join('\n')}\n\nConnectors:\n${edgeLines.join('\n') || '(none)'}`,
+    maxRetries: 1,
+    reasoning: QUICK_REASONING,
+    ...(signal ? { abortSignal: signal } : {}),
+  });
+
+  const out: TidySuggestion[] = [];
+  const seen = new Set<string>();
+  for (const s of result.output.suggestions) {
+    if (out.length >= TIDY_SUGGESTIONS_MAX) break;
+    const node = idOf.get(s.ref.trim());
+    if (!node) continue;
+    const reason = s.reason.trim();
+    if (s.kind === 'retype' && s.type && s.type !== node.type && !seen.has(`type:${node.id}`)) {
+      seen.add(`type:${node.id}`);
+      out.push({ kind: 'retype', ideaId: node.id, type: s.type, reason });
+    } else if (s.kind === 'retitle' && !seen.has(`title:${node.id}`)) {
+      const title = (s.title ?? '').replace(/\s+/g, ' ').trim().slice(0, NODE_TITLE_MAX);
+      if (!title || title === node.title.trim()) continue;
+      seen.add(`title:${node.id}`);
+      out.push({ kind: 'retitle', ideaId: node.id, title, reason });
+    } else if (s.kind === 'connect' && s.to) {
+      const target = idOf.get(s.to.trim());
+      if (!target || target.id === node.id || connected.has(`${node.id}|${target.id}`)) continue;
+      connected.add(`${node.id}|${target.id}`).add(`${target.id}|${node.id}`);
+      out.push({ kind: 'connect', sourceId: node.id, targetId: target.id, reason });
+    }
+  }
+  return { output: out, usage: toUsage(result.usage) };
 }
