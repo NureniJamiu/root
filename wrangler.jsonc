@@ -18,9 +18,10 @@
 		]
 	},
 	// The database. Replace database_id with the id `npx wrangler d1 create root-db` prints.
+	// Keep the binding named "DB": the code reads env.DB.
 	"d1_databases": [
 		{
-			"binding": "root_db",
+			"binding": "DB",
 			"database_name": "root-db",
 			"database_id": "04befb99-7e0a-4129-aab5-17063558717a",
 			"migrations_dir": "migrations"

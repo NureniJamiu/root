@@ -31,6 +31,9 @@ async function start(env: WorkerEnv, origin: string): Promise<void> {
   // Code that reads process.env (email, for one) sees the same settings.
   Object.assign(process.env, settings);
 
+  // Without the database, Better Auth would quietly keep accounts in memory and lose them.
+  if (!env.DB) throw new Error('The D1 binding "DB" is missing: check d1_databases[0].binding in wrangler.jsonc.');
+  if (!env.FILES) throw new Error('The R2 binding "FILES" is missing: check r2_buckets[0].binding in wrangler.jsonc.');
   if (!settings.BETTER_AUTH_SECRET) throw new Error('BETTER_AUTH_SECRET is not set: run `npx wrangler secret put BETTER_AUTH_SECRET`.');
 
   const app = await createApp({
