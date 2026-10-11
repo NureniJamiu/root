@@ -15,6 +15,7 @@ import type { NodePatch, UUID } from '../data';
 import type { ReviewIssue, ReviewKind, TidySuggestion } from '../lib/ai/contracts';
 import { FEATURE_LABELS, cheapestPlanFor, PLAN_DEFINITIONS } from '../lib/ai/plans';
 import type { Feature } from '../lib/ai/plans';
+import { billingActions, useBillingStore } from '../billing';
 import { Button } from '../ui/Button';
 import { aiActions } from './aiActions';
 import { aiConfigActions, useAiFeature } from './aiConfig';
@@ -98,10 +99,22 @@ export function AiPanel({ projectId, open, tab, onTabChange, onClose, nav }: AiP
 /** "Gap check is part of the Pro plan." */
 function UpgradeNote({ feature }: { readonly feature: Feature }): JSX.Element {
   const plan = cheapestPlanFor(feature);
+  const canPay = useBillingStore((s) => s.status?.enabled ?? false);
+  const busy = useBillingStore((s) => s.busy);
+  useEffect(() => {
+    void billingActions.load();
+  }, []);
   return (
-    <p className="m-0 font-serif text-[13px] leading-[19px] text-ink-read" data-testid="ai-upgrade-note">
-      {FEATURE_LABELS[feature]} is part of the {plan ? PLAN_DEFINITIONS[plan].label : 'a paid'} plan.
-    </p>
+    <div className="flex flex-col items-start gap-2">
+      <p className="m-0 font-serif text-[13px] leading-[19px] text-ink-read" data-testid="ai-upgrade-note">
+        {FEATURE_LABELS[feature]} is part of the {plan ? PLAN_DEFINITIONS[plan].label : 'a paid'} plan.
+      </p>
+      {canPay && plan === 'pro' && (
+        <Button size="sm" variant="primary" loading={busy} onClick={() => void billingActions.upgrade()} data-testid="ai-upgrade-button">
+          Upgrade to Pro
+        </Button>
+      )}
+    </div>
   );
 }
 

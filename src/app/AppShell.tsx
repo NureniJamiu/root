@@ -75,6 +75,7 @@ import {
   UI_INSPECTOR_OPEN_KEY,
 } from '../persistence';
 import { useOptionalAuth } from '../auth';
+import { billingActions, takeBillingReturn } from '../billing';
 
 import { DocumentPane } from './DocumentPane';
 import { ToastSurface, showNotice } from './Toasts';
@@ -399,6 +400,25 @@ export function AppShell(): JSX.Element {
 
   useEffect(() => {
     void aiConfigActions.load();
+  }, []);
+
+  // Back from Stripe: apply the payment now (the webhook may still be on its way) and show the plan.
+  useEffect(() => {
+    const back = takeBillingReturn();
+    if (!back) return;
+    if (back.kind === 'cancelled') {
+      showNotice('Checkout cancelled. You have not been charged.');
+      return;
+    }
+    void (async () => {
+      const status = back.sessionId ? await billingActions.confirm(back.sessionId) : null;
+      if (!status) await billingActions.load(true);
+      await aiConfigActions.load(true);
+      if (back.kind === 'success') {
+        showNotice(status?.plan === 'pro' ? 'Welcome to Pro.' : 'Payment received. Pro turns on in a moment.');
+        setAiSettingsOpen(true);
+      }
+    })();
   }, []);
 
   // Suggestions belong to the project they were made for.

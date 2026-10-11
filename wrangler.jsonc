@@ -1,5 +1,5 @@
 // Cloudflare Workers settings for Root. Step-by-step: docs/DEPLOY.md.
-// Secrets (BETTER_AUTH_SECRET, AI_KEY_SECRET, API keys) are never written
+// Secrets (BETTER_AUTH_SECRET, AI_KEY_SECRET, API keys, STRIPE_*) are never written
 // here: set them with `npx wrangler secret put <NAME>`.
 {
 	"$schema": "node_modules/wrangler/config-schema.json",

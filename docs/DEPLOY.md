@@ -60,7 +60,8 @@ Plain settings are under `vars` in `wrangler.jsonc`; secrets are set with
 | `RESEND_API_KEY` | secret | Optional. Without it, reset emails are only written to the Worker's log. |
 | `BETTER_AUTH_URL`, `VITE_APP_URL` | vars | Only with your own domain: set both to it. Without them the app uses the URL it is reached on. |
 | `EMAIL_FROM` | vars | `onboarding@resend.dev` only delivers to your own address; verify a domain in Resend and use an address on it. |
-| `AI_DEFAULT_PLAN` | vars | `free` until payments exist; `pro` gives everyone Research. |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO` | secret | Payments for Pro; see [Payments](#payments-stripe). Billing stays hidden without them. |
+| `AI_DEFAULT_PLAN` | vars | Plan for people who have never paid. Keep `free`; `pro` gives everyone Pro. |
 | `NODE_ENV` | vars | Keep `production`. |
 
 ## After the first deploy
@@ -99,6 +100,50 @@ never deploy. It needs two secrets, set once:
    run first, then `deploy`.
 
 Secrets set with `wrangler secret put` stay on the Worker; deploys keep them.
+
+## Payments (Stripe)
+
+People upgrade to Pro from AI settings or the pricing page. Stripe Checkout
+takes the card, a webhook moves them to Pro, and Stripe's billing portal is
+where they change their card, see invoices or cancel. Cancelling keeps Pro to
+the end of the paid period, then they go back to Free. Code:
+`src/lib/billing/`.
+
+Start in **test mode** (the Test mode switch in the Stripe dashboard, keys
+starting `sk_test_`). No real card is charged; pay with `4242 4242 4242 4242`,
+any future date, any CVC. AI settings shows "Test mode" while it is on.
+
+1. **Make the Pro product.** Stripe dashboard → Product catalog → Add
+   product. Name it "Root Pro", pick **Recurring**, set the monthly price,
+   save. Open the price and copy its ID (`price_…`).
+2. **Copy the secret key.** Developers → API keys → Secret key (`sk_test_…`).
+3. **Add the webhook.** Developers → Webhooks → Add endpoint.
+   - Endpoint URL: `https://<your app>/api/billing/webhook`
+   - Events: `checkout.session.completed`,
+     `customer.subscription.created`, `customer.subscription.updated`,
+     `customer.subscription.deleted`
+   - Save, then reveal the **Signing secret** (`whsec_…`).
+4. **Turn on the billing portal.** Settings → Billing → Customer portal →
+   Activate. Allow cancelling and updating payment methods.
+5. **Store the three values** and deploy:
+   ```bash
+   npx wrangler secret put STRIPE_SECRET_KEY       # sk_test_…
+   npx wrangler secret put STRIPE_PRICE_PRO        # price_…
+   npx wrangler secret put STRIPE_WEBHOOK_SECRET   # whsec_…
+   npm run cf:deploy
+   ```
+6. **Try it.** Sign in, open AI settings → Upgrade to Pro, pay with the test
+   card. You come back on Pro. Manage billing → Cancel shows "Pro ends on…".
+
+**Going live** later: switch the dashboard to live mode, make the product
+and webhook again there (test and live are separate), and put the live
+`sk_live_…`, `price_…` and `whsec_…` in with the same three commands.
+
+**Locally**, add the same three to `.env` (or `.dev.vars` for `cf:dev`). For
+the webhook, run `stripe listen --forward-to localhost:3001/api/billing/webhook`
+with the Stripe CLI and use the `whsec_…` it prints. Without it, upgrades
+still apply when you come back from Checkout; only portal changes wait for
+the webhook.
 
 ## Try the Worker on your machine first (optional)
 

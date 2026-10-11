@@ -176,6 +176,19 @@ CREATE TABLE IF NOT EXISTS "user_plan" (
 );
 `;
 
+/** Stripe customers and subscriptions (see `billing/billing-store.ts`). */
+const BILLING = `
+CREATE TABLE IF NOT EXISTS "billing_account" (
+  "userId"            TEXT PRIMARY KEY NOT NULL,
+  "customerId"        TEXT NOT NULL UNIQUE,
+  "subscriptionId"    TEXT,
+  "status"            TEXT,
+  "periodEnd"         TEXT,
+  "cancelAtPeriodEnd" INTEGER NOT NULL DEFAULT 0,
+  "updatedAt"         TEXT NOT NULL
+);
+`;
+
 /** The project search index (see `ai/search-index.ts`). */
 const SEARCH = `
 CREATE TABLE IF NOT EXISTS "ai_chunk" (
@@ -210,7 +223,7 @@ CREATE TRIGGER IF NOT EXISTS "ai_chunk_au" AFTER UPDATE OF "title", "text" ON "a
 END;
 `;
 
-export const SCHEMA_SQL = [AUTH, PROJECTS, DOCUMENTS, AI, SEARCH].map((part) => part.trim()).join('\n\n');
+export const SCHEMA_SQL = [AUTH, PROJECTS, DOCUMENTS, AI, SEARCH, BILLING].map((part) => part.trim()).join('\n\n');
 
 /** The D1 migration file's contents: the schema, with a header saying where it comes from. */
 export function migrationSql(): string {

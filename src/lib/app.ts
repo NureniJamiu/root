@@ -8,6 +8,7 @@
  *   - /api/projects/:pid/documents/*      Research documents
  *   - /api/projects/:pid/assets/*         Images pasted into documents
  *   - /api/ai/*                           AI features, settings and usage
+ *   - /api/billing/*                      Upgrading to Pro through Stripe
  *   - /api/health                         Liveness check for the host
  */
 import express from 'express';
@@ -29,6 +30,9 @@ import { readAiEnv } from './ai/providers';
 import { createAiRouter } from './ai/routes';
 import { readResearchEnv, searchProvidersFor } from './ai/web-search';
 import { createSearchIndex } from './ai/search-index';
+import { createSqlBillingStore } from './billing/billing-store';
+import { createBillingRouter, readBillingEnv } from './billing/routes';
+import { createStripeClient } from './billing/stripe';
 
 export interface AppDeps {
   readonly sql: Sql;
@@ -68,16 +72,20 @@ export async function createApp({ sql, auth, blobs, aiLimiter, env }: AppDeps): 
     res.json({ ok: true });
   });
 
-  // Resolve the signed-in user's id, or null when there is no valid session.
-  async function getUserId(req: express.Request): Promise<string | null> {
+  // Resolve the signed-in user, or null when there is no valid session.
+  async function getUser(req: express.Request): Promise<{ id: string; email: string; name: string } | null> {
     try {
       const session = await auth.api.getSession({
         headers: fromNodeHeaders(req.headers),
       });
-      return session?.user?.id ?? null;
+      return session?.user ?? null;
     } catch (_err) {
       return null;
     }
+  }
+
+  async function getUserId(req: express.Request): Promise<string | null> {
+    return (await getUser(req))?.id ?? null;
   }
 
   // Every project route requires a signed-in user; the id is stored on res.locals.
@@ -274,11 +282,12 @@ export async function createApp({ sql, auth, blobs, aiLimiter, env }: AppDeps): 
 
   // Everyone is on Pro in development so every feature can be tried; Free in production.
   const aiDefaultPlan = isPlan(env.AI_DEFAULT_PLAN) ? env.AI_DEFAULT_PLAN : isProduction ? 'free' : 'pro';
+  const aiStore = createSqlAiStore(sql);
   app.use(
     '/api/ai',
     requireUser,
     createAiRouter({
-      store: createSqlAiStore(sql),
+      store: aiStore,
       env: readAiEnv(env),
       cryptoKey: await deriveKeyFromSecret(
         env.AI_KEY_SECRET || env.BETTER_AUTH_SECRET || 'root-development-only-secret',
@@ -300,6 +309,25 @@ export async function createApp({ sql, auth, blobs, aiLimiter, env }: AppDeps): 
           documents: docs.flatMap((doc) => (doc ? [{ id: doc.id, title: doc.title, content: doc.content }] : [])),
         };
       },
+    }),
+  );
+
+  /* ------------------------------------------------------------------------ */
+  /* Billing (Stripe)                                                         */
+  /* ------------------------------------------------------------------------ */
+
+  // Off until STRIPE_SECRET_KEY and STRIPE_PRICE_PRO are set; a test key (sk_test_…) never charges anyone.
+  const billingEnv = readBillingEnv(env);
+  app.use(
+    '/api/billing',
+    createBillingRouter({
+      stripe: billingEnv.secretKey ? createStripeClient(billingEnv.secretKey) : null,
+      env: billingEnv,
+      store: createSqlBillingStore(sql),
+      ai: aiStore,
+      defaultPlan: aiDefaultPlan,
+      currentUser: getUser,
+      appUrl: (req) => env.VITE_APP_URL ?? `${req.protocol}://${req.get('host')}`,
     }),
   );
 

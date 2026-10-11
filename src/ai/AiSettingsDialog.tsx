@@ -9,6 +9,7 @@ import { FEATURES, FEATURE_LABELS } from '../lib/ai/plans';
 import { KEYED_PROVIDERS, PROVIDER_LABELS } from '../lib/ai/models';
 import type { KeyedProvider } from '../lib/ai/models';
 import type { AiTestResult } from '../lib/ai/contracts';
+import { BillingSection } from '../billing';
 import { Button } from '../ui/Button';
 import { aiConfigActions, useAiConfigStore } from './aiConfig';
 import { Allowance } from './AiMenu';
@@ -82,6 +83,7 @@ export function AiSettingsDialog({ onClose }: AiSettingsDialogProps): JSX.Elemen
 
             <Section title="Plan">
               <Allowance />
+              <BillingSection />
               <ul className="m-0 p-0 list-none grid grid-cols-2 gap-x-3 gap-y-1">
                 {FEATURES.map((f) => {
                   const on = config.features.includes(f);
