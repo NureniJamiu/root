@@ -45,6 +45,7 @@ import {
   connect as mutConnect,
   deleteNodeOnly as mutDeleteNodeOnly,
   deleteSubtree as mutDeleteSubtree,
+  describeImages as mutDescribeImages,
   emptyCanvas,
   expandMany as mutExpandMany,
   expandSubtree as mutExpandSubtree,
@@ -59,7 +60,7 @@ import {
   updateEdge as mutUpdateEdge,
   updateNode as mutUpdateNode,
 } from './mutators';
-import type { ConnectorEnds, NodePatch } from './mutators';
+import type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators';
 import { emitSaveError } from './storeEvents';
 import { computeFacingSides, subtreeIds } from './graph';
 import { NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
@@ -455,6 +456,15 @@ export const canvasActions = {
       (s) => mutUpdateNode(s.canvas, id, patch),
       () => ({}),
       `updateNode:${id}`,
+    );
+  },
+
+  /** Store AI descriptions (caption and visible text) of `id`'s images, as one undo step. */
+  describeImages(id: UUID, descriptions: readonly ImageDescriptionPatch[]): void {
+    commitCanvasWrite(
+      'describeImages',
+      (s) => mutDescribeImages(s.canvas, id, descriptions),
+      () => ({}),
     );
   },
 

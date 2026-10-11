@@ -56,3 +56,8 @@ export function useAiEnabled(): boolean {
 export function useAiFeature(feature: Feature): boolean {
   return useAiConfigStore((s) => s.config?.features.includes(feature) ?? false);
 }
+
+/** Research has sources to look things up on (whether the plan allows it is the server's call). */
+export function useResearchAvailable(): boolean {
+  return useAiConfigStore((s) => (s.config?.enabled ?? false) && (s.config?.researchSources.length ?? 0) > 0);
+}

@@ -14,3 +14,9 @@ export const CANVAS_TITLE_MAX = 200;
 
 /** Per-image data-URL byte cap: 2 MB (design.md §Error Handling, R4.4). */
 export const IMAGE_DATA_URL_MAX_BYTES = 2 * 1024 * 1024;
+
+/** Maximum length of an image's caption (written by AI image descriptions). */
+export const IMAGE_CAPTION_MAX = 300;
+
+/** Maximum length of the text read out of an image. */
+export const IMAGE_TEXT_MAX = 2_000;

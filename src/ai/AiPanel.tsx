@@ -1,5 +1,6 @@
 /**
- * The AI side panel: Ask your project, Gap check and Tidy suggestions.
+ * The AI side panel: Ask your project, Gap check, Tidy suggestions and
+ * walkthrough speaker notes.
  *
  * Kept mounted while hidden so a conversation survives closing the panel;
  * the app gives it a fresh `key` per project, so nothing carries over from
@@ -8,24 +9,27 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { canvasActions, useCanvasStore } from '../data';
+import { presentationOrder, walkthroughActions } from '../canvas';
+import { canvasActions, scriptText, speakerNotesActions, useCanvasStore, useSpeakerNotesStore } from '../data';
 import type { NodePatch, UUID } from '../data';
 import type { ReviewIssue, ReviewKind, TidySuggestion } from '../lib/ai/contracts';
 import { FEATURE_LABELS, cheapestPlanFor, PLAN_DEFINITIONS } from '../lib/ai/plans';
 import type { Feature } from '../lib/ai/plans';
 import { Button } from '../ui/Button';
+import { aiActions } from './aiActions';
 import { aiConfigActions, useAiFeature } from './aiConfig';
 import { AnswerText, SourceChip } from './AnswerText';
 import type { SourceNavigation } from './AnswerText';
 import { AiRequestError, aiApi } from './api';
 import { toPromptCanvas } from './promptCanvas';
 
-export type AiPanelTab = 'ask' | 'review' | 'tidy';
+export type AiPanelTab = 'ask' | 'review' | 'tidy' | 'script';
 
 const TABS: ReadonlyArray<{ id: AiPanelTab; label: string }> = [
   { id: 'ask', label: 'Ask' },
   { id: 'review', label: 'Gap check' },
   { id: 'tidy', label: 'Tidy' },
+  { id: 'script', label: 'Script' },
 ];
 
 export interface AiPanelProps {
@@ -83,6 +87,9 @@ export function AiPanel({ projectId, open, tab, onTabChange, onClose, nav }: AiP
       </div>
       <div className={`flex-1 min-h-0 overflow-y-auto ${tab === 'tidy' ? '' : 'hidden'}`}>
         <TidyTab />
+      </div>
+      <div className={`flex-1 min-h-0 overflow-y-auto ${tab === 'script' ? '' : 'hidden'}`}>
+        <ScriptTab nav={nav} />
       </div>
     </aside>
   );
@@ -509,6 +516,156 @@ function TidyTab(): JSX.Element {
               Dismiss
             </Button>
             <span className="ml-auto font-mono text-[10px] text-muted">{state.model}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Walkthrough script                                                         */
+/* -------------------------------------------------------------------------- */
+
+function ScriptTab({ nav }: { readonly nav: SourceNavigation }): JSX.Element {
+  const allowed = useAiFeature('ai.script');
+  const canvas = useCanvasStore((s) => s.canvas);
+  const selectedId = useCanvasStore((s) => s.selection.nodeId);
+  const notes = useSpeakerNotesStore((s) => (s.notes?.canvasId === canvas.id ? s.notes : null));
+  const [scope, setScope] = useState<'all' | 'selected'>('all');
+  const [state, setState] = useState<{ status: 'idle' } | { status: 'busy' } | { status: 'error'; message: string }>({
+    status: 'idle',
+  });
+  const [copied, setCopied] = useState(false);
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
+
+  const selected = selectedId ? canvas.nodes.find((n) => n.id === selectedId) ?? null : null;
+  const effectiveScope = scope === 'selected' && selected ? 'selected' : 'all';
+  const roots = effectiveScope === 'selected' && selected ? [selected.id] : null;
+  const titleOf = (id: UUID): string => canvas.nodes.find((n) => n.id === id)?.title || 'Untitled idea';
+
+  const run = async (): Promise<void> => {
+    const steps = presentationOrder(canvas, roots);
+    if (steps.length === 0) return;
+    controller.current = new AbortController();
+    setState({ status: 'busy' });
+    setCopied(false);
+    try {
+      const res = await aiActions.writeScript(steps, controller.current.signal);
+      speakerNotesActions.set({ canvasId: canvas.id, ...res.script, modelLabel: res.model.label });
+      setState({ status: 'idle' });
+    } catch (error) {
+      const message = errorMessage(error);
+      setState(message ? { status: 'error', message } : { status: 'idle' });
+    } finally {
+      controller.current = null;
+    }
+  };
+
+  const copy = (): void => {
+    if (!notes) return;
+    void navigator.clipboard
+      ?.writeText(scriptText(notes, titleOf))
+      .then(() => setCopied(true))
+      .catch(() => setCopied(false));
+  };
+
+  // Notes for a branch walk that branch; notes for the canvas walk all of it.
+  const walkRoots = (): readonly UUID[] | null => {
+    if (!notes) return null;
+    const first = notes.steps[0]?.ideaId;
+    const all = presentationOrder(canvas, null);
+    return first && notes.steps.length < all.length ? [first] : null;
+  };
+
+  return (
+    <div className="p-4 flex flex-col gap-3" data-testid="ai-script">
+      <p className="m-0 font-serif text-[13px] leading-[19px] text-ink-read">
+        Writes what to say as a walkthrough reveals your ideas one at a time: an opening, a short note per idea and a
+        closing. The note for each idea shows above the walkthrough bar while you present.
+      </p>
+      {!allowed ? (
+        <UpgradeNote feature="ai.script" />
+      ) : (
+        <>
+          <div className="flex flex-col gap-1.5 font-serif text-[13px] text-ink" role="radiogroup" aria-label="What to present">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="ai-script-scope" checked={effectiveScope === 'all'} onChange={() => setScope('all')} />
+              The whole canvas
+            </label>
+            <label className={`flex items-center gap-2 ${selected ? 'cursor-pointer' : 'text-faint'}`}>
+              <input
+                type="radio"
+                name="ai-script-scope"
+                disabled={!selected}
+                checked={effectiveScope === 'selected'}
+                onChange={() => setScope('selected')}
+                data-testid="ai-script-scope-selected"
+              />
+              <span className="truncate">
+                {selected ? `The branch from “${selected.title || 'Untitled idea'}”` : 'The branch from the selected idea'}
+              </span>
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="cobalt"
+              disabled={state.status === 'busy' || canvas.nodes.length === 0}
+              onClick={() => void run()}
+              data-testid="ai-script-run"
+            >
+              {state.status === 'busy' ? 'Writing…' : notes ? 'Write again' : 'Write speaker notes'}
+            </Button>
+            {state.status === 'busy' && (
+              <Button size="sm" variant="ghost" onClick={() => controller.current?.abort()}>
+                Stop
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+      {state.status === 'error' && (
+        <p className="m-0 font-serif text-[13px] text-question" role="alert">
+          {state.message}
+        </p>
+      )}
+      {notes && (
+        <>
+          <div className="flex flex-col gap-3 pt-1" data-testid="ai-script-notes">
+            {notes.opening && (
+              <section className="flex flex-col gap-1">
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">Opening</span>
+                <p className="m-0 font-serif text-[13px] leading-[19px] text-ink">{notes.opening}</p>
+              </section>
+            )}
+            <ol className="m-0 p-0 list-none flex flex-col gap-2.5">
+              {notes.steps.map((step, i) => (
+                <li key={step.ideaId} className="flex flex-col gap-1" data-testid="ai-script-step">
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-mono text-[10px] text-muted tabular-nums w-5">{i + 1}</span>
+                    <SourceChip source={{ kind: 'idea', ideaId: step.ideaId }} nav={nav} />
+                  </span>
+                  {step.note && <p className="m-0 pl-[26px] font-serif text-[13px] leading-[19px] text-ink">{step.note}</p>}
+                </li>
+              ))}
+            </ol>
+            {notes.closing && (
+              <section className="flex flex-col gap-1">
+                <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">Closing</span>
+                <p className="m-0 font-serif text-[13px] leading-[19px] text-ink">{notes.closing}</p>
+              </section>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="cobalt" onClick={() => walkthroughActions.start(walkRoots())} data-testid="ai-script-present">
+              Start walkthrough
+            </Button>
+            <Button size="sm" variant="secondary" onClick={copy} data-testid="ai-script-copy">
+              {copied ? 'Copied' : 'Copy script'}
+            </Button>
+            <span className="ml-auto font-mono text-[10px] text-muted">{notes.modelLabel}</span>
           </div>
         </>
       )}

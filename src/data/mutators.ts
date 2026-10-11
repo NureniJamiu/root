@@ -13,7 +13,7 @@
  */
 
 import { newId } from './ids';
-import { IMAGE_DATA_URL_MAX_BYTES } from './limits';
+import { IMAGE_CAPTION_MAX, IMAGE_DATA_URL_MAX_BYTES, IMAGE_TEXT_MAX } from './limits';
 import { now } from './time';
 import {
   computeFacingSides,
@@ -194,6 +194,43 @@ export function updateNode(c: Canvas, id: UUID, patch: NodePatch): Canvas {
     ...(patch.title !== undefined ? { title: patch.title } : null),
     ...(patch.body !== undefined ? { body: patch.body } : null),
     ...(patch.type !== undefined ? { type: patch.type } : null),
+    updatedAt: ts,
+  }));
+  if (nextNodes === null) return c;
+  return { ...c, nodes: nextNodes, updatedAt: ts };
+}
+
+/* -------------------------------------------------------------------------- */
+/* describeImages                                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface ImageDescriptionPatch {
+  readonly imageId: UUID;
+  readonly caption: string;
+  readonly text: string;
+}
+
+/**
+ * Set the caption and visible text of images on the node `id`, matched by
+ * image id. Text is cut to the schema limits; an empty `text` removes it.
+ * Images not described keep what they had. Unknown node, or nothing to
+ * change, returns `c` unchanged.
+ */
+export function describeImages(c: Canvas, id: UUID, descriptions: readonly ImageDescriptionPatch[]): Canvas {
+  const byImage = new Map(descriptions.map((d) => [d.imageId, d]));
+  const node = c.nodes.find((n) => n.id === id);
+  if (!node || !node.images.some((img) => byImage.has(img.id))) return c;
+  const ts = now();
+  const nextNodes = replaceNode(c.nodes, id, (n) => ({
+    ...n,
+    images: n.images.map((img) => {
+      const d = byImage.get(img.id);
+      if (!d) return img;
+      const caption = d.caption.trim().slice(0, IMAGE_CAPTION_MAX);
+      const text = d.text.trim().slice(0, IMAGE_TEXT_MAX);
+      const { caption: _caption, text: _text, ...rest } = img;
+      return { ...rest, ...(caption ? { caption } : null), ...(text ? { text } : null) };
+    }),
     updatedAt: ts,
   }));
   if (nextNodes === null) return c;

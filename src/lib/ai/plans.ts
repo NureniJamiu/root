@@ -30,6 +30,12 @@ export const FEATURES = [
   'ai.capture',
   /** Suggest better types, titles and missing connectors for ideas. */
   'ai.tidy',
+  /** Look a question up on the web and suggest findings with their sources. */
+  'ai.research',
+  /** Write speaker notes for a walkthrough. */
+  'ai.script',
+  /** Caption card images and read the text in them. */
+  'ai.describe',
   /** Use premium models (such as Claude) on the app's keys. */
   'models.premium',
 ] as const;
@@ -48,7 +54,7 @@ export interface PlanDefinition {
 export const PLAN_DEFINITIONS: Record<Plan, PlanDefinition> = {
   free: {
     label: 'Free',
-    features: ['ai.map', 'ai.expand', 'ai.rewrite', 'ai.ask', 'ai.capture', 'ai.tidy'],
+    features: ['ai.map', 'ai.expand', 'ai.rewrite', 'ai.ask', 'ai.capture', 'ai.tidy', 'ai.script', 'ai.describe'],
     monthlyActions: 30,
   },
   pro: {
@@ -60,8 +66,11 @@ export const PLAN_DEFINITIONS: Record<Plan, PlanDefinition> = {
       'ai.ask',
       'ai.capture',
       'ai.tidy',
+      'ai.script',
+      'ai.describe',
       'ai.draft',
       'ai.review',
+      'ai.research',
       'models.premium',
     ],
     monthlyActions: 1000,
@@ -90,5 +99,8 @@ export const FEATURE_LABELS: Record<Feature, string> = {
   'ai.review': 'Gap check',
   'ai.capture': 'Make ideas from text',
   'ai.tidy': 'Tidy suggestions',
+  'ai.research': 'Research a question',
+  'ai.script': 'Walkthrough script',
+  'ai.describe': 'Describe images',
   'models.premium': 'Premium models',
 };

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { addChild, addNode, collapseMany, emptyCanvas, expandMany } from '../../data/mutators';
+import { addChild, addNode, collapseMany, connect, emptyCanvas, expandMany } from '../../data/mutators';
 import { canvasActions, useCanvasStore } from '../../data/store';
 import { visibleNodeIds } from '../../data/graph';
 import type { Canvas, UUID } from '../../data/types';
-import { nextToReveal, shownNodeIds, useWalkthroughStore, walkthroughActions } from '../walkthrough';
+import { nextToReveal, presentationOrder, shownNodeIds, useWalkthroughStore, walkthroughActions } from '../walkthrough';
 
 /**
  *        root
@@ -105,5 +105,20 @@ describe('walkthrough', () => {
     walkthroughActions.end();
     const canvas = useCanvasStore.getState().canvas;
     expect([...shownNodeIds(canvas, useWalkthroughStore.getState().revealed)]).toEqual([t.root]);
+  });
+});
+
+describe('presentationOrder', () => {
+  it('lists every idea in the order Next reveals them', () => {
+    const { canvas, root, a, b, a1 } = tree();
+    expect(presentationOrder(canvas, null)).toEqual([root, a, b, a1]);
+    expect(presentationOrder(canvas, [a])).toEqual([a, a1]);
+  });
+
+  it('reaches ideas that only hang off a loop', () => {
+    const { canvas, root, a, b, a1 } = tree();
+    const looped = connect(canvas, { source: a1, target: root, sourceSide: 'left', targetSide: 'right' });
+    // Nothing is unpointed-at, so the walk starts at the top-left idea, as a walkthrough does.
+    expect(presentationOrder(looped, null)).toEqual([a, a1, root, b]);
   });
 });

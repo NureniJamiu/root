@@ -21,7 +21,7 @@
 
 import { z } from 'zod';
 
-import { CANVAS_TITLE_MAX, NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
+import { CANVAS_TITLE_MAX, IMAGE_CAPTION_MAX, IMAGE_TEXT_MAX, NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
 
 /* -------------------------------------------------------------------------- */
 /* Primitive schemas                                                          */
@@ -43,6 +43,10 @@ export const imageEntrySchema = z.object({
   id: z.string().uuid(),
   dataUrl: z.string().startsWith('data:'),
   addedAt: z.string().datetime(),
+  /** What the image shows, in a sentence; absent until described. */
+  caption: z.string().max(IMAGE_CAPTION_MAX).optional(),
+  /** Text visible in the image (a chart's labels, a slide, a page). */
+  text: z.string().max(IMAGE_TEXT_MAX).optional(),
 });
 
 export const sideSchema = z.enum(['top', 'right', 'bottom', 'left']);

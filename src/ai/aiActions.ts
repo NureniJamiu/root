@@ -3,14 +3,19 @@
  * suggestions placed on the canvas (see `data/aiProposals.ts`).
  */
 
-import { aiProposalActions, setAiDecisionListener, useAiProposalStore, useCanvasStore } from '../data';
+import { aiProposalActions, canvasActions, setAiDecisionListener, useAiProposalStore, useCanvasStore } from '../data';
 import type { GhostIdea, Position, UUID } from '../data';
 import { layoutExpansion, layoutMap } from '../canvas/ghostLayout';
 import { getMeasuredSizes } from '../canvas/measuredSizes';
-import type { DraftResponse, IdeaSuggestion, SuggestionsResponse } from '../lib/ai/contracts';
+import { DESCRIBE_IMAGES_MAX, SCRIPT_STEPS_MAX } from '../lib/ai/contracts';
+import type { DraftResponse, IdeaSuggestion, ScriptResponse, SuggestionsResponse } from '../lib/ai/contracts';
 import { aiConfigActions } from './aiConfig';
 import { AiRequestError, aiApi } from './api';
 import { toPromptCanvas } from './promptCanvas';
+import { shrinkImage } from './shrinkImage';
+
+/** Most image data sent in one description request, well under the server's limit. */
+const DESCRIBE_BATCH_CHARS = 7_000_000;
 
 let controller: AbortController | null = null;
 
@@ -39,6 +44,12 @@ function toGhosts(ideas: readonly IdeaSuggestion[], positions: ReadonlyMap<strin
     parentKey: i.parent,
     position: positions.get(i.key) ?? { x: 0, y: 0 },
   }));
+}
+
+/** "A", "A and B", "A, B and C". */
+function listOf(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? 'the web';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
 function settle(res: SuggestionsResponse): void {
@@ -140,11 +151,95 @@ export const aiActions = {
     }
   },
 
+  /**
+   * Look the question `nodeId` up on the server's research sources and
+   * suggest findings, each with links to its sources, connected from it.
+   */
+  async researchQuestion(nodeId: UUID, guidance?: string): Promise<void> {
+    const signal = begin();
+    aiProposalActions.start({ kind: 'research', anchorId: nodeId });
+    try {
+      const canvas = useCanvasStore.getState().canvas;
+      const res = await aiApi.research(
+        { focusId: nodeId, canvas: toPromptCanvas(canvas, [nodeId]), ...(guidance ? { guidance } : {}) },
+        signal,
+      );
+      settle(res);
+      const latest = useCanvasStore.getState().canvas;
+      if (!latest.nodes.some((n) => n.id === nodeId)) {
+        aiProposalActions.clear();
+        return;
+      }
+      const positions = layoutExpansion(
+        latest,
+        nodeId,
+        res.ideas.map((i) => ({ key: i.key, type: i.type, parentKey: i.parent })),
+        getMeasuredSizes(),
+      );
+      aiProposalActions.propose({
+        kind: 'research',
+        anchorId: nodeId,
+        ideas: toGhosts(res.ideas, positions),
+        excluded: [],
+        modelLabel: res.model.label,
+        detail: `read ${res.sourcesRead} ${res.sourcesRead === 1 ? 'source' : 'sources'} from ${listOf(res.searched)}`,
+      });
+    } catch (error) {
+      const message = messageFor(error);
+      if (message) aiProposalActions.fail(message);
+      else aiProposalActions.clear();
+    }
+  },
+
   /** Stop the request in flight, if any. */
   cancel(): void {
     controller?.abort();
     controller = null;
     if (useAiProposalStore.getState().pending) aiProposalActions.clear();
+  },
+
+  /**
+   * Caption the images of `nodeId` and read the text in them; with `all`,
+   * images described before are described again. Stores the results on the
+   * idea (one undo step) and returns how many images were described.
+   * Throws `AiRequestError`.
+   */
+  async describeImages(nodeId: UUID, all = false, signal?: AbortSignal): Promise<number> {
+    const node = useCanvasStore.getState().canvas.nodes.find((n) => n.id === nodeId);
+    if (!node) return 0;
+    const wanted = node.images.filter((img) => all || !img.caption);
+    const prepared: Array<{ id: string; dataUrl: string }> = [];
+    for (const img of wanted) {
+      const dataUrl = await shrinkImage(img.dataUrl);
+      if (dataUrl) prepared.push({ id: img.id, dataUrl });
+    }
+    if (prepared.length === 0) {
+      throw new AiRequestError('These images could not be prepared for AI. Try a PNG or JPEG.', 'invalid', 0);
+    }
+    // Several images per request, within the count and size limits.
+    const batches: Array<typeof prepared> = [];
+    for (const img of prepared) {
+      const last = batches[batches.length - 1];
+      const size = last?.reduce((n, i) => n + i.dataUrl.length, 0) ?? 0;
+      if (last && last.length < DESCRIBE_IMAGES_MAX && size + img.dataUrl.length <= DESCRIBE_BATCH_CHARS) last.push(img);
+      else batches.push([img]);
+    }
+    let described = 0;
+    for (const images of batches) {
+      const res = await aiApi.describe({ ideaTitle: node.title.slice(0, 200) || undefined, images }, signal);
+      aiConfigActions.setAllowance(res.allowance);
+      canvasActions.describeImages(nodeId, res.descriptions);
+      described += res.descriptions.length;
+    }
+    return described;
+  },
+
+  /** Speaker notes for presenting `steps` in order. Throws `AiRequestError`. */
+  async writeScript(steps: readonly UUID[], signal?: AbortSignal): Promise<ScriptResponse> {
+    const canvas = useCanvasStore.getState().canvas;
+    const res = await aiApi.script({ canvas: toPromptCanvas(canvas, steps), steps: steps.slice(0, SCRIPT_STEPS_MAX) }, signal);
+    aiConfigActions.setAllowance(res.allowance);
+    return res;
   },
 
   /** Draft a document from the branch under `rootId`. Throws `AiRequestError`. */

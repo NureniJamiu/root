@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { canvasActions, downstreamIds, useCanvasStore, visibleNodeIds } from '../data';
+import { canvasActions, downstreamIds, noteFor, useCanvasStore, useSpeakerNotesStore, visibleNodeIds } from '../data';
 import type { UUID } from '../data';
 
 import { hiddenInScope, shownNodeIds, useWalkthroughStore, walkthroughActions } from './walkthrough';
@@ -186,6 +186,8 @@ export function WalkthroughBar({ onRevealed }: WalkthroughBarProps): JSX.Element
   const finished = remaining === 0;
 
   return (
+    <>
+    <SpeakerNote revealed={revealed} finished={finished} />
     <div
       className="root-walkthrough-bar absolute bottom-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-inverse text-on-inverse rounded-[3px] pl-3 pr-1 py-1"
       role="toolbar"
@@ -221,6 +223,53 @@ export function WalkthroughBar({ onRevealed }: WalkthroughBarProps): JSX.Element
       <BarButton label="End the walkthrough (Esc)" onClick={() => walkthroughActions.end()} testId="btn-walkthrough-end">
         End
       </BarButton>
+    </div>
+    </>
+  );
+}
+
+/**
+ * The speaker note for what is on screen, when AI notes were written for this
+ * canvas: the opening before anything is revealed, the note of the idea just
+ * revealed, and the closing once everything is shown.
+ */
+function SpeakerNote({ revealed, finished }: { readonly revealed: readonly UUID[]; readonly finished: boolean }): JSX.Element | null {
+  const notes = useSpeakerNotesStore((s) => s.notes);
+  const canvasId = useCanvasStore((s) => s.canvas.id);
+  const [hidden, setHidden] = useState(false);
+  if (!notes || notes.canvasId !== canvasId) return null;
+  const last = revealed[revealed.length - 1];
+  const text = finished ? notes.closing : last ? noteFor(notes, last) : notes.opening;
+  if (!text) return null;
+  if (hidden) {
+    return (
+      <button
+        type="button"
+        onClick={() => setHidden(false)}
+        className="absolute bottom-[104px] left-1/2 -translate-x-1/2 z-10 h-6 px-2.5 rounded-[2px] bg-inverse text-on-inverse/80 font-mono text-[10px] uppercase tracking-[0.06em] cursor-pointer hover:text-on-inverse"
+        data-testid="btn-speaker-note-show"
+      >
+        Show notes
+      </button>
+    );
+  }
+  return (
+    <div
+      className="absolute bottom-[104px] left-1/2 -translate-x-1/2 z-10 w-[min(560px,calc(100%-32px))] bg-inverse text-on-inverse rounded-[3px] pl-3.5 pr-2 py-2.5 flex items-start gap-2"
+      role="note"
+      aria-label="Speaker note"
+      data-testid="speaker-note"
+    >
+      <p className="m-0 flex-1 font-serif text-[14px] leading-[21px]">{text}</p>
+      <button
+        type="button"
+        onClick={() => setHidden(true)}
+        className="shrink-0 font-mono text-[10px] uppercase tracking-[0.06em] text-on-inverse/60 hover:text-on-inverse cursor-pointer px-1 py-0.5"
+        title="Hide speaker notes"
+        data-testid="btn-speaker-note-hide"
+      >
+        Hide
+      </button>
     </div>
   );
 }

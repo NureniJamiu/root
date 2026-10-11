@@ -104,6 +104,36 @@ export function nextToReveal(
   return null;
 }
 
+/**
+ * Every idea in scope in the order a full walkthrough shows it: the ideas it
+ * starts from, then each connected idea level by level in reading order (the
+ * order Next reveals them). Used to write speaker notes ahead of time.
+ */
+export function presentationOrder(canvas: Canvas, roots: readonly UUID[] | null): UUID[] {
+  const all = new Set(canvas.nodes.map((n) => n.id));
+  const out = outgoingIndex(canvas);
+  const order = byReadingOrder(canvas);
+  const starts = startIds(canvas, all, roots);
+  const seen = new Set<UUID>();
+  const result: UUID[] = [];
+  for (const start of starts) {
+    if (seen.has(start)) continue;
+    seen.add(start);
+    result.push(start);
+    const queue: UUID[] = [start];
+    while (queue.length > 0) {
+      const current = queue.shift() as UUID;
+      for (const target of (out.get(current) ?? []).map((e) => e.target).sort(order)) {
+        if (seen.has(target)) continue;
+        seen.add(target);
+        result.push(target);
+        queue.push(target);
+      }
+    }
+  }
+  return result;
+}
+
 /** Ideas in scope that are still hidden. */
 export function hiddenInScope(
   canvas: Canvas,

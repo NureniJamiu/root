@@ -31,3 +31,22 @@ export function streamModel(chunks: string[]): MockLanguageModelV4 {
     }),
   });
 }
+
+/** A model that answers its generate calls with `values` in turn, as JSON, and keeps each call's prompt. */
+export function sequenceModel(values: unknown[]): MockLanguageModelV4 & { prompts: unknown[] } {
+  let i = 0;
+  const prompts: unknown[] = [];
+  const model = new MockLanguageModelV4({
+    doGenerate: async (options) => {
+      prompts.push(options.prompt);
+      const value = values[Math.min(i++, values.length - 1)];
+      return {
+        content: [{ type: 'text', text: JSON.stringify(value) }],
+        finishReason: { unified: 'stop', raw: undefined },
+        usage: usage(100, 50),
+        warnings: [],
+      };
+    },
+  });
+  return Object.assign(model, { prompts });
+}

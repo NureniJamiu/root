@@ -58,6 +58,7 @@ export {
   connect,
   deleteNodeOnly,
   deleteSubtree,
+  describeImages,
   emptyCanvas,
   expandMany,
   expandSubtree,
@@ -72,7 +73,7 @@ export {
   updateEdge,
   updateNode,
 } from './mutators';
-export type { ConnectorEnds, NodePatch } from './mutators';
+export type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators';
 
 export {
   childReveals,
@@ -118,6 +119,8 @@ export {
   useAiProposalStore,
 } from './aiProposals';
 export type { AiPending, AiProposal, AiProposalKind, AiProposalState, GhostIdea } from './aiProposals';
+export { noteFor, scriptText, speakerNotesActions, useSpeakerNotesStore } from './speakerNotes';
+export type { SpeakerNotes, SpeakerNotesState } from './speakerNotes';
 export type { CanvasState, NodeEdits } from './store';
 
 export { docLinksActions, useDocLinksStore } from './docLinks';

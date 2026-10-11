@@ -60,12 +60,33 @@ const PASSAGE_MAX = 1_200;
 /** The parts of a canvas `toPromptCanvas` reads (the full canvas type fits). */
 export interface CanvasLike {
   readonly title: string;
-  readonly nodes: ReadonlyArray<{ readonly id: string; readonly title: string; readonly body: string; readonly type: PromptCanvas['nodes'][number]['type'] }>;
+  readonly nodes: ReadonlyArray<{
+    readonly id: string;
+    readonly title: string;
+    readonly body: string;
+    readonly type: PromptCanvas['nodes'][number]['type'];
+    /** Only what AI image descriptions wrote is read; the pictures never are. */
+    readonly images?: ReadonlyArray<{ readonly caption?: string | undefined; readonly text?: string | undefined }>;
+  }>;
   readonly edges: ReadonlyArray<{ readonly source: string; readonly target: string }>;
 }
 
+/** An idea's notes followed by its described images, within `PROMPT_BODY_MAX`. */
+function promptBody(node: CanvasLike['nodes'][number]): string {
+  const images = (node.images ?? [])
+    .filter((img) => img.caption)
+    .map((img) => `[Image] ${img.caption}${img.text ? ` | text in it: ${img.text.replace(/\s+/g, ' ')}` : ''}`)
+    .join('\n')
+    .slice(0, PROMPT_BODY_MAX / 2);
+  if (!images) return node.body.length > PROMPT_BODY_MAX ? node.body.slice(0, PROMPT_BODY_MAX) : node.body;
+  const room = PROMPT_BODY_MAX - images.length - 2;
+  const body = node.body.trim().slice(0, room);
+  return body ? `${body}\n\n${images}` : images;
+}
+
 /**
- * A canvas as the AI reads it: titles, notes, types and connectors. Images,
+ * A canvas as the AI reads it: titles, notes, types and connectors. Images
+ * appear only as the captions and text AI descriptions wrote for them;
  * positions and styling are left out. `mustInclude` keeps the ideas a request
  * is about when the canvas is too big to send whole.
  */
@@ -80,7 +101,7 @@ export function toPromptCanvas(canvas: CanvasLike, mustInclude: readonly string[
     nodes: nodes.map((n) => ({
       id: n.id,
       title: n.title,
-      body: n.body.length > PROMPT_BODY_MAX ? n.body.slice(0, PROMPT_BODY_MAX) : n.body,
+      body: promptBody(n),
       type: n.type,
     })),
     edges: canvas.edges

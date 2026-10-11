@@ -9,6 +9,7 @@
     "auth-server": "tsx server.ts",
     "auth-server:watch": "tsx watch server.ts",
     "auth:migrate": "tsx migrate.ts",
+    "db:migration": "tsx scripts/write-migration.ts",
     "build": "tsc -b && tsc -p tsconfig.server.json && vite build",
     "start": "NODE_ENV=production tsx server.ts",
     "preview": "vite preview",
@@ -16,7 +17,9 @@
     "lint": "eslint . --ext .ts,.tsx",
     "test": "vitest",
     "test:run": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "cf:dev": "npm run build && wrangler d1 migrations apply root-db --local && wrangler dev",
+    "cf:deploy": "npm run build && wrangler d1 migrations apply root-db --remote && wrangler deploy"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.65",
@@ -75,7 +78,8 @@
     "tailwindcss": "^3.4.19",
     "typescript": "5.5.4",
     "vite": "5.4.10",
-    "vitest": "^2.1.4"
+    "vitest": "^2.1.4",
+    "wrangler": "^4.149.0"
   },
   "engines": {
     "node": ">=20.19"

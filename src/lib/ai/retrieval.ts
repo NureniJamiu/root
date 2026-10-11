@@ -153,7 +153,7 @@ export interface Gathered {
 export async function gatherContext(input: GatherInput): Promise<Gathered> {
   const chunks = buildChunks(input.content);
   const { index, userId, projectId, embedder } = input;
-  const stale = index.sync(userId, projectId, chunks, embedder?.modelId ?? null);
+  const stale = await index.sync(userId, projectId, chunks, embedder?.modelId ?? null);
 
   if (chunksSize(chunks) <= input.budget) return { chunks, mode: 'whole', semantic: false };
   if (input.query === null) {
@@ -163,21 +163,21 @@ export async function gatherContext(input: GatherInput): Promise<Gathered> {
   }
 
   let semantic = false;
-  const lists: SearchHit[][] = [index.keywordSearch(userId, projectId, input.query, 30)];
+  const lists: SearchHit[][] = [await index.keywordSearch(userId, projectId, input.query, 30)];
   if (embedder) {
     try {
       const prefixed = embedder.modelId.includes('gemini-embedding-2');
       const todo = stale.slice(0, EMBED_PER_CALL);
       if (todo.length > 0) {
         const vectors = await embedder.embed(todo.map((c) => documentText(c, prefixed)), 'document', input.signal);
-        index.setEmbeddings(
+        await index.setEmbeddings(
           embedder.modelId,
           todo.map((c, i) => ({ rowid: c.rowid, vector: vectors[i] ?? [] })).filter((v) => v.vector.length > 0),
         );
       }
       const [queryVector] = await embedder.embed([input.query], 'query', input.signal);
       if (queryVector) {
-        lists.push(index.vectorSearch(userId, projectId, embedder.modelId, queryVector, 30));
+        lists.push(await index.vectorSearch(userId, projectId, embedder.modelId, queryVector, 30));
         semantic = true;
       }
     } catch (error) {

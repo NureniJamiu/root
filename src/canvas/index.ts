@@ -30,3 +30,4 @@ export type { NodeSize, NodeSizes } from './measuredSizes';
 export { CanvasView } from './CanvasView';
 export type { CanvasViewProps, CanvasViewProbeProps, CanvasViewControls, DragState } from './CanvasView';
 export { connectionToEnds, nearestSide } from './reconnect';
+export { presentationOrder, useWalkthroughStore, walkthroughActions } from './walkthrough';

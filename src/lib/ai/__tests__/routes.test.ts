@@ -1,14 +1,14 @@
 // @vitest-environment node
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import Database from 'better-sqlite3';
+import { memorySql } from '../../__tests__/memory-sql';
 import express from 'express';
 import { APICallError } from 'ai';
 import type { LanguageModel } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createRateLimiter, createSqliteAiStore } from '../ai-store';
+import { createRateLimiter, createSqlAiStore } from '../ai-store';
 import type { AiStore } from '../ai-store';
 import { deriveKeyFromSecret } from '../keys';
 import type { AiModel } from '../models';
@@ -16,7 +16,8 @@ import { readAiEnv } from '../providers';
 import type { ProjectContent } from '../project-content';
 import { createAiRouter } from '../routes';
 import { createSearchIndex } from '../search-index';
-import { jsonModel, streamModel } from './mock';
+import type { SearchProvider } from '../web-search';
+import { jsonModel, sequenceModel, streamModel } from './mock';
 
 const servers: Server[] = [];
 afterEach(() => {
@@ -30,8 +31,10 @@ interface Setup {
   limit?: number;
   /** Pick a model per catalog entry; wins over `model`. */
   modelFor?: (model: AiModel) => LanguageModel;
-  timeouts?: Partial<Record<'suggest' | 'draft' | 'rewrite' | 'test' | 'ask' | 'review', number>>;
+  timeouts?: Partial<Record<'suggest' | 'draft' | 'rewrite' | 'test' | 'ask' | 'review' | 'research' | 'describe', number>>;
   projects?: Record<string, ProjectContent>;
+  /** Research sources; none turns research off. */
+  research?: SearchProvider[];
 }
 
 /** A model whose every call fails the way a provider's HTTP error does. */
@@ -70,7 +73,7 @@ const draftBody = {
 };
 
 async function start(setup: Setup = {}) {
-  const store: AiStore = createSqliteAiStore(new Database(':memory:'));
+  const store: AiStore = createSqlAiStore(memorySql());
   const calls: Array<{ model: AiModel; apiKey: string }> = [];
   const app = express();
   app.use((req, res, next) => {
@@ -86,9 +89,10 @@ async function start(setup: Setup = {}) {
       defaultPlan: setup.plan ?? 'pro',
       limiter: createRateLimiter(setup.limit ?? 100, 60_000),
       ...(setup.timeouts ? { timeouts: setup.timeouts } : {}),
-      index: createSearchIndex(new Database(':memory:')),
+      index: createSearchIndex(memorySql()),
       loadProject: async (userId, projectId) => (userId === 'user-1' ? setup.projects?.[projectId] ?? null : null),
       buildEmbedder: (modelId) => ({ modelId, embed: async (values) => values.map(() => [1, 0]) }),
+      ...(setup.research ? { research: setup.research } : {}),
       buildModel: (model, apiKey) => {
         calls.push({ model, apiKey });
         if (setup.modelFor) return setup.modelFor(model);
@@ -348,6 +352,69 @@ describe('/api/ai', () => {
       expect(config.acceptRates).toEqual([{ feature: 'ai.expand', offered: 9, accepted: 7 }]);
       expect(config.semanticSearch).toBe(true);
       expect(await store.countActions('user-1', '2000-01-01T00:00:00.000Z')).toBe(0);
+    });
+  });
+
+  describe('phase 3', () => {
+    const Q = '00000000-0000-4000-8000-0000000000b1';
+    const questionCanvas = { title: 'Sleep', nodes: [{ id: Q, title: 'Do naps help?', body: '', type: 'question' }], edges: [] };
+    const wiki: SearchProvider = {
+      id: 'wikipedia',
+      search: async () => [
+        { title: 'Nap', url: 'https://en.wikipedia.org/wiki/Nap', snippet: 'Naps help.', site: 'Wikipedia', published: null, kind: 'encyclopedia' },
+      ],
+    };
+    const down: SearchProvider = {
+      id: 'openalex',
+      search: async () => {
+        throw new Error('down');
+      },
+    };
+    const researchModel = () =>
+      sequenceModel([{ queries: ['naps memory'] }, { findings: [{ title: 'Naps help', summary: 'They do.', type: 'finding', sources: ['S1'] }] }]);
+
+    it('researches a question on Pro, as one action, skipping a source that is down', async () => {
+      const { call, store } = await start({ research: [wiki, down], model: researchModel() });
+      const config = await (await call('/config')).json();
+      expect(config.researchSources).toEqual(['Wikipedia', 'OpenAlex']);
+      const res = await call('/research', { body: { focusId: Q, canvas: questionCanvas } });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({ queries: ['naps memory'], sourcesRead: 1, searched: ['Wikipedia', 'OpenAlex'] });
+      expect(body.ideas[0].body).toContain('[Nap](https://en.wikipedia.org/wiki/Nap)');
+      expect(await store.countActions('user-1', '2000-01-01T00:00:00.000Z')).toBe(1);
+
+      const free = await start({ research: [wiki], model: researchModel(), plan: 'free' });
+      expect((await free.call('/research', { body: { focusId: Q, canvas: questionCanvas } })).status).toBe(403);
+    });
+
+    it('explains when research has no sources or none answer', async () => {
+      const off = await start({ model: researchModel() });
+      expect((await (await off.call('/config')).json()).researchSources).toEqual([]);
+      expect((await off.call('/research', { body: { focusId: Q, canvas: questionCanvas } })).status).toBe(503);
+      const broken = await start({ research: [down], model: researchModel() });
+      const res = await broken.call('/research', { body: { focusId: Q, canvas: questionCanvas } });
+      expect(res.status).toBe(502);
+      expect((await res.json()).error).toContain('research sources');
+    });
+
+    it('writes a walkthrough script', async () => {
+      const model = jsonModel({ opening: 'Hello.', steps: [{ ref: 'I1', note: 'A question.' }], closing: 'Bye.' });
+      const { call } = await start({ model, plan: 'free' });
+      const res = await call('/script', { body: { canvas: questionCanvas, steps: [Q] } });
+      expect(res.status).toBe(200);
+      expect((await res.json()).script).toEqual({ opening: 'Hello.', steps: [{ ideaId: Q, note: 'A question.' }], closing: 'Bye.' });
+    });
+
+    it('describes images, and refuses what is not an image', async () => {
+      const IMG = '00000000-0000-4000-8000-0000000000e1';
+      const model = jsonModel({ images: [{ ref: 'P1', caption: 'A chart.', text: '' }] });
+      const { call } = await start({ model, plan: 'free' });
+      const ok = await call('/describe', { body: { images: [{ id: IMG, dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }] } });
+      expect(ok.status).toBe(200);
+      expect((await ok.json()).descriptions).toEqual([{ imageId: IMG, caption: 'A chart.', text: '' }]);
+      const bad = await call('/describe', { body: { images: [{ id: IMG, dataUrl: 'data:image/svg+xml;base64,PHN2Zz4=' }] } });
+      expect(bad.status).toBe(400);
     });
   });
 });

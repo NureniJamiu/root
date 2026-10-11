@@ -48,7 +48,12 @@ CI runs all of these on every pull request (`.github/workflows/ci.yml`).
 
 ## Deploy
 
-One Node process serves the API and the built app.
+**Cloudflare (recommended, free to start):** one Worker serves the app and the
+API, with D1 as the database and R2 for images. Step by step:
+[`docs/DEPLOY.md`](docs/DEPLOY.md). After the first set-up, `npm run cf:deploy`
+ships a change.
+
+**Any Node host with a disk:** one Node process serves the API and the built app.
 
 ```bash
 npm ci
@@ -77,8 +82,11 @@ SQLite needs a host with a persistent disk (Render, Railway or Fly.io with a vol
 ## Project layout
 
 ```
-server.ts               Express API: auth, projects, documents, assets, AI; serves dist/ in production
-src/lib/                Server stores (projects, documents), auth, mailer; client API helpers
+server.ts               Node server: opens the SQLite file, runs the API, serves dist/ in production
+src/worker.ts           Cloudflare Worker: the same API on D1 and R2 (wrangler.jsonc)
+src/lib/app.ts          The Express API itself: auth, projects, documents, assets, AI
+src/lib/                Server stores (projects, documents), schema, auth, mailer; client API helpers
+migrations/             D1 tables (from src/lib/schema.ts)
 src/lib/ai/             AI layer: model registry, plans, prompts, providers, usage store, /api/ai routes
 src/ai/                 Browser side of AI: API client, AI menu and settings, suggestion requests
 src/data/               Canvas model, zod schema, Zustand store (no React)

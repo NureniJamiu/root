@@ -41,6 +41,11 @@ export interface ToolbarCallbacks {
    * accept. Absent when AI is not set up, so the toolbar hides the button.
    */
   readonly onExpandWithAi?: ((nodeId: UUID) => void) | undefined;
+  /**
+   * Research a question card on the web with AI. Absent when research is not
+   * available; the toolbar shows it on question cards only.
+   */
+  readonly onResearchWithAi?: ((nodeId: UUID) => void) | undefined;
 }
 
 /**

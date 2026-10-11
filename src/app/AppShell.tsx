@@ -36,6 +36,7 @@ import {
   aiConfigActions,
   useAiEnabled,
   useAiFeature,
+  useResearchAvailable,
 } from '../ai';
 import type { AiPanelTab } from '../ai';
 import { CanvasView, computeChildPosition, findFreePosition, getMeasuredSizes } from '../canvas';
@@ -283,6 +284,7 @@ export function AppShell(): JSX.Element {
 
   const aiEnabled = useAiEnabled();
   const captureAllowed = useAiFeature('ai.capture');
+  const researchAvailable = useResearchAvailable();
   const activeDocumentTitle = activeDocument?.title ?? '';
 
   /** Turn document text into suggested ideas, with the canvas in view to show them. */
@@ -408,9 +410,31 @@ export function AppShell(): JSX.Element {
   const callbacks = useMemo<ToolbarCallbacks>(
     () =>
       aiEnabled
-        ? { ...toolbarCallbacks, onExpandWithAi: (id: UUID) => void aiActions.expandIdea(id) }
+        ? {
+            ...toolbarCallbacks,
+            onExpandWithAi: (id: UUID) => void aiActions.expandIdea(id),
+            ...(researchAvailable ? { onResearchWithAi: (id: UUID) => void aiActions.researchQuestion(id) } : {}),
+          }
         : toolbarCallbacks,
-    [aiEnabled],
+    [aiEnabled, researchAvailable],
+  );
+  const researching = useAiProposalStore((s) => s.pending?.kind === 'research');
+
+  const [describingImages, setDescribingImages] = useState(false);
+  const handleDescribeImages = useCallback(
+    async (nodeId: UUID, all: boolean) => {
+      if (describingImages) return;
+      setDescribingImages(true);
+      try {
+        const count = await aiActions.describeImages(nodeId, all);
+        showNotice(`Described ${count} ${count === 1 ? 'image' : 'images'}. Search and Ask can now find them.`);
+      } catch (error) {
+        showNotice(error instanceof AiRequestError ? error.message : 'Describing the images failed.');
+      } finally {
+        setDescribingImages(false);
+      }
+    },
+    [describingImages],
   );
 
   const handleMapTopic = useCallback((topic: string) => {
@@ -783,6 +807,10 @@ export function AppShell(): JSX.Element {
                 onDraftFromBranch={isReady ? handleDraftFromBranch : undefined}
                 onDraftWithAi={isReady && aiEnabled ? (id) => void handleDraftWithAi(id) : undefined}
                 isDraftingWithAi={draftingWithAi}
+                onResearchWithAi={isReady && researchAvailable ? (id) => void aiActions.researchQuestion(id) : undefined}
+                isResearching={researching}
+                onDescribeImages={isReady && aiEnabled ? (id, all) => void handleDescribeImages(id, all) : undefined}
+                isDescribingImages={describingImages}
               />
             </div>
 

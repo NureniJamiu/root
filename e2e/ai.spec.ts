@@ -11,6 +11,7 @@ import type { Page } from '@playwright/test';
  *   - Rewrite selected document text and replace it.
  *   - Ask the project a question; a citation chip leads to the idea.
  *   - Make ideas from selected document text.
+ *   - Research a question card: findings arrive with their source links.
  */
 
 const allowance = { used: 1, limit: 1000, resetsAt: '2099-01-01T00:00:00.000Z' };
@@ -23,7 +24,7 @@ async function mockAi(page: Page): Promise<void> {
         enabled: true,
         plan: 'pro',
         planLabel: 'Pro',
-        features: ['ai.map', 'ai.expand', 'ai.rewrite', 'ai.ask', 'ai.capture', 'ai.tidy', 'ai.draft', 'ai.review', 'models.premium'],
+        features: ['ai.map', 'ai.expand', 'ai.rewrite', 'ai.ask', 'ai.capture', 'ai.tidy', 'ai.script', 'ai.describe', 'ai.draft', 'ai.review', 'ai.research', 'models.premium'],
         allowance: { ...allowance, used: 0 },
         models: [],
         selectedModelId: null,
@@ -31,7 +32,7 @@ async function mockAi(page: Page): Promise<void> {
         keys: [],
         appProviders: ['google'],
         acceptRates: [],
-        semanticSearch: true,
+        semanticSearch: true, researchSources: ['Wikipedia', 'OpenAlex'],
       },
     }),
   );
@@ -65,6 +66,25 @@ async function mockAi(page: Page): Promise<void> {
         ideas: [
           { key: 'c1', title: 'Sleep strengthens memory', body: '', type: 'finding', parent: null },
           { key: 'c2', title: 'How much sleep is enough?', body: '', type: 'question', parent: 'c1' },
+        ],
+      },
+    }),
+  );
+  await page.route('**/api/ai/research', (route) =>
+    route.fulfill({
+      json: {
+        ...meta,
+        queries: ['nap memory'],
+        sourcesRead: 4,
+        searched: ['Wikipedia', 'OpenAlex'],
+        ideas: [
+          {
+            key: 'r1',
+            title: 'Short naps improve recall',
+            body: 'Two studies agree.\n\nSources:\n- [Nap](https://en.wikipedia.org/wiki/Nap) · Wikipedia',
+            type: 'finding',
+            parent: null,
+          },
         ],
       },
     }),
@@ -202,4 +222,29 @@ test('make ideas from selected document text', async ({ dashboard: page }) => {
   await expect(page.getByTestId('ghost-card-c1')).toBeVisible();
   await page.getByTestId('ai-accept').click();
   await expect(cards(page)).toHaveCount(2);
+});
+
+test('research a question card and keep a finding with its sources', async ({ dashboard: page }) => {
+  await mockAi(page);
+  await openDashboard(page);
+  await addIdea(page);
+  await page.getByTestId('node-editor-title').fill('Do naps help memory?');
+  await page.getByTestId('node-editor-save').click();
+
+  // A new idea is a topic; two turns of the type button make it a question.
+  const card = cards(page).first();
+  await card.hover();
+  await card.getByTestId('btn-cycle-type').click();
+  await card.getByTestId('btn-cycle-type').click();
+  await card.hover();
+  await card.getByTestId('btn-research-ai').click();
+
+  await expect(page.getByTestId('ai-review-bar')).toContainText('read 4 sources from Wikipedia and OpenAlex');
+  await page.getByTestId('ai-accept').click();
+  await expect(cards(page)).toHaveCount(2);
+  await cards(page).filter({ hasText: 'Short naps improve recall' }).click();
+  await expect(page.getByTestId('inspector-notes').getByRole('link', { name: 'Nap' })).toHaveAttribute(
+    'href',
+    'https://en.wikipedia.org/wiki/Nap',
+  );
 });

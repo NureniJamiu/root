@@ -108,8 +108,50 @@ export const tidyRequestSchema = z.object({
 });
 export type TidyRequest = z.infer<typeof tidyRequestSchema>;
 
+export const researchRequestSchema = z.object({
+  /** The question card to research. */
+  focusId: z.string().uuid(),
+  canvas: promptCanvasSchema,
+  guidance: z.string().max(500).optional(),
+});
+export type ResearchRequest = z.infer<typeof researchRequestSchema>;
+
+/** Most ideas one walkthrough script covers. */
+export const SCRIPT_STEPS_MAX = 80;
+
+export const scriptRequestSchema = z.object({
+  canvas: promptCanvasSchema,
+  /** The ideas in the order they are presented. */
+  steps: z.array(z.string().uuid()).min(1).max(SCRIPT_STEPS_MAX),
+  guidance: z.string().max(500).optional(),
+});
+export type ScriptRequest = z.infer<typeof scriptRequestSchema>;
+
+/** Most images described in one request. */
+export const DESCRIBE_IMAGES_MAX = 6;
+/** Largest image accepted for description (browsers shrink them first). */
+export const DESCRIBE_IMAGE_MAX_CHARS = 1_500_000;
+
+export const describeRequestSchema = z.object({
+  /** The idea the images belong to, for context. */
+  ideaTitle: z.string().max(NODE_TITLE_MAX).optional(),
+  images: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        dataUrl: z
+          .string()
+          .max(DESCRIBE_IMAGE_MAX_CHARS)
+          .regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/, 'Images must be PNG, JPEG, WebP or GIF.'),
+      }),
+    )
+    .min(1)
+    .max(DESCRIBE_IMAGES_MAX),
+});
+export type DescribeRequest = z.infer<typeof describeRequestSchema>;
+
 /** Features whose suggestions the person accepts or not, for accept rates. */
-export const FEEDBACK_FEATURES = ['ai.map', 'ai.expand', 'ai.capture', 'ai.rewrite', 'ai.tidy'] as const;
+export const FEEDBACK_FEATURES = ['ai.map', 'ai.expand', 'ai.capture', 'ai.rewrite', 'ai.tidy', 'ai.research'] as const;
 export type FeedbackFeature = (typeof FEEDBACK_FEATURES)[number];
 
 export const feedbackRequestSchema = z.object({
@@ -199,6 +241,37 @@ export const tidyOutputSchema = z.object({
 });
 export type TidyOutput = z.infer<typeof tidyOutputSchema>;
 
+/** The searches a research run plans before it looks anything up. */
+export const researchPlanSchema = z.object({
+  queries: z.array(z.string()),
+});
+
+/** Findings written from what the searches found; `sources` are refs ("S2"). */
+export const researchOutputSchema = z.object({
+  findings: z.array(
+    z.object({
+      title: z.string(),
+      summary: z.string(),
+      /** finding: backed by sources. question: something the sources leave open. */
+      type: z.enum(['finding', 'question']),
+      sources: z.array(z.string()),
+    }),
+  ),
+});
+export type ResearchOutput = z.infer<typeof researchOutputSchema>;
+
+/** Speaker notes as the model writes them, with ideas named by ref ("I3"). */
+export const scriptOutputSchema = z.object({
+  opening: z.string(),
+  steps: z.array(z.object({ ref: z.string(), note: z.string() })),
+  closing: z.string(),
+});
+
+/** What each image shows, by ref ("P1"). */
+export const describeOutputSchema = z.object({
+  images: z.array(z.object({ ref: z.string(), caption: z.string(), text: z.string() })),
+});
+
 /* -------------------------------------------------------------------------- */
 /* Responses                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -220,6 +293,36 @@ export interface AiResultMeta {
 
 export interface SuggestionsResponse extends AiResultMeta {
   readonly ideas: IdeaSuggestion[];
+}
+
+export interface ResearchResponse extends SuggestionsResponse {
+  /** What was searched for. */
+  readonly queries: string[];
+  /** Sources the findings were written from. */
+  readonly sourcesRead: number;
+  /** Where it looked, for people ("Wikipedia", "OpenAlex", "the web"). */
+  readonly searched: string[];
+}
+
+/** Speaker notes for a walkthrough: an opening, a note per idea, a closing. */
+export interface SpeakerScript {
+  readonly opening: string;
+  readonly steps: Array<{ readonly ideaId: string; readonly note: string }>;
+  readonly closing: string;
+}
+
+export interface ScriptResponse extends AiResultMeta {
+  readonly script: SpeakerScript;
+}
+
+export interface ImageDescription {
+  readonly imageId: string;
+  readonly caption: string;
+  readonly text: string;
+}
+
+export interface DescribeResponse extends AiResultMeta {
+  readonly descriptions: ImageDescription[];
 }
 
 export interface DraftResponse extends AiResultMeta {
@@ -287,6 +390,8 @@ export interface AiConfig {
   readonly acceptRates: AcceptRate[];
   /** Ask can search by meaning (an embedding model and key exist), not only by words. */
   readonly semanticSearch: boolean;
+  /** Where research looks things up ("Wikipedia", "OpenAlex", "the web"); empty when it is off. */
+  readonly researchSources: string[];
 }
 
 /** One model checked by `POST /api/ai/test`. */

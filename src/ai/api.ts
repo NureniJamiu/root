@@ -11,13 +11,19 @@ import type {
   AiTestResult,
   AskRequest,
   CaptureRequest,
+  DescribeRequest,
+  DescribeResponse,
   DraftRequest,
   DraftResponse,
   ExpandRequest,
   FeedbackRequest,
   MapRequest,
+  ResearchRequest,
+  ResearchResponse,
   ReviewResponse,
   RewriteRequest,
+  ScriptRequest,
+  ScriptResponse,
   SuggestionsResponse,
   TidyRequest,
   TidyResponse,
@@ -31,7 +37,7 @@ const API_BASE = '/api/ai';
  * A backstop for a request the server never answers. The server gives up on
  * the model well before this, so it only fires when something in between hangs.
  */
-const CLIENT_TIMEOUT_MS = 150_000;
+const CLIENT_TIMEOUT_MS = 180_000;
 
 /** A signal that aborts when `outer` does or after `ms`, whichever comes first. */
 function withDeadline(outer: AbortSignal | undefined, ms: number): { signal: AbortSignal; timedOut: () => boolean; clear: () => void } {
@@ -152,6 +158,12 @@ export const aiApi = {
     json<SuggestionsResponse>('/capture', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
   tidy: (req: TidyRequest, signal?: AbortSignal) =>
     json<TidyResponse>('/tidy', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
+  research: (req: ResearchRequest, signal?: AbortSignal) =>
+    json<ResearchResponse>('/research', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
+  script: (req: ScriptRequest, signal?: AbortSignal) =>
+    json<ScriptResponse>('/script', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
+  describe: (req: DescribeRequest, signal?: AbortSignal) =>
+    json<DescribeResponse>('/describe', { method: 'POST', body: req, ...(signal ? { signal } : {}) }),
   review: (projectId: string, signal?: AbortSignal) =>
     json<ReviewResponse>('/review', { method: 'POST', body: { projectId }, ...(signal ? { signal } : {}) }),
   /** Note how many suggestions were kept. Best-effort: failures are ignored. */

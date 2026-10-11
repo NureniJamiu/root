@@ -33,6 +33,7 @@ import {
   ChevronRightIcon,
   CloseIcon,
   CycleIcon,
+  GlobeIcon,
   PencilIcon,
   PlusIcon,
   SparkleIcon,
@@ -76,7 +77,7 @@ export interface HoverToolbarProps {
 }
 
 export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
-  const { onAddChild, onExpandWithAi } = useToolbarCallbacks();
+  const { onAddChild, onExpandWithAi, onResearchWithAi } = useToolbarCallbacks();
   const hasChildren = useCanvasStore(selectHasHideable(node.id));
   const hasAnyChild = useCanvasStore(selectHasChildren(node.id));
   // Collapsed, or showing only some of its connected ideas.
@@ -159,6 +160,11 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
         {onExpandWithAi && (
           <ToolbarButton label="Suggest connected ideas with AI" onClick={() => onExpandWithAi(node.id)} testId="btn-expand-ai">
             <SparkleIcon />
+          </ToolbarButton>
+        )}
+        {onResearchWithAi && node.type === 'question' && (
+          <ToolbarButton label="Research this question on the web with AI" onClick={() => onResearchWithAi(node.id)} testId="btn-research-ai">
+            <GlobeIcon />
           </ToolbarButton>
         )}
         <ToolbarButton label="Edit (notes and images)" onClick={onEdit} testId="btn-edit">

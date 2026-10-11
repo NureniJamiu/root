@@ -12,6 +12,7 @@ const PENDING_LABELS: Record<AiProposalKind, string> = {
   map: 'Mapping the topic…',
   expand: 'Thinking of connected ideas…',
   capture: 'Turning the text into ideas…',
+  research: 'Researching: planning searches, reading sources, writing findings…',
 };
 
 export interface AiReviewBarProps {
@@ -76,7 +77,11 @@ export function AiReviewBar({ onAccepted, onCancel }: AiReviewBarProps): JSX.Ele
             <span className="text-ink-strong font-medium">
               {total} suggested {total === 1 ? 'idea' : 'ideas'}
             </span>
-            <span className="text-muted"> · {proposal.modelLabel} · click a card to leave it out</span>
+            <span className="text-muted">
+              {' '}
+              · {proposal.modelLabel}
+              {proposal.detail ? ` · ${proposal.detail}` : ''} · click a card to leave it out
+            </span>
           </span>
           <BarButton onClick={accept} disabled={included === 0} primary testId="ai-accept">
             Add {included}

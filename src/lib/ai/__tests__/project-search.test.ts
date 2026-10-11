@@ -1,5 +1,5 @@
 // @vitest-environment node
-import Database from 'better-sqlite3';
+import { memorySql } from '../../__tests__/memory-sql';
 import { describe, expect, it } from 'vitest';
 
 import { createCitationRewriter, parseSourceMarker, resolveRefs } from '../citations';
@@ -99,30 +99,30 @@ describe('citations', () => {
 });
 
 describe('search index', () => {
-  it('syncs by hash and searches by words', () => {
-    const index = createSearchIndex(new Database(':memory:'));
+  it('syncs by hash and searches by words', async () => {
+    const index = createSearchIndex(memorySql());
     const chunks = buildChunks(content);
-    expect(index.sync('u', 'p', chunks, 'm')).toHaveLength(5);
-    index.setEmbeddings('m', [{ rowid: 1, vector: [1, 0] }]);
+    expect(await index.sync('u', 'p', chunks, 'm')).toHaveLength(5);
+    await index.setEmbeddings('m', [{ rowid: 1, vector: [1, 0] }]);
     // Unchanged chunks keep their vectors; only those still without one come back.
-    expect(index.sync('u', 'p', chunks, 'm')).toHaveLength(4);
-    expect(index.keywordSearch('u', 'p', 'coffee onset', 5).map((h) => h.key)).toEqual([`doc:${DOC}:h2`]);
-    expect(index.keywordSearch('other-user', 'p', 'coffee', 5)).toEqual([]);
+    expect(await index.sync('u', 'p', chunks, 'm')).toHaveLength(4);
+    expect((await index.keywordSearch('u', 'p', 'coffee onset', 5)).map((h) => h.key)).toEqual([`doc:${DOC}:h2`]);
+    expect(await index.keywordSearch('other-user', 'p', 'coffee', 5)).toEqual([]);
     // A removed idea leaves the index.
-    index.sync('u', 'p', chunks.slice(1), 'm');
-    expect(index.keywordSearch('u', 'p', 'root question', 5)).toEqual([]);
+    await index.sync('u', 'p', chunks.slice(1), 'm');
+    expect(await index.keywordSearch('u', 'p', 'root question', 5)).toEqual([]);
     expect(ftsQuery('OR "ab" c-de')).toBe('"or" OR "ab" OR "de"');
   });
 
-  it('searches by meaning', () => {
-    const index = createSearchIndex(new Database(':memory:'));
-    const stale = index.sync('u', 'p', buildChunks(content), 'm');
-    index.setEmbeddings(
+  it('searches by meaning', async () => {
+    const index = createSearchIndex(memorySql());
+    const stale = await index.sync('u', 'p', buildChunks(content), 'm');
+    await index.setEmbeddings(
       'm',
       stale.map((c, i) => ({ rowid: c.rowid, vector: i === 4 ? [0, 1] : [1, 0] })),
     );
-    expect(index.vectorSearch('u', 'p', 'm', [0, 1], 1)[0]!.key).toBe(`doc:${DOC}:h2`);
-    expect(index.vectorSearch('u', 'p', 'other-model', [0, 1], 1)).toEqual([]);
+    expect((await index.vectorSearch('u', 'p', 'm', [0, 1], 1))[0]!.key).toBe(`doc:${DOC}:h2`);
+    expect(await index.vectorSearch('u', 'p', 'other-model', [0, 1], 1)).toEqual([]);
   });
 });
 
@@ -140,7 +140,7 @@ describe('retrieval', () => {
   });
 
   it('sends a small project whole and searches a big one', async () => {
-    const index = createSearchIndex(new Database(':memory:'));
+    const index = createSearchIndex(memorySql());
     const embedded: string[][] = [];
     const embedder: Embedder = {
       modelId: 'test:embed',

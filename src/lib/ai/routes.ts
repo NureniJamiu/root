@@ -28,13 +28,16 @@ import { createCitationRewriter } from './citations';
 import {
   askRequestSchema,
   captureRequestSchema,
+  describeRequestSchema,
   draftRequestSchema,
   expandRequestSchema,
   feedbackRequestSchema,
   keyRequestSchema,
   mapRequestSchema,
+  researchRequestSchema,
   reviewRequestSchema,
   rewriteRequestSchema,
+  scriptRequestSchema,
   settingsRequestSchema,
   tidyRequestSchema,
 } from './contracts';
@@ -50,8 +53,10 @@ import type {
 import {
   AiInputError,
   captureIdeas,
+  describeImages,
   draftDocument,
   pingModel,
+  researchQuestion,
   reviewProject,
   ruleIssues,
   streamAnswer,
@@ -59,6 +64,7 @@ import {
   suggestExpansion,
   suggestMap,
   suggestTidy,
+  writeScript,
 } from './features';
 import type { TokenUsage } from './features';
 import { lastFour, openKey, sealKey } from './keys';
@@ -73,6 +79,8 @@ import type { ProjectContent } from './project-content';
 import { gatherContext, sdkEmbedder, withinBudget } from './retrieval';
 import type { Embedder } from './retrieval';
 import type { SearchIndex } from './search-index';
+import { SEARCH_PROVIDER_LABELS, searchAll } from './web-search';
+import type { SearchProvider } from './web-search';
 
 export interface AiRouterOptions {
   readonly store: AiStore;
@@ -96,6 +104,8 @@ export interface AiRouterOptions {
   readonly index?: SearchIndex;
   /** Swappable for tests: builds the embedder for the search index. */
   readonly buildEmbedder?: (modelId: string, apiKey: string) => Embedder | null;
+  /** Where "Research this question" looks things up. Without any, research is off. */
+  readonly research?: readonly SearchProvider[];
 }
 
 const DEFAULT_TIMEOUTS = {
@@ -105,7 +115,13 @@ const DEFAULT_TIMEOUTS = {
   test: 30_000,
   ask: 90_000,
   review: 120_000,
+  research: 150_000,
+  describe: 90_000,
 } as const;
+
+/** Results kept per search, and sources a research run reads at most. */
+const RESEARCH_PER_QUERY = 4;
+const RESEARCH_SOURCES_MAX = 14;
 
 /** Most characters of project text an answer may read. */
 const ASK_BUDGET = 40_000;
@@ -271,6 +287,9 @@ async function withTimeLimit<T>(
 export function createAiRouter(opts: AiRouterOptions): express.Router {
   const router = express.Router();
   const json = express.json({ limit: '2mb' });
+  // Images to describe, already shrunk by the browser.
+  const imageJson = express.json({ limit: '10mb' });
+  const researchProviders = opts.research ?? [];
   const now = opts.now ?? (() => new Date());
   const buildModel = opts.buildModel ?? languageModelFor;
   const timeouts = { ...DEFAULT_TIMEOUTS, ...opts.timeouts };
@@ -321,6 +340,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
       appProviders: [...appProviders],
       acceptRates: await opts.store.acceptRates(userId, monthWindow(now()).start),
       semanticSearch: !!opts.index && (await embedderFor(userId)) !== null,
+      researchSources: researchProviders.map((p) => SEARCH_PROVIDER_LABELS[p.id]),
     };
   }
 
@@ -471,8 +491,8 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
     return parsed.data;
   }
 
-  function limit(res: Response): void {
-    if (!opts.limiter.take(res.locals.userId as string)) {
+  async function limit(res: Response): Promise<void> {
+    if (!(await opts.limiter.take(res.locals.userId as string))) {
       throw new AiHttpError(429, 'rate-limit', 'Too many AI requests. Wait a moment and try again.');
     }
   }
@@ -538,7 +558,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
 
   router.post('/map', json, async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const body = parse(mapRequestSchema, req.body);
       const { p, result } = await runFeature(req, res, 'ai.map', 'fast', timeouts.suggest, (model, signal) =>
         suggestMap(model, body, signal),
@@ -551,7 +571,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
 
   router.post('/expand', json, async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const body = parse(expandRequestSchema, req.body);
       const { p, result } = await runFeature(req, res, 'ai.expand', 'fast', timeouts.suggest, (model, signal) =>
         suggestExpansion(model, body, signal),
@@ -564,7 +584,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
 
   router.post('/draft', json, async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const body = parse(draftRequestSchema, req.body);
       const { p, result } = await runFeature(req, res, 'ai.draft', 'smart', timeouts.draft, (model, signal) =>
         draftDocument(model, body, signal),
@@ -645,7 +665,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
 
   router.post('/rewrite', json, async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const body = parse(rewriteRequestSchema, req.body);
       await streamFeature(req, res, 'ai.rewrite', timeouts.rewrite, async (p, signal) => {
         let usage: TokenUsage | null = null;
@@ -703,7 +723,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
    */
   router.post('/ask', json, async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const body = parse(askRequestSchema, req.body);
       const userId = res.locals.userId as string;
       const content = await projectFor(userId, body.projectId);
@@ -737,7 +757,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
   /** Check a project for weak spots: Root's own rules, then the model's review. */
   router.post('/review', json, async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const body = parse(reviewRequestSchema, req.body);
       const userId = res.locals.userId as string;
       const content = await projectFor(userId, body.projectId);
@@ -761,7 +781,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
 
   router.post('/capture', json, async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const body = parse(captureRequestSchema, req.body);
       const { p, result } = await runFeature(req, res, 'ai.capture', 'fast', timeouts.suggest, (model, signal) =>
         captureIdeas(model, body, signal),
@@ -774,12 +794,77 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
 
   router.post('/tidy', json, async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const body = parse(tidyRequestSchema, req.body);
       const { p, result } = await runFeature(req, res, 'ai.tidy', 'fast', timeouts.suggest, (model, signal) =>
         suggestTidy(model, body, signal),
       );
       res.json({ suggestions: result.output, ...(await meta(p)) });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  /**
+   * Research a question card: plan searches, run them on the server's sources,
+   * write findings with their links. Sources that fail are skipped; research
+   * fails only when none of them answered.
+   */
+  router.post('/research', json, async (req, res) => {
+    try {
+      await limit(res);
+      const body = parse(researchRequestSchema, req.body);
+      if (researchProviders.length === 0) {
+        throw new AiHttpError(503, 'no-model', 'Research has no sources set up on this server.');
+      }
+      const search = async (queries: readonly string[], signal?: AbortSignal) => {
+        const outcome = await searchAll(researchProviders, queries, {
+          perQuery: RESEARCH_PER_QUERY,
+          max: RESEARCH_SOURCES_MAX,
+          ...(signal ? { signal } : {}),
+        });
+        for (const f of outcome.failures) logFailure(`research search on ${f.provider}`, undefined, f.error);
+        if (outcome.sources.length === 0 && outcome.failures.length >= queries.length * researchProviders.length) {
+          throw new AiHttpError(502, 'provider', "Root couldn't reach its research sources. Try again in a moment.");
+        }
+        return outcome.sources;
+      };
+      const { p, result } = await runFeature(req, res, 'ai.research', 'fast', timeouts.research, (model, signal) =>
+        researchQuestion(model, body, search, signal),
+      );
+      res.json({
+        ideas: result.output.ideas,
+        queries: result.output.queries,
+        sourcesRead: result.output.sourcesRead,
+        searched: researchProviders.map((r) => SEARCH_PROVIDER_LABELS[r.id]),
+        ...(await meta(p)),
+      });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  router.post('/script', json, async (req, res) => {
+    try {
+      await limit(res);
+      const body = parse(scriptRequestSchema, req.body);
+      const { p, result } = await runFeature(req, res, 'ai.script', 'fast', timeouts.suggest, (model, signal) =>
+        writeScript(model, body, signal),
+      );
+      res.json({ script: result.output, ...(await meta(p)) });
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  router.post('/describe', imageJson, async (req, res) => {
+    try {
+      await limit(res);
+      const body = parse(describeRequestSchema, req.body);
+      const { p, result } = await runFeature(req, res, 'ai.describe', 'fast', timeouts.describe, (model, signal) =>
+        describeImages(model, body, signal),
+      );
+      res.json({ descriptions: result.output, ...(await meta(p)) });
     } catch (error) {
       fail(res, error);
     }
@@ -802,7 +887,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
    */
   router.post('/test', async (req, res) => {
     try {
-      limit(res);
+      await limit(res);
       const userId = res.locals.userId as string;
       const plan = await planOf(userId);
       const results: AiTestResult[] = [];

@@ -1,0 +1,7 @@
+# Copy to .dev.vars to run Root as a Worker on your machine (`npm run cf:dev`).
+# Never commit .dev.vars. Values here override "vars" in wrangler.jsonc.
+BETTER_AUTH_SECRET=change-me-to-a-long-random-string-32-plus
+BETTER_AUTH_URL=http://localhost:8787
+VITE_APP_URL=http://localhost:8787
+NODE_ENV=development
+# GOOGLE_GENERATIVE_AI_API_KEY=

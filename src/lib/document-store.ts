@@ -1,5 +1,5 @@
 /**
- * SQLite-backed research documents and the images pasted into them.
+ * Research documents and the images pasted into them, on SQLite or D1.
  *
  * Documents belong to a project and are saved on their own, not inside the
  * canvas JSON: they change at typing speed and can be large, while a canvas
@@ -16,7 +16,6 @@
  */
 
 import crypto from 'node:crypto';
-import type Database from 'better-sqlite3';
 import type { JSONContent } from '@tiptap/core';
 import { z } from 'zod';
 
@@ -27,6 +26,10 @@ import {
   extractLinks,
   isAllowedHref,
 } from '../editor/schema';
+import { blobKeys } from './blob-store';
+import type { BlobStore } from './blob-store';
+import { bytesOf, stmt } from './sql';
+import type { Sql, SqlStatement, SqlValue } from './sql';
 
 /* -------------------------------------------------------------------------- */
 /* Limits                                                                     */
@@ -70,46 +73,6 @@ export class DocumentError extends Error {
     super(message);
     this.name = 'DocumentError';
   }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Schema                                                                     */
-/* -------------------------------------------------------------------------- */
-
-export function ensureDocumentSchema(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS "document" (
-      "id"            TEXT PRIMARY KEY NOT NULL,
-      "projectId"     TEXT NOT NULL,
-      "userId"        TEXT NOT NULL,
-      "title"         TEXT NOT NULL,
-      "content"       TEXT NOT NULL,
-      "schemaVersion" INTEGER NOT NULL DEFAULT 1,
-      "revision"      INTEGER NOT NULL DEFAULT 1,
-      "wordCount"     INTEGER NOT NULL DEFAULT 0,
-      "createdAt"     TEXT NOT NULL,
-      "updatedAt"     TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS "idx_document_project" ON "document" ("projectId", "updatedAt" DESC);
-
-    CREATE TABLE IF NOT EXISTS "document_link" (
-      "documentId" TEXT NOT NULL,
-      "projectId"  TEXT NOT NULL,
-      "nodeId"     TEXT NOT NULL,
-      "kind"       TEXT NOT NULL,
-      PRIMARY KEY ("documentId", "nodeId", "kind")
-    );
-    CREATE INDEX IF NOT EXISTS "idx_document_link_project" ON "document_link" ("projectId");
-
-    CREATE TABLE IF NOT EXISTS "project_asset" (
-      "projectId" TEXT NOT NULL,
-      "id"        TEXT NOT NULL,
-      "mime"      TEXT NOT NULL,
-      "bytes"     BLOB NOT NULL,
-      "createdAt" TEXT NOT NULL,
-      PRIMARY KEY ("projectId", "id")
-    );
-  `);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -196,54 +159,47 @@ interface DocumentRow extends DocumentSummary {
 }
 
 const SUMMARY_COLUMNS = 'id, projectId, title, wordCount, revision, createdAt, updatedAt';
+const SELECT_ROW = `SELECT ${SUMMARY_COLUMNS}, content FROM document WHERE id = ? AND projectId = ? AND userId = ?`;
 
-export function createDocumentStore(db: Database.Database) {
-  const ownsProject = db.prepare('SELECT 1 FROM project WHERE id = ? AND userId = ?');
-  const selectSummaries = db.prepare(
-    `SELECT ${SUMMARY_COLUMNS} FROM document WHERE projectId = ? AND userId = ? ORDER BY updatedAt DESC`,
-  );
-  const selectRow = db.prepare(
-    `SELECT ${SUMMARY_COLUMNS}, content FROM document WHERE id = ? AND projectId = ? AND userId = ?`,
-  );
-  const idTaken = db.prepare('SELECT 1 FROM document WHERE id = ?');
-  const insertDocument = db.prepare(
-    `INSERT INTO document (id, projectId, userId, title, content, revision, wordCount, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-  );
-  const updateDocument = db.prepare(
-    `UPDATE document SET title = ?, content = ?, revision = ?, wordCount = ?, updatedAt = ?
-     WHERE id = ? AND projectId = ? AND userId = ?`,
-  );
-  const deleteDocument = db.prepare('DELETE FROM document WHERE id = ? AND projectId = ? AND userId = ?');
-  const deleteLinks = db.prepare('DELETE FROM document_link WHERE documentId = ?');
-  const insertLink = db.prepare(
-    'INSERT OR IGNORE INTO document_link (documentId, projectId, nodeId, kind) VALUES (?, ?, ?, ?)',
-  );
-  const selectLinks = db.prepare(
-    `SELECT l.nodeId, l.documentId FROM document_link l
-     JOIN document d ON d.id = l.documentId
-     WHERE l.projectId = ? AND d.userId = ?`,
-  );
-  const insertAsset = db.prepare(
-    'INSERT INTO project_asset (projectId, id, mime, bytes, createdAt) VALUES (?, ?, ?, ?, ?)',
-  );
-  const selectAsset = db.prepare(
-    `SELECT a.mime, a.bytes FROM project_asset a
-     JOIN project p ON p.id = a.projectId
-     WHERE a.projectId = ? AND a.id = ? AND p.userId = ?`,
-  );
-
-  function requireProject(userId: string, projectId: string): void {
-    if (!ownsProject.get(projectId, userId)) {
+/**
+ * Documents for `sql`. With `blobs`, uploaded images go to blob storage (R2
+ * on Workers) and `project_asset` keeps only their type.
+ */
+export function createDocumentStore(sql: Sql, blobs?: BlobStore) {
+  async function requireProject(userId: string, projectId: string): Promise<void> {
+    if (!(await sql.first('SELECT 1 FROM project WHERE id = ? AND userId = ?', projectId, userId))) {
       throw new DocumentError(404, 'not-found', 'Project not found');
     }
   }
 
-  function writeLinks(documentId: string, projectId: string, content: JSONContent): void {
-    deleteLinks.run(documentId);
+  /**
+   * The writes that replace a document's links. `when` is an SQL condition
+   * (with its parameters) that must hold for them to apply.
+   */
+  function linkWrites(
+    documentId: string,
+    projectId: string,
+    content: JSONContent,
+    when: { sql: string; params: SqlValue[] } = { sql: '1', params: [] },
+  ): SqlStatement[] {
     const { mentions, embeds } = extractLinks(content);
-    for (const nodeId of mentions) insertLink.run(documentId, projectId, nodeId, 'mention');
-    for (const nodeId of embeds) insertLink.run(documentId, projectId, nodeId, 'embed');
+    const links = [
+      ...[...mentions].map((nodeId) => [nodeId, 'mention'] as const),
+      ...[...embeds].map((nodeId) => [nodeId, 'embed'] as const),
+    ];
+    return [
+      stmt(`DELETE FROM document_link WHERE documentId = ? AND ${when.sql}`, documentId, ...when.params),
+      ...links.map(([nodeId, kind]) =>
+        stmt(
+          `INSERT OR IGNORE INTO document_link (documentId, projectId, nodeId, kind) SELECT ?, ?, ?, ? WHERE ${when.sql}`,
+          documentId,
+          projectId,
+          nodeId,
+          kind,
+          ...when.params,
+        ),
+      ),
+    ];
   }
 
   function toDetail(row: DocumentRow): DocumentDetail {
@@ -258,30 +214,47 @@ export function createDocumentStore(db: Database.Database) {
   }
 
   return {
-    list(userId: string, projectId: string): DocumentSummary[] {
-      requireProject(userId, projectId);
-      return selectSummaries.all(projectId, userId) as DocumentSummary[];
+    async list(userId: string, projectId: string): Promise<DocumentSummary[]> {
+      await requireProject(userId, projectId);
+      return sql.all<DocumentSummary>(
+        `SELECT ${SUMMARY_COLUMNS} FROM document WHERE projectId = ? AND userId = ? ORDER BY updatedAt DESC`,
+        projectId,
+        userId,
+      );
     },
 
-    get(userId: string, projectId: string, id: string): DocumentDetail | null {
-      requireProject(userId, projectId);
-      const row = selectRow.get(id, projectId, userId) as DocumentRow | undefined;
+    async get(userId: string, projectId: string, id: string): Promise<DocumentDetail | null> {
+      await requireProject(userId, projectId);
+      const row = await sql.first<DocumentRow>(SELECT_ROW, id, projectId, userId);
       return row ? toDetail(row) : null;
     },
 
-    create(userId: string, projectId: string, input: unknown): DocumentDetail {
-      requireProject(userId, projectId);
+    async create(userId: string, projectId: string, input: unknown): Promise<DocumentDetail> {
+      await requireProject(userId, projectId);
       const body = parseInput(createInputSchema, input);
       const id = body.id ?? crypto.randomUUID();
-      if (idTaken.get(id)) throw new DocumentError(409, 'conflict', 'a document with this id already exists');
+      if (await sql.first('SELECT 1 FROM document WHERE id = ?', id)) {
+        throw new DocumentError(409, 'conflict', 'a document with this id already exists');
+      }
       const content = checkContent(body.content ?? emptyDocument(), projectId);
       const title = body.title?.trim() || 'Untitled document';
       const now = new Date().toISOString();
       const wordCount = countWords(content);
-      db.transaction(() => {
-        insertDocument.run(id, projectId, userId, title, JSON.stringify(content), wordCount, now, now);
-        writeLinks(id, projectId, content);
-      })();
+      await sql.batch([
+        stmt(
+          `INSERT INTO document (id, projectId, userId, title, content, revision, wordCount, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+          id,
+          projectId,
+          userId,
+          title,
+          JSON.stringify(content),
+          wordCount,
+          now,
+          now,
+        ),
+        ...linkWrites(id, projectId, content),
+      ]);
       return { id, projectId, title, wordCount, revision: 1, createdAt: now, updatedAt: now, content };
     },
 
@@ -289,71 +262,137 @@ export function createDocumentStore(db: Database.Database) {
      * Save a document. Refused with 409 (carrying the current version) when
      * `baseRevision` is not the stored revision.
      */
-    update(userId: string, projectId: string, id: string, input: unknown): DocumentSummary {
-      requireProject(userId, projectId);
+    async update(userId: string, projectId: string, id: string, input: unknown): Promise<DocumentSummary> {
+      await requireProject(userId, projectId);
       const body = parseInput(updateInputSchema, input);
       const content = body.content === undefined ? undefined : checkContent(body.content, projectId);
-      return db.transaction(() => {
-        const row = selectRow.get(id, projectId, userId) as DocumentRow | undefined;
-        if (!row) throw new DocumentError(404, 'not-found', 'Document not found');
-        if (row.revision !== body.baseRevision) {
-          throw new DocumentError(409, 'conflict', 'This document was changed somewhere else', toDetail(row));
-        }
-        const now = new Date().toISOString();
-        const title = body.title === undefined ? row.title : body.title.trim() || 'Untitled document';
-        const serialized = content === undefined ? row.content : JSON.stringify(content);
-        const wordCount = content === undefined ? row.wordCount : countWords(content);
-        const revision = row.revision + 1;
-        updateDocument.run(title, serialized, revision, wordCount, now, id, projectId, userId);
-        if (content !== undefined) writeLinks(id, projectId, content);
-        return { id, projectId, title, wordCount, revision, createdAt: row.createdAt, updatedAt: now };
-      })();
+      const conflict = async (): Promise<never> => {
+        const current = await sql.first<DocumentRow>(SELECT_ROW, id, projectId, userId);
+        if (!current) throw new DocumentError(404, 'not-found', 'Document not found');
+        throw new DocumentError(409, 'conflict', 'This document was changed somewhere else', toDetail(current));
+      };
+
+      const row = await sql.first<DocumentRow>(SELECT_ROW, id, projectId, userId);
+      if (!row) throw new DocumentError(404, 'not-found', 'Document not found');
+      if (row.revision !== body.baseRevision) return conflict();
+
+      // Strictly later than the version read, so this save's (revision, updatedAt) is its own.
+      const now = new Date(Math.max(Date.now(), Date.parse(row.updatedAt) + 1)).toISOString();
+      const title = body.title === undefined ? row.title : body.title.trim() || 'Untitled document';
+      const serialized = content === undefined ? row.content : JSON.stringify(content);
+      const wordCount = content === undefined ? row.wordCount : countWords(content);
+      const revision = row.revision + 1;
+      // The update only applies if nobody saved since we read; the links only
+      // if this very save (this revision and timestamp) is the one stored.
+      const results = await sql.batch([
+        stmt(
+          `UPDATE document SET title = ?, content = ?, revision = ?, wordCount = ?, updatedAt = ?
+           WHERE id = ? AND projectId = ? AND userId = ? AND revision = ?`,
+          title,
+          serialized,
+          revision,
+          wordCount,
+          now,
+          id,
+          projectId,
+          userId,
+          row.revision,
+        ),
+        ...(content === undefined
+          ? []
+          : linkWrites(id, projectId, content, {
+              sql: 'EXISTS (SELECT 1 FROM document WHERE id = ? AND revision = ? AND updatedAt = ?)',
+              params: [id, revision, now],
+            })),
+      ]);
+      if (results[0]!.changes === 0) return conflict();
+      return { id, projectId, title, wordCount, revision, createdAt: row.createdAt, updatedAt: now };
     },
 
-    remove(userId: string, projectId: string, id: string): boolean {
-      requireProject(userId, projectId);
-      return db.transaction(() => {
-        const removed = deleteDocument.run(id, projectId, userId).changes > 0;
-        if (removed) deleteLinks.run(id);
-        return removed;
-      })();
+    async remove(userId: string, projectId: string, id: string): Promise<boolean> {
+      await requireProject(userId, projectId);
+      const owned = 'EXISTS (SELECT 1 FROM document WHERE id = ? AND projectId = ? AND userId = ?)';
+      const results = await sql.batch([
+        stmt(`DELETE FROM document_link WHERE documentId = ? AND ${owned}`, id, id, projectId, userId),
+        stmt('DELETE FROM document WHERE id = ? AND projectId = ? AND userId = ?', id, projectId, userId),
+      ]);
+      return results[1]!.changes > 0;
     },
 
-    /** Remove every document, link and asset of a project (the project is being deleted). */
-    removeProject(projectId: string): void {
-      db.prepare('DELETE FROM document_link WHERE projectId = ?').run(projectId);
-      db.prepare('DELETE FROM document WHERE projectId = ?').run(projectId);
-      db.prepare('DELETE FROM project_asset WHERE projectId = ?').run(projectId);
+    /**
+     * The writes that remove every document, link and asset of a project
+     * (the project is being deleted), for one batch with the project's own.
+     * Blob storage is cleared by `removeProjectBlobs` once they have run.
+     */
+    removeProjectStatements(projectId: string): SqlStatement[] {
+      return [
+        stmt('DELETE FROM document_link WHERE projectId = ?', projectId),
+        stmt('DELETE FROM document WHERE projectId = ?', projectId),
+        stmt('DELETE FROM project_asset WHERE projectId = ?', projectId),
+      ];
     },
 
-    backlinks(userId: string, projectId: string): Backlinks {
-      requireProject(userId, projectId);
+    /** Delete a deleted project's images from blob storage. */
+    async removeProjectBlobs(projectId: string): Promise<void> {
+      await blobs?.deletePrefix(blobKeys.project(projectId));
+    },
+
+    async backlinks(userId: string, projectId: string): Promise<Backlinks> {
+      await requireProject(userId, projectId);
       const out: Backlinks = {};
-      for (const { nodeId, documentId } of selectLinks.all(projectId, userId) as Array<{
-        nodeId: string;
-        documentId: string;
-      }>) {
+      const rows = await sql.all<{ nodeId: string; documentId: string }>(
+        `SELECT l.nodeId, l.documentId FROM document_link l
+         JOIN document d ON d.id = l.documentId
+         WHERE l.projectId = ? AND d.userId = ?`,
+        projectId,
+        userId,
+      );
+      for (const { nodeId, documentId } of rows) {
         const list = (out[nodeId] ??= []);
         if (!list.includes(documentId)) list.push(documentId);
       }
       return out;
     },
 
-    putAsset(userId: string, projectId: string, mime: string, bytes: Buffer): { id: string; url: string } {
-      requireProject(userId, projectId);
+    async putAsset(
+      userId: string,
+      projectId: string,
+      mime: string,
+      bytes: Uint8Array,
+    ): Promise<{ id: string; url: string }> {
+      await requireProject(userId, projectId);
       if (!(ASSET_MIME_TYPES as readonly string[]).includes(mime)) {
         throw new DocumentError(400, 'invalid', 'only PNG, JPEG, GIF and WebP images can be uploaded');
       }
       if (bytes.length === 0) throw new DocumentError(400, 'invalid', 'the image is empty');
       if (bytes.length > ASSET_MAX_BYTES) throw new DocumentError(413, 'too-large', 'images must be under 5 MB');
       const id = crypto.randomUUID();
-      insertAsset.run(projectId, id, mime, bytes, new Date().toISOString());
+      if (blobs) await blobs.put(blobKeys.documentAsset(projectId, id), bytes, mime);
+      await sql.run(
+        'INSERT INTO project_asset (projectId, id, mime, bytes, createdAt) VALUES (?, ?, ?, ?, ?)',
+        projectId,
+        id,
+        mime,
+        blobs ? new Uint8Array(0) : bytes,
+        new Date().toISOString(),
+      );
       return { id, url: `/api/projects/${projectId}/assets/${id}` };
     },
 
-    getAsset(userId: string, projectId: string, id: string): { mime: string; bytes: Buffer } | null {
-      const row = selectAsset.get(projectId, id, userId) as { mime: string; bytes: Buffer } | undefined;
-      return row ?? null;
+    async getAsset(userId: string, projectId: string, id: string): Promise<{ mime: string; bytes: Uint8Array } | null> {
+      const row = await sql.first<{ mime: string; bytes: unknown }>(
+        `SELECT a.mime, a.bytes FROM project_asset a
+         JOIN project p ON p.id = a.projectId
+         WHERE a.projectId = ? AND a.id = ? AND p.userId = ?`,
+        projectId,
+        id,
+        userId,
+      );
+      if (!row) return null;
+      const bytes = bytesOf(row.bytes);
+      if (bytes.length > 0 || !blobs) return { mime: row.mime, bytes };
+      const blob = await blobs.get(blobKeys.documentAsset(projectId, id));
+      return blob ? { mime: row.mime, bytes: blob.bytes } : null;
     },
   };
 }

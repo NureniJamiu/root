@@ -1,0 +1,58 @@
+// Cloudflare Workers settings for Root. Step-by-step: docs/DEPLOY.md.
+// Secrets (BETTER_AUTH_SECRET, AI_KEY_SECRET, API keys) are never written
+// here: set them with `npx wrangler secret put <NAME>`.
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "root",
+	"main": "src/worker.ts",
+	"compatibility_date": "2026-10-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	// Cloudflare serves the built app; only /api/* runs the Worker.
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": [
+			"/api/*"
+		]
+	},
+	// The database. Replace database_id with the id `npx wrangler d1 create root-db` prints.
+	"d1_databases": [
+		{
+			"binding": "root_db",
+			"database_name": "root-db",
+			"database_id": "04befb99-7e0a-4129-aab5-17063558717a",
+			"migrations_dir": "migrations"
+		}
+	],
+	// Images on cards and in documents (`npx wrangler r2 bucket create root-files`).
+	"r2_buckets": [
+		{
+			"binding": "FILES",
+			"bucket_name": "root-files"
+		}
+	],
+	// At most 10 AI requests a minute per person, shared by every copy of the Worker.
+	"ratelimits": [
+		{
+			"name": "AI_LIMITER",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 10,
+				"period": 60
+			}
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	// The app's public URL is the one it is reached on (root.<you>.workers.dev).
+	// With your own domain, add "BETTER_AUTH_URL" and "VITE_APP_URL" here, set to it.
+	"vars": {
+		"NODE_ENV": "production",
+		"EMAIL_FROM": "Root <onboarding@resend.dev>",
+		"AI_DEFAULT_PLAN": "free",
+		"RESEARCH_SOURCES": "wikipedia,openalex"
+	}
+}

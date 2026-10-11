@@ -25,7 +25,7 @@ export interface GhostIdea {
   readonly position: Position;
 }
 
-export type AiProposalKind = 'map' | 'expand' | 'capture';
+export type AiProposalKind = 'map' | 'expand' | 'capture' | 'research';
 
 export interface AiProposal {
   readonly kind: AiProposalKind;
@@ -36,6 +36,8 @@ export interface AiProposal {
   readonly excluded: readonly string[];
   /** Which model wrote it, shown in the review bar. */
   readonly modelLabel: string;
+  /** More about where it came from, such as the sources a research run read. */
+  readonly detail?: string;
 }
 
 export interface AiPending {

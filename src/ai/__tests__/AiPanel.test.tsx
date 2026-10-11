@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { addNode, canvasActions, emptyCanvas, updateNode, useCanvasStore } from '../../data';
+import { addNode, aiProposalActions, canvasActions, connect, emptyCanvas, speakerNotesActions, updateNode, useAiProposalStore, useCanvasStore } from '../../data';
+import { WalkthroughBar } from '../../canvas/BranchControls';
+import { useWalkthroughStore, walkthroughActions } from '../../canvas/walkthrough';
+import { aiActions } from '../aiActions';
 import type { AiConfig } from '../../lib/ai/contracts';
 import { PLAN_DEFINITIONS } from '../../lib/ai/plans';
 import { aiConfigActions } from '../aiConfig';
@@ -25,7 +28,7 @@ function config(plan: 'free' | 'pro'): AiConfig {
     keys: [],
     appProviders: ['google'],
     acceptRates: [],
-    semanticSearch: true,
+    semanticSearch: true, researchSources: ['Wikipedia', 'OpenAlex'],
   };
 }
 
@@ -123,5 +126,52 @@ describe('AI panel', () => {
     expect(canvas.edges).toHaveLength(0);
     expect(feedback).toHaveBeenCalledWith({ feature: 'ai.tidy', offered: 2, accepted: 1 });
     expect(screen.getByRole('status').textContent).toContain('Applied 1 change');
+  });
+
+  it('writes speaker notes and shows them during the walkthrough', async () => {
+    const { a, b } = seedCanvas();
+    canvasActions.loadCanvas(connect(useCanvasStore.getState().canvas, { source: a, target: b, sourceSide: 'right', targetSide: 'left' }));
+    const script = vi.spyOn(aiApi, 'script').mockResolvedValue({
+      script: { opening: 'Welcome.', steps: [{ ideaId: a, note: 'Start here.' }, { ideaId: b, note: 'Then naps.' }], closing: 'Thanks.' },
+      model: { id: 'm', label: 'Gemini' },
+      allowance: config('pro').allowance,
+      ownKey: false,
+    });
+    render(<AiPanel projectId={PROJECT} open tab="script" onTabChange={() => {}} onClose={() => {}} nav={nav} />);
+    fireEvent.click(screen.getByTestId('ai-script-run'));
+    expect(await screen.findByText('Then naps.')).toBeTruthy();
+    expect(script.mock.calls[0]![0].steps).toEqual([a, b]);
+    expect(screen.getAllByTestId('ai-script-step')).toHaveLength(2);
+
+    render(<WalkthroughBar />);
+    fireEvent.click(screen.getByTestId('ai-script-present'));
+    expect(useWalkthroughStore.getState().active).toBe(true);
+    expect((await screen.findByTestId('speaker-note')).textContent).toContain('Welcome.');
+    act(() => {
+      walkthroughActions.next();
+    });
+    expect(screen.getByTestId('speaker-note').textContent).toContain('Thanks.');
+    act(() => {
+      walkthroughActions.end();
+      speakerNotesActions.clear();
+    });
+  });
+
+  it('turns research into suggestions with where they came from', async () => {
+    const { a } = seedCanvas();
+    vi.spyOn(aiApi, 'research').mockResolvedValue({
+      ideas: [{ key: 'r1', title: 'Naps help', body: 'Sources:\n- [Nap](https://en.wikipedia.org/wiki/Nap)', type: 'finding', parent: null }],
+      queries: ['naps'],
+      sourcesRead: 3,
+      searched: ['Wikipedia', 'OpenAlex'],
+      model: { id: 'm', label: 'Gemini' },
+      allowance: config('pro').allowance,
+      ownKey: false,
+    });
+    await aiActions.researchQuestion(a);
+    const proposal = useAiProposalStore.getState().proposal!;
+    expect(proposal).toMatchObject({ kind: 'research', anchorId: a, detail: 'read 3 sources from Wikipedia and OpenAlex' });
+    expect(proposal.ideas[0]!.title).toBe('Naps help');
+    act(() => aiProposalActions.clear());
   });
 });

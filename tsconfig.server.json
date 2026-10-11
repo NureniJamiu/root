@@ -4,5 +4,5 @@
     "types": ["node"],
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["server.ts", "migrate.ts", "src/lib/auth.ts", "src/lib/mailer.ts", "src/lib/document-store.ts", "src/lib/project-store.ts", "src/lib/ai"]
+  "include": ["server.ts", "migrate.ts", "scripts", "src/worker.ts", "src/cloudflare-node.d.ts", "src/lib/app.ts", "src/lib/auth.ts", "src/lib/blob-store.ts", "src/lib/cloudflare.ts", "src/lib/db.ts", "src/lib/document-store.ts", "src/lib/mailer.ts", "src/lib/password.ts", "src/lib/project-store.ts", "src/lib/schema.ts", "src/lib/sql.ts", "src/lib/ai"]
 }

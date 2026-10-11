@@ -1,12 +1,12 @@
 // @vitest-environment node
-import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
-import { createRateLimiter, createSqliteAiStore, monthWindow } from '../ai-store';
+import { memorySql } from '../../__tests__/memory-sql';
+import { createRateLimiter, createSqlAiStore, monthWindow } from '../ai-store';
 
 describe('AI store', () => {
   it('stores plan, model and keys per user', async () => {
-    const store = createSqliteAiStore(new Database(':memory:'));
+    const store = createSqlAiStore(memorySql());
     expect(await store.getPlan('u')).toBeNull();
     await store.setPlan('u', 'pro');
     expect(await store.getPlan('u')).toBe('pro');
@@ -25,7 +25,7 @@ describe('AI store', () => {
   });
 
   it('counts only calls on the app’s keys', async () => {
-    const store = createSqliteAiStore(new Database(':memory:'));
+    const store = createSqlAiStore(memorySql());
     const base = {
       userId: 'u',
       feature: 'ai.map' as const,

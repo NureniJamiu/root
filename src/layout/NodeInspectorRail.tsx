@@ -25,6 +25,14 @@ export interface NodeInspectorRailProps {
   readonly onDraftWithAi?: ((nodeId: UUID) => void) | undefined;
   /** An AI draft is being written. */
   readonly isDraftingWithAi?: boolean;
+  /** Research a question card on the web with AI (shown on question cards). */
+  readonly onResearchWithAi?: ((nodeId: UUID) => void) | undefined;
+  /** A research run is in progress. */
+  readonly isResearching?: boolean;
+  /** Caption the idea's images with AI; `all` describes ones already described again. */
+  readonly onDescribeImages?: ((nodeId: UUID, all: boolean) => void) | undefined;
+  /** Images are being described. */
+  readonly isDescribingImages?: boolean;
 }
 
 const SAVE_LABELS: Record<SaveStatus, string> = {
@@ -170,6 +178,10 @@ export function NodeInspectorRail({
   onDraftFromBranch,
   onDraftWithAi,
   isDraftingWithAi = false,
+  onResearchWithAi,
+  isResearching = false,
+  onDescribeImages,
+  isDescribingImages = false,
 }: NodeInspectorRailProps): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const selectionId = useCanvasStore((s) => s.selection.nodeId);
@@ -287,6 +299,21 @@ export function NodeInspectorRail({
                   No notes yet.
                 </p>
               )}
+              {onResearchWithAi && selectedNode.type === 'question' && (
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => onResearchWithAi(selectedNode.id)}
+                    disabled={isResearching}
+                    className="font-mono text-[10px] h-7"
+                    title="Look this question up and suggest findings, each linked to its sources"
+                    data-testid="btn-research-with-ai"
+                  >
+                    {isResearching ? 'Researching…' : '✦ Research this question'}
+                  </Button>
+                </div>
+              )}
             </section>
 
             {/* Images */}
@@ -294,6 +321,44 @@ export function NodeInspectorRail({
               <section className="flex flex-col gap-2" data-testid="inspector-images">
                 <SectionLabel>Images</SectionLabel>
                 <ImageMosaic key={selectedNode.id} images={selectedNode.images} />
+                {selectedNode.images.some((img) => img.caption) && (
+                  <ol className="m-0 pl-4 flex flex-col gap-1 font-serif text-[13px] leading-[19px] text-ink-3" data-testid="inspector-image-captions">
+                    {selectedNode.images.map((img) =>
+                      img.caption ? (
+                        <li key={img.id}>
+                          {img.caption}
+                          {img.text && (
+                            <details className="mt-0.5">
+                              <summary className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-faint cursor-pointer">Text in image</summary>
+                              <p className="m-0 mt-1 whitespace-pre-wrap text-[12.5px]">{img.text}</p>
+                            </details>
+                          )}
+                        </li>
+                      ) : (
+                        <li key={img.id} className="italic text-faint">Not described yet.</li>
+                      ),
+                    )}
+                  </ol>
+                )}
+                {onDescribeImages && (
+                  <div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onDescribeImages(selectedNode.id, selectedNode.images.every((img) => img.caption))}
+                      disabled={isDescribingImages}
+                      className="font-mono text-[10px] h-7"
+                      title="Have AI caption these images and read the text in them, so search and Ask can find them"
+                      data-testid="btn-describe-images"
+                    >
+                      {isDescribingImages
+                        ? 'Describing…'
+                        : selectedNode.images.every((img) => img.caption)
+                          ? '✦ Describe again'
+                          : '✦ Describe images'}
+                    </Button>
+                  </div>
+                )}
               </section>
             )}
 

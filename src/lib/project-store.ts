@@ -1,5 +1,5 @@
 /**
- * SQLite-backed project storage.
+ * Project storage, on SQLite or D1 (see `sql.ts`).
  *
  * Every function takes the owning `userId` and only ever touches that user's
  * rows. Canvases are validated with the same `canvasSchema` the client uses,
@@ -9,13 +9,16 @@
  */
 
 import crypto from 'node:crypto';
-import type Database from 'better-sqlite3';
 import { z } from 'zod';
 
 import { CANVAS_TITLE_MAX } from '../data/limits';
 import { canvasSchema, migrateLegacyCanvas } from '../data/schema';
 import type { Canvas } from '../data/types';
+import { blobKeys } from './blob-store';
+import type { BlobStore } from './blob-store';
 import { IMAGE_REF_DATA_URL } from './image-ref';
+import { stmt } from './sql';
+import type { Sql, SqlStatement } from './sql';
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
@@ -43,33 +46,6 @@ export class ProjectError extends Error {
     super(message);
     this.name = 'ProjectError';
   }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Schema                                                                     */
-/* -------------------------------------------------------------------------- */
-
-export function ensureProjectSchema(db: Database.Database): void {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS "project" (
-      "id"          TEXT PRIMARY KEY NOT NULL,
-      "userId"      TEXT NOT NULL,
-      "title"       TEXT NOT NULL,
-      "canvas"      TEXT NOT NULL,
-      "nodeCount"   INTEGER NOT NULL DEFAULT 0,
-      "createdAt"   TEXT NOT NULL,
-      "updatedAt"   TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS "idx_project_userId_updatedAt" ON "project" ("userId", "updatedAt" DESC);
-
-    CREATE TABLE IF NOT EXISTS "project_image" (
-      "projectId" TEXT NOT NULL,
-      "id"        TEXT NOT NULL,
-      "dataUrl"   TEXT NOT NULL,
-      PRIMARY KEY ("projectId", "id")
-    );
-  `);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -113,41 +89,38 @@ interface ProjectRow extends ProjectSummary {
   canvas: string;
 }
 
-export function createProjectStore(db: Database.Database) {
-  const selectSummaries = db.prepare(
-    'SELECT id, title, nodeCount, createdAt, updatedAt FROM project WHERE userId = ? ORDER BY updatedAt DESC',
-  );
-  const selectRow = db.prepare(
-    'SELECT id, title, canvas, nodeCount, createdAt, updatedAt FROM project WHERE id = ? AND userId = ?',
-  );
-  const idTaken = db.prepare('SELECT 1 FROM project WHERE id = ?');
-  const insertProject = db.prepare(
-    `INSERT INTO project (id, userId, title, canvas, nodeCount, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  );
-  const updateProject = db.prepare(
-    `UPDATE project SET title = ?, canvas = ?, nodeCount = ?, updatedAt = ?
-     WHERE id = ? AND userId = ?`,
-  );
-  const deleteProject = db.prepare('DELETE FROM project WHERE id = ? AND userId = ?');
-  const selectImages = db.prepare('SELECT id, dataUrl FROM project_image WHERE projectId = ?');
-  const upsertImage = db.prepare(
-    `INSERT INTO project_image (projectId, id, dataUrl) VALUES (?, ?, ?)
-     ON CONFLICT (projectId, id) DO UPDATE SET dataUrl = excluded.dataUrl`,
-  );
-  const deleteImages = db.prepare('DELETE FROM project_image WHERE projectId = ?');
-  const deleteImage = db.prepare('DELETE FROM project_image WHERE projectId = ? AND id = ?');
+/** Where an image's data lives: in its `project_image` row, or in blob storage when the row is ''. */
+const IN_BLOB_STORE = '';
+
+const SELECT_ROW =
+  'SELECT id, title, canvas, nodeCount, createdAt, updatedAt FROM project WHERE id = ? AND userId = ?';
+const SELECT_IMAGES = 'SELECT id, dataUrl FROM project_image WHERE projectId = ?';
+
+/**
+ * Projects for `sql`. With `blobs`, image data goes to blob storage (R2 on
+ * Workers) and `project_image` keeps only which images a project has.
+ */
+export function createProjectStore(sql: Sql, blobs?: BlobStore) {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
 
   /**
-   * Move image data out of the canvas into `project_image` and return the
-   * canvas JSON to store (images replaced by `IMAGE_REF_DATA_URL`). Rows for
-   * images the canvas no longer contains are dropped.
+   * Plan the writes that move image data out of the canvas into
+   * `project_image` (or blob storage), and return the canvas JSON to store
+   * (images replaced by `IMAGE_REF_DATA_URL`). Rows for images the canvas no
+   * longer contains are dropped. Blob writes happen here, before the
+   * database batch, so a stored row never points at a missing blob.
    */
-  function stashImages(projectId: string, canvas: Canvas): string {
+  async function stashImages(
+    projectId: string,
+    canvas: Canvas,
+  ): Promise<{ json: string; writes: SqlStatement[]; dropBlobs: string[] }> {
     const stored = new Set(
-      (selectImages.all(projectId) as Array<{ id: string }>).map((r) => r.id),
+      (await sql.all<{ id: string }>('SELECT id FROM project_image WHERE projectId = ?', projectId)).map((r) => r.id),
     );
     const keep = new Set<string>();
+    const writes: SqlStatement[] = [];
+    const uploads: Array<() => Promise<void>> = [];
     const slim: Canvas = {
       ...canvas,
       nodes: canvas.nodes.map((node) => ({
@@ -163,33 +136,55 @@ export function createProjectStore(db: Database.Database) {
               );
             }
           } else {
-            upsertImage.run(projectId, image.id, image.dataUrl);
+            let dataUrl = image.dataUrl;
+            if (blobs) {
+              const key = blobKeys.canvasImage(projectId, image.id);
+              const bytes = encoder.encode(image.dataUrl);
+              uploads.push(() => blobs.put(key, bytes, 'text/plain'));
+              dataUrl = IN_BLOB_STORE;
+            }
+            writes.push(
+              stmt(
+                `INSERT INTO project_image (projectId, id, dataUrl) VALUES (?, ?, ?)
+                 ON CONFLICT (projectId, id) DO UPDATE SET dataUrl = excluded.dataUrl`,
+                projectId,
+                image.id,
+                dataUrl,
+              ),
+            );
           }
           return { ...image, dataUrl: IMAGE_REF_DATA_URL };
         }),
       })),
     };
+    const dropBlobs: string[] = [];
     for (const id of stored) {
       if (!keep.has(id)) {
-        deleteImage.run(projectId, id);
+        writes.push(stmt('DELETE FROM project_image WHERE projectId = ? AND id = ?', projectId, id));
+        dropBlobs.push(blobKeys.canvasImage(projectId, id));
       }
     }
-    return JSON.stringify(slim);
+    await Promise.all(uploads.map((upload) => upload()));
+    return { json: JSON.stringify(slim), writes, dropBlobs };
   }
 
   /** Inverse of `stashImages`: put stored image data back into the canvas. */
-  function hydrate(projectId: string, row: ProjectRow): Canvas {
+  async function hydrate(projectId: string, row: ProjectRow): Promise<Canvas> {
     let parsed: Canvas;
     try {
       parsed = migrateLegacyCanvas(JSON.parse(row.canvas)) as Canvas;
     } catch {
       return blankCanvas(row.id, row.title, row.updatedAt);
     }
+    const rows = await sql.all<{ id: string; dataUrl: string }>(SELECT_IMAGES, projectId);
     const images = new Map(
-      (selectImages.all(projectId) as Array<{ id: string; dataUrl: string }>).map((r) => [
-        r.id,
-        r.dataUrl,
-      ]),
+      await Promise.all(
+        rows.map(async (r): Promise<[string, string | undefined]> => {
+          if (r.dataUrl !== IN_BLOB_STORE || !blobs) return [r.id, r.dataUrl];
+          const blob = await blobs.get(blobKeys.canvasImage(projectId, r.id));
+          return [r.id, blob ? decoder.decode(blob.bytes) : undefined];
+        }),
+      ),
     );
     return {
       ...parsed,
@@ -198,77 +193,125 @@ export function createProjectStore(db: Database.Database) {
         images: (node.images ?? []).flatMap((image) => {
           if (image.dataUrl !== IMAGE_REF_DATA_URL) return [image]; // legacy inline image
           const dataUrl = images.get(image.id);
-          return dataUrl === undefined ? [] : [{ ...image, dataUrl }];
+          return dataUrl === undefined || dataUrl === IN_BLOB_STORE ? [] : [{ ...image, dataUrl }];
         }),
       })),
     };
   }
 
-  function insert(userId: string, id: string, title: string, canvas: Canvas, now: string): void {
-    insertProject.run(id, userId, title, stashImages(id, canvas), canvas.nodes.length, now, now);
+  async function dropBlobs(keys: readonly string[]): Promise<void> {
+    if (blobs && keys.length) await blobs.delete(keys);
   }
 
-  function create(userId: string, input: CreateProjectInput): ProjectDetail {
+  function removeStatements(userId: string, id: string): SqlStatement[] {
+    const owned = 'EXISTS (SELECT 1 FROM project WHERE id = ? AND userId = ?)';
+    return [
+      stmt(`DELETE FROM project_image WHERE projectId = ? AND ${owned}`, id, id, userId),
+      stmt('DELETE FROM project WHERE id = ? AND userId = ?', id, userId),
+    ];
+  }
+
+  async function create(userId: string, input: CreateProjectInput): Promise<ProjectDetail> {
     const body = parseInput(createInputSchema, input);
     const now = new Date().toISOString();
     const id = body.id ?? crypto.randomUUID();
-    if (idTaken.get(id)) {
+    if (await sql.first('SELECT 1 FROM project WHERE id = ?', id)) {
       throw new ProjectError(409, 'exists', 'a project with this id already exists');
     }
     const title = body.title ?? body.canvas?.title ?? 'Interactive Graph';
     const canvas = body.canvas ?? blankCanvas(id, title, now);
-    db.transaction(() => insert(userId, id, title, canvas, now))();
+    const { json, writes } = await stashImages(id, canvas);
+    await sql.batch([
+      ...writes,
+      stmt(
+        `INSERT INTO project (id, userId, title, canvas, nodeCount, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        id,
+        userId,
+        title,
+        json,
+        canvas.nodes.length,
+        now,
+        now,
+      ),
+    ]);
     return { id, title, nodeCount: canvas.nodes.length, canvas, createdAt: now, updatedAt: now };
   }
 
   return {
     /** Summaries of the user's projects; creates a first one if there are none. */
-    list(userId: string): ProjectSummary[] {
-      const rows = selectSummaries.all(userId) as ProjectSummary[];
-      if (rows.length > 0) return rows;
-      return [create(userId, { title: 'Interactive Graph' })].map(
-        ({ canvas: _canvas, ...summary }) => summary,
+    async list(userId: string): Promise<ProjectSummary[]> {
+      const rows = await sql.all<ProjectSummary>(
+        'SELECT id, title, nodeCount, createdAt, updatedAt FROM project WHERE userId = ? ORDER BY updatedAt DESC',
+        userId,
       );
+      if (rows.length > 0) return rows;
+      const { canvas: _canvas, ...summary } = await create(userId, { title: 'Interactive Graph' });
+      return [summary];
     },
 
-    get(userId: string, id: string): ProjectDetail | null {
-      const row = selectRow.get(id, userId) as ProjectRow | undefined;
+    async get(userId: string, id: string): Promise<ProjectDetail | null> {
+      const row = await sql.first<ProjectRow>(SELECT_ROW, id, userId);
       if (!row) return null;
-      return { ...row, canvas: hydrate(id, row) };
+      return { ...row, canvas: await hydrate(id, row) };
     },
 
     create,
 
     /** Update an existing project. Returns `null` when it does not exist. */
-    update(
+    async update(
       userId: string,
       id: string,
       input: UpdateProjectInput,
-    ): Pick<ProjectSummary, 'id' | 'title' | 'nodeCount' | 'updatedAt'> | null {
+    ): Promise<Pick<ProjectSummary, 'id' | 'title' | 'nodeCount' | 'updatedAt'> | null> {
       const body = parseInput(updateInputSchema, input);
-      return db.transaction(() => {
-        const existing = selectRow.get(id, userId) as ProjectRow | undefined;
-        if (!existing) return null;
+      const existing = await sql.first<ProjectRow>(SELECT_ROW, id, userId);
+      if (!existing) return null;
 
-        const now = new Date().toISOString();
-        const title = body.title ?? body.canvas?.title ?? existing.title;
-        let serialized = existing.canvas;
-        let nodeCount = existing.nodeCount;
-        if (body.canvas) {
-          serialized = stashImages(id, body.canvas);
-          nodeCount = body.canvas.nodes.length;
-        }
-        updateProject.run(title, serialized, nodeCount, now, id, userId);
-        return { id, title, nodeCount, updatedAt: now };
-      })();
+      const now = new Date().toISOString();
+      const title = body.title ?? body.canvas?.title ?? existing.title;
+      let serialized = existing.canvas;
+      let nodeCount = existing.nodeCount;
+      let writes: SqlStatement[] = [];
+      let dropped: string[] = [];
+      if (body.canvas) {
+        ({ json: serialized, writes, dropBlobs: dropped } = await stashImages(id, body.canvas));
+        nodeCount = body.canvas.nodes.length;
+      }
+      await sql.batch([
+        ...writes,
+        stmt(
+          `UPDATE project SET title = ?, canvas = ?, nodeCount = ?, updatedAt = ?
+           WHERE id = ? AND userId = ?`,
+          title,
+          serialized,
+          nodeCount,
+          now,
+          id,
+          userId,
+        ),
+      ]);
+      await dropBlobs(dropped);
+      return { id, title, nodeCount, updatedAt: now };
     },
 
-    remove(userId: string, id: string): boolean {
-      return db.transaction(() => {
-        const removed = deleteProject.run(id, userId).changes > 0;
-        if (removed) deleteImages.run(id);
-        return removed;
-      })();
+    /** Whether the user has this project. */
+    async owns(userId: string, id: string): Promise<boolean> {
+      return (await sql.first('SELECT 1 FROM project WHERE id = ? AND userId = ?', id, userId)) !== null;
+    },
+
+    /**
+     * The writes that delete a project and its images, for a batch with the
+     * other stores' writes for the project. They do nothing unless the user
+     * owns the project; check with `owns` first.
+     */
+    removeStatements,
+
+    async remove(userId: string, id: string): Promise<boolean> {
+      const results = await sql.batch(removeStatements(userId, id));
+      const removed = results[1]!.changes > 0;
+      if (removed) await blobs?.deletePrefix(blobKeys.project(id));
+      return removed;
     },
   };
 }
