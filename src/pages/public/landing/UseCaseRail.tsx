@@ -39,28 +39,28 @@ const CASES: readonly UseCase[] = [
   {
     title: 'Outline an article',
     type: 'finding',
-    body: 'Put the thesis at the root and let sections, sources and counterpoints branch off it until the structure writes itself.',
+    body: 'Put your main point on the first card, then branch off sections, sources and counterpoints until the structure is clear.',
     dots: [[120, 20, 'topic'], [50, 80, 'finding'], [120, 80, 'finding'], [190, 80, 'question'], [120, 145, 'conclusion']],
     lines: [[0, 1], [0, 2], [0, 3], [1, 4], [2, 4], [3, 4]],
   },
   {
     title: 'Map a research question',
     type: 'question',
-    body: 'Track what you know, what you suspect and what is still open. Findings in green, questions in coral, conclusions in oxblood.',
+    body: 'Keep track of what you know, what you suspect and what is still open, with each kind of card in its own colour.',
     dots: [[30, 40, 'question'], [30, 120, 'topic'], [110, 30, 'finding'], [110, 90, 'finding'], [110, 150, 'question'], [200, 80, 'conclusion']],
     lines: [[0, 2], [1, 3], [1, 4], [2, 5], [3, 5]],
   },
   {
     title: 'Brainstorm a project',
     type: 'conclusion',
-    body: 'Throw every idea onto the canvas, then drag, connect and collapse until the plan you actually want is the one left standing.',
+    body: 'Put every idea on the canvas, then move, connect and fold them away until the plan you want is the one left.',
     dots: [[120, 85, 'topic'], [40, 30, 'question'], [200, 30, 'finding'], [40, 140, 'finding'], [200, 140, 'question'], [120, 160, 'conclusion']],
     lines: [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5]],
   },
   {
     title: 'Prepare a talk',
     type: 'topic',
-    body: 'Build the argument once, then present it as a walkthrough, revealing one idea at a time so the room follows your reasoning.',
+    body: 'Build the argument once, then present it card by card so the room follows your reasoning.',
     dots: [[20, 90, 'topic'], [75, 90, 'finding'], [130, 90, 'finding'], [185, 90, 'question'], [230, 90, 'conclusion']],
     lines: [[0, 1], [1, 2], [2, 3], [3, 4]],
   },
@@ -235,9 +235,9 @@ function RailHeading(): JSX.Element {
   return (
     <div className="w-full max-w-6xl mx-auto px-6 md:px-8 mb-6 md:mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint mb-3">What people map</p>
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint mb-3">What people use it for</p>
         <h2 className="font-serif font-light text-[34px] md:text-[clamp(36px,5.8vh,52px)] leading-[1.05] tracking-[-0.02em] text-on-accent max-w-2xl">
-          One canvas, <span className="italic text-[#b1c5ff]">whatever you are making.</span>
+          Anything you need to <span className="italic text-[#b1c5ff]">think through first.</span>
         </h2>
       </div>
       <p className="font-mono text-[11px] uppercase tracking-[0.1em] text-faint">Keep scrolling →</p>

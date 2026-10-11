@@ -67,8 +67,8 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    expect(await screen.findByText(/Map your research. Write it up./i, {}, LAZY)).toBeInTheDocument();
-    expect(screen.getByText(/Start Creating/i)).toBeInTheDocument();
+    expect(await screen.findByText(/See all your research on one page./i, {}, LAZY)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Start for free/i })).toBeInTheDocument();
   });
 
   it('navigates to auth login page when clicking Sign In', async () => {
@@ -92,7 +92,7 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    const createAccountBtn = await screen.findByRole('button', { name: /Create Account/i }, LAZY);
+    const createAccountBtn = await screen.findByRole('button', { name: /Start for free/i }, LAZY);
     await act(async () => {
       await user.click(createAccountBtn);
     });

@@ -103,13 +103,13 @@ export function SiteFooter(): JSX.Element {
         <BlockCell index={2} label="Root" mark="question">
           <div className="flex flex-col gap-10 h-full justify-end">
             <p className="font-serif text-[17px] md:text-[18px] leading-[1.45] text-muted max-w-[300px]">
-              <span className="text-ink">A canvas for ideas that branch.</span> Topics, findings, questions and conclusions,
-              all in full view.
+              <span className="text-ink">A canvas for research and writing.</span> Map what you find, then write it up in
+              one place.
             </p>
             <div className="flex items-center gap-3 font-mono text-[11px] uppercase tracking-[0.1em]">
               <span className="inline-flex items-center gap-1.5 h-7 px-2.5 border border-rule rounded-[2px] bg-panel text-finding">
                 <span className="w-1.5 h-1.5 rounded-full bg-finding-fill lp-foot-pulse" aria-hidden="true" />
-                Free in beta
+                Free plan
               </span>
               <button
                 type="button"
@@ -136,7 +136,7 @@ export function SiteFooter(): JSX.Element {
       {/* Legal line */}
       <div className="border-t border-rule px-5 md:px-7 py-5 grid grid-cols-2 md:grid-cols-4 gap-y-3 gap-x-6 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
         <span className="text-ink">©{new Date().getFullYear()} Root</span>
-        <span>Visual idea mapping &amp; planning</span>
+        <span>Research, mapped and written up</span>
         <span className="md:text-center">Set in EB Garamond &amp; JetBrains Mono</span>
         <span className="md:text-right">Made for thinking out loud</span>
       </div>

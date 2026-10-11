@@ -37,34 +37,34 @@ interface Step {
 
 const STEPS: readonly Step[] = [
   {
-    kicker: 'Plant a root',
-    title: 'Start with one idea.',
-    body: 'Double-click the canvas and name the thing you are thinking about. That card is the root everything else grows from.',
+    kicker: 'Start',
+    title: 'Write down your question.',
+    body: 'Double-click the canvas and type what you are trying to figure out. That first card is the root everything else grows from.',
   },
   {
     kicker: 'Branch out',
-    title: 'Branch in any direction.',
-    body: 'Press + on any card to add a connected idea. Connectors draw themselves, so the shape of your thinking is always in view.',
+    title: 'Add what you find.',
+    body: 'Press + on any card to add a connected one. The lines draw themselves, so you can always see how one idea led to the next.',
   },
   {
-    kicker: 'Name it',
-    title: 'Say what each idea is.',
-    body: 'Mark ideas as topics, findings, questions or conclusions. Colour does the reading for you: open questions stand out at a glance.',
+    kicker: 'Label it',
+    title: 'Say what each card is.',
+    body: 'Mark each card as a topic, a finding, a question or a conclusion. Each has its own colour, so open questions stand out at a glance.',
   },
   {
-    kicker: 'Open an idea',
-    title: 'Keep the evidence inside the idea.',
-    body: 'Open any card to write notes, drop in images, cite sources and attach files. What you gather stays with the point it supports.',
+    kicker: 'Add sources',
+    title: 'Keep your sources in the card.',
+    body: 'Open any card to write notes, add images, link sources and attach files. What you collect stays next to the point it supports.',
   },
   {
     kicker: 'Focus',
-    title: 'Fold away the noise.',
-    body: 'Collapse a branch you are done with, then walk through the rest one idea at a time when it is time to present.',
+    title: 'Hide what you are done with.',
+    body: 'Fold a finished branch away to focus on the rest. When it is time to present, show your cards one at a time.',
   },
   {
     kicker: 'Write it up',
     title: 'Turn the map into a draft.',
-    body: 'Open a document beside the canvas. Type @ to cite an idea, drag a card in, or select a sentence and send it to the map as a new idea.',
+    body: 'Open a document next to the map. Type @ to cite a card or drag one in. Your draft and your research stay linked, so nothing gets lost on the way.',
   },
 ];
 

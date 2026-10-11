@@ -149,9 +149,9 @@ export function ProductFilm(): JSX.Element {
                 >
                   <RootLogo style={{ height: 80, width: 'auto' }} />
                   <p className="font-serif text-[34px] font-light text-ink" style={{ letterSpacing: '-0.02em' }}>
-                    From initial spark to finished content.
+                    From first question to finished draft.
                   </p>
-                  <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Free while in beta</span>
+                  <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Free to start</span>
                 </div>
               )}
 

@@ -4,6 +4,7 @@ import { useRouter } from '../../routing';
 import type { AppRoute } from '../../routing/routes';
 import { Button, ThemeToggle } from '../../ui';
 import { AnimatedLogo } from './landing/LogoMascot';
+import { useStartRoute } from './landing/useStartRoute';
 import './landing/landing.css';
 
 const NAV: readonly { label: string; to: AppRoute }[] = [
@@ -21,6 +22,7 @@ const NAV: readonly { label: string; to: AppRoute }[] = [
 /** `wide` lines the header up with the landing page's full-width hero. */
 export function PublicHeader({ wide = false }: { readonly wide?: boolean } = {}): JSX.Element {
   const { navigate, pathname } = useRouter();
+  const start = useStartRoute();
   const headerRef = useRef<HTMLElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -96,10 +98,10 @@ export function PublicHeader({ wide = false }: { readonly wide?: boolean } = {})
           <Button
             variant="primary"
             size="sm"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(start.to)}
             className="text-xs uppercase tracking-wider"
           >
-            Get Started
+            {start.signedIn ? 'Open Root' : 'Start free'}
           </Button>
         </div>
       </div>

@@ -73,7 +73,7 @@ export function AboutPage(): JSX.Element {
       <PublicSection label="Try it">
         <div className="flex flex-wrap items-center justify-between gap-6">
           <p className="font-serif text-[20px] leading-[1.5] m-0 max-w-xl">
-            Root is free while in beta. Bring one question you are working on and see how it maps.
+            Root is free to start. Bring one question you are working on and see how it maps.
           </p>
           <button
             type="button"

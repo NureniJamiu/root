@@ -12,6 +12,7 @@ import { Reveal } from './landing/Reveal';
 import { ScrollStory } from './landing/ScrollStory';
 import { ScrubText } from './landing/ScrubText';
 import { UseCaseRail } from './landing/UseCaseRail';
+import { useStartRoute } from './landing/useStartRoute';
 import { easeOutCubic, usePrefersReducedMotion, useScrollProgressCallback } from './landing/motion';
 import { TYPE_COLOR } from './landing/SceneCanvas';
 import type { IdeaType } from './landing/SceneCanvas';
@@ -68,16 +69,17 @@ const WASH_LINES: readonly string[] = [
 ];
 
 const MADE_FOR: readonly { type: IdeaType; label: string }[] = [
-  { type: 'topic', label: 'Research' },
-  { type: 'finding', label: 'Literature reviews' },
-  { type: 'question', label: 'Theses' },
-  { type: 'conclusion', label: 'Articles' },
-  { type: 'topic', label: 'Interviews' },
-  { type: 'finding', label: 'Strategy' },
+  { type: 'topic', label: 'Students' },
+  { type: 'finding', label: 'Researchers' },
+  { type: 'question', label: 'Writers' },
+  { type: 'conclusion', label: 'Journalists' },
+  { type: 'topic', label: 'Analysts' },
+  { type: 'finding', label: 'Teachers' },
 ];
 
 function Hero(): JSX.Element {
   const { navigate } = useRouter();
+  const start = useStartRoute();
   const stageRef = useRef<HTMLDivElement>(null);
   const filmRef = useRef<HTMLDivElement>(null);
   const peekRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -110,16 +112,16 @@ function Hero(): JSX.Element {
             style={{ fontSize: 'clamp(42px, 6.4vw, 100px)', textWrap: 'balance' } as CSSProperties}
           >
             <span className="lp-line" style={delay(100)}>
-              <span>Map your research. Write it up.</span>
+              <span>See all your research on one page.</span>
             </span>
           </h1>
           <p
             className="lp-fade-up font-serif text-[18px] md:text-[21px] leading-[1.55] text-ink-2 max-w-xl lg:pb-3"
             style={delay(380)}
           >
-            Root is a canvas for research. Ideas branch, questions stay open and the evidence lives inside the point it
-            supports. When the picture is clear, write it up in a document beside the canvas that cites your ideas as
-            you go.
+            Root is a canvas for students, researchers and writers. Put your question on the first card, branch out
+            with what you find, and keep sources, notes and images inside each card. When it makes sense, write it up
+            in a document beside the map that cites your cards.
           </p>
         </div>
 
@@ -129,25 +131,25 @@ function Hero(): JSX.Element {
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(start.to)}
               className="group inline-flex items-center gap-3 h-12 pl-1.5 pr-6 bg-inverse text-on-inverse font-mono text-[12px] uppercase tracking-[0.1em] rounded-[2px] hover:bg-accent hover:text-on-accent transition-colors duration-200"
             >
               <span className="lp-arrow-box w-9 h-9 rounded-[2px] bg-on-inverse text-inverse flex items-center justify-center text-[15px]" aria-hidden="true">
                 →
               </span>
-              Start Creating
+              {start.signedIn ? 'Open your canvas' : 'Start for free'}
             </button>
             <button
               type="button"
-              onClick={() => navigate('/auth/register')}
+              onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' })}
               className="inline-flex items-center h-12 px-6 bg-panel border border-rule-strong text-ink font-mono text-[12px] uppercase tracking-[0.1em] rounded-[2px] hover:border-ink transition-colors duration-200"
             >
-              Create Account
+              See how it works
             </button>
           </div>
           <p className="hidden sm:flex items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
             <span className="w-1.5 h-1.5 rounded-full bg-finding-fill" />
-            Free while in beta · No setup
+            Free plan · No card needed
           </p>
         </div>
 
@@ -251,11 +253,11 @@ function Statement(): JSX.Element {
     <section className="border-y border-rule bg-panel">
       <div className="max-w-5xl mx-auto px-6 py-28 md:py-40">
         <Reveal as="p" variant="fade" className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted mb-8">
-          Why a canvas
+          Why Root
         </Reveal>
         <ScrubText
           className="font-serif font-light text-[32px] md:text-[54px] leading-[1.12] tracking-[-0.02em] text-ink"
-          text="Linear notes flatten how thinking actually works. Ideas branch, loop back and raise new questions. Root lets them grow the way they really do: *outward,* *connected,* and in full view."
+          text="Research never goes in a straight line. One source leads to three new questions, and soon your notes are a long scroll you cannot follow. Root keeps every idea on one page, *connected* to where it came from, so you can *see* what you know and what is still missing."
         />
       </div>
     </section>
@@ -270,19 +272,19 @@ const DETAILS: readonly { kicker: string; title: string; body: string; scene: ()
   {
     kicker: 'Write beside it',
     title: 'Citations that link back.',
-    body: 'Click a citation to find the idea on the canvas, and every card lists the documents that cite it. Or draft a whole outline from a branch in one click.',
+    body: 'Click a citation in your draft to jump to its card on the map, and every card shows which documents cite it. You can also turn a whole branch into an outline with one click.',
     scene: WriteScene,
   },
   {
     kicker: 'Collapse & reveal',
     title: 'See only what matters.',
-    body: 'Fold a branch to a single card, or reveal its ideas one at a time while you talk them through.',
+    body: 'Fold a finished branch down to a single card. When you present, show its cards one at a time so people follow along.',
     scene: FoldScene,
   },
   {
     kicker: 'Images & notes',
     title: 'Keep the evidence close.',
-    body: 'Attach images and formatted notes to any idea so the proof sits next to the point it supports. Everything saves to your account as you go.',
+    body: 'Add images and formatted notes to any card, so the proof sits next to the point it supports. Everything saves to your account as you go, and only you can see it.',
     scene: EvidenceScene,
   },
 ];
@@ -316,6 +318,7 @@ function Details(): JSX.Element {
 
 function FinalCta(): JSX.Element {
   const { navigate } = useRouter();
+  const start = useStartRoute();
 
   return (
     <section className="relative overflow-hidden bg-stage text-on-accent">
@@ -327,18 +330,18 @@ function FinalCta(): JSX.Element {
           </div>
         </Reveal>
         <Reveal as="h2" variant="mask" delay={100} className="font-serif font-light text-[40px] md:text-[72px] leading-[1.02] tracking-[-0.03em] mb-6">
-          Give your next question <span className="italic text-[#b1c5ff]">room to branch.</span>
+          Bring the question <span className="italic text-[#b1c5ff]">you are stuck on.</span>
         </Reveal>
         <Reveal as="p" delay={220} className="font-serif text-[18px] md:text-[20px] leading-[1.6] text-rule-strong max-w-xl mb-12">
-          Free while in beta. Map the question, gather the evidence and write it up, without leaving the page.
+          Lay it out, see what is missing and write it up, all in one place. Free to start, no card needed.
         </Reveal>
         <Reveal delay={320}>
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(start.to)}
             className="group inline-flex items-center gap-3 h-12 px-7 bg-white text-stage font-mono text-[12px] uppercase tracking-[0.1em] rounded-[2px] hover:bg-accent hover:text-on-accent transition-colors duration-200"
           >
-            Open your canvas
+            {start.signedIn ? 'Open your canvas' : 'Create your free account'}
             <span className="inline-block transition-transform duration-200 group-hover:translate-x-1" aria-hidden="true">
               →
             </span>

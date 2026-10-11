@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
 import { useRouter } from '../../../routing';
+import { useStartRoute } from './useStartRoute';
 
 import { canObserve, clamp01, easeOutCubic, useInView, withAlpha } from './motion';
 import { Reveal } from './Reveal';
@@ -29,28 +30,28 @@ const KINDS: readonly Kind[] = [
     type: 'topic',
     name: 'Topic',
     lead: 'Give every idea a home.',
-    body: 'Topics are the subjects your canvas hangs from. Fold a branch down to one card when you are done with it, or reveal it one idea at a time.',
+    body: 'Topics are the main subjects of your map. Fold one down to a single card when you are done with it, or open it up one card at a time.',
     Scene: TopicScene,
   },
   {
     type: 'finding',
     name: 'Finding',
     lead: 'Keep the proof with the point.',
-    body: 'Findings hold what you know. Notes, images, sources and documents live inside the card, so evidence never drifts from the claim it backs.',
+    body: 'Findings are the things you have found out. Notes, images, links and files live inside the card, so the evidence stays with the claim it backs.',
     Scene: FindingScene,
   },
   {
     type: 'question',
     name: 'Question',
-    lead: 'Never lose an open thread.',
-    body: 'Questions draw dashed and stay coral until something answers them, so the gaps in your thinking are the first thing you see.',
+    lead: 'Never lose an open question.',
+    body: 'Questions get a dashed line and stay coral until you answer them, so the gaps in your research are the first thing you see.',
     Scene: QuestionScene,
   },
   {
     type: 'conclusion',
     name: 'Conclusion',
-    lead: 'Land the thinking.',
-    body: 'Conclusions mark where an argument ends up. Walk the room through the path that got you there, one card at a time.',
+    lead: 'Say what you concluded.',
+    body: 'Conclusions mark where your argument ends up. When you present, walk people through the cards that got you there, one at a time.',
     Scene: ConclusionScene,
   },
 ];
@@ -64,6 +65,7 @@ const step = (i: number): CSSProperties => ({ '--i': i }) as CSSProperties;
 
 export function IdeaTypes(): JSX.Element {
   const { navigate } = useRouter();
+  const start = useStartRoute();
   const panelRefs = useRef<(HTMLElement | null)[]>([]);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const stackRef = useRef<HTMLDivElement>(null);
@@ -141,12 +143,12 @@ export function IdeaTypes(): JSX.Element {
             variant="mask"
             className="font-serif font-light text-[38px] md:text-[56px] leading-[1.04] tracking-[-0.025em] text-ink mb-8"
           >
-            Four kinds of idea. <span className="block italic text-faint">Each one does its own job.</span>
+            Four kinds of card. <span className="block italic text-faint">Tell them apart at a glance.</span>
           </Reveal>
           <Reveal delay={160}>
             <button
               type="button"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(start.to)}
               className="group inline-flex items-center gap-2 h-9 px-4 bg-subtle border border-rule rounded-[2px] font-mono text-[11px] uppercase tracking-[0.1em] text-ink hover:border-ink transition-colors"
             >
               Try them on a canvas
@@ -211,7 +213,7 @@ export function IdeaTypes(): JSX.Element {
                 panelRef={(el) => {
                   panelRefs.current[i] = el;
                 }}
-                onOpen={() => navigate('/dashboard')}
+                onOpen={() => navigate(start.to)}
               />
             </div>
           ))}
