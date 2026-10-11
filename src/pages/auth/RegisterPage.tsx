@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useRouter } from '../../routing';
 import { useAuth } from '../../auth';
 import { AuthLayout } from './AuthLayout';
@@ -13,9 +13,15 @@ export function RegisterPage(): JSX.Element {
   const [password, setPassword] = useState('');
 
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Blocks a second submit (a double click or Enter) before the button re-renders as disabled.
+  const submitting = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
+    setIsSubmitting(true);
     setError(null);
     try {
       const { error: signUpError } = await authClient.signUp.email({
@@ -28,6 +34,8 @@ export function RegisterPage(): JSX.Element {
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
+      submitting.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -81,6 +89,7 @@ export function RegisterPage(): JSX.Element {
           type="submit"
           variant="primary"
           size="md"
+          loading={isSubmitting}
           className="mt-2 w-full text-xs uppercase tracking-wider"
         >
           Create Account

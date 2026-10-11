@@ -70,15 +70,35 @@ Plain settings are under `vars` in `wrangler.jsonc`; secrets are set with
 - **Your own domain:** Workers & Pages → root → Settings → Domains & Routes →
   Add → Custom domain. Then add `BETTER_AUTH_URL` and `VITE_APP_URL` (both
   `https://your-domain`) under `vars` in `wrangler.jsonc` and deploy again.
-- **Deploy on every push:** Workers & Pages → root → Settings → Builds →
-  connect your GitHub repo. Build command `npm run build`; deploy command
-  `npx wrangler d1 migrations apply root-db --remote && npx wrangler deploy`.
+- **Deploy on every push:** see below.
 - **Change a table:** edit `src/lib/schema.ts` and add a new
   `migrations/0002_<name>.sql` with the same change. Never edit
   `0001_init.sql` once it is deployed. `src/lib/__tests__/schema.test.ts`
   fails until the two agree.
 - **Backups:** D1 keeps 7 days of history on the free plan (30 on Paid); restore with
   `npx wrangler d1 time-travel restore root-db --timestamp=<time>`.
+
+## Deploy on every push to main
+
+`.github/workflows/ci.yml` has a `deploy` job. After lint, type checks,
+unit tests and browser tests all pass on a push to `main`, it applies new
+migrations to D1 and deploys the Worker. Pull requests and failed checks
+never deploy. It needs two secrets, set once:
+
+1. **API token.** Cloudflare dashboard → your profile icon → My Profile →
+   API Tokens → Create Token → "Edit Cloudflare Workers" template → Use
+   template. Under Permissions click "+ Add more" and add **Account · D1 ·
+   Edit**. Under Account Resources pick your account. Continue to summary →
+   Create Token, and copy the token (it is shown once).
+2. **Account ID.** Workers & Pages overview → the Account ID on the right,
+   or run `npx wrangler whoami`.
+3. **Add both to GitHub.** github.com/NureniJamiu/root → Settings → Secrets
+   and variables → Actions → New repository secret. Add
+   `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+4. **Push to main.** Watch it in the repo's Actions tab: `check` and `e2e`
+   run first, then `deploy`.
+
+Secrets set with `wrangler secret put` stay on the Worker; deploys keep them.
 
 ## Try the Worker on your machine first (optional)
 

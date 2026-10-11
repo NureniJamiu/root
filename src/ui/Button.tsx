@@ -8,6 +8,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   readonly size?: ButtonSize;
   readonly icon?: ReactNode;
   readonly children?: ReactNode;
+  /**
+   * Show a spinner in place of the label and disable the button, for example
+   * while a form submits. The label stays in place, transparent, so the
+   * button keeps its width and screen readers still read it.
+   */
+  readonly loading?: boolean;
 }
 
 export function Button({
@@ -17,6 +23,7 @@ export function Button({
   children,
   className = '',
   disabled,
+  loading = false,
   style,
   ...rest
 }: ButtonProps): JSX.Element {
@@ -54,12 +61,19 @@ export function Button({
   };
 
   const { base, inline } = variantStyles[variant];
+  const label = (
+    <>
+      {icon && <span className="inline-flex shrink-0 items-center justify-center">{icon}</span>}
+      {children}
+    </>
+  );
 
   return (
     <button
       type="button"
-      disabled={disabled}
-      className={`inline-flex items-center justify-center font-mono font-medium rounded-[2px] transition-colors duration-150 select-none whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${sizeClasses[size]} ${base} ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={`inline-flex items-center justify-center font-mono font-medium rounded-[2px] transition-colors duration-150 select-none whitespace-nowrap ${loading ? 'relative cursor-wait' : 'cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'} ${sizeClasses[size]} ${base} ${className}`}
       style={{
         boxShadow: 'none',
         ...inline,
@@ -67,8 +81,21 @@ export function Button({
       }}
       {...rest}
     >
-      {icon && <span className="inline-flex shrink-0 items-center justify-center">{icon}</span>}
-      {children}
+      {loading ? (
+        <>
+          <span className="inline-flex items-center justify-center gap-[inherit] opacity-0">
+            {label}
+          </span>
+          <span className="absolute inset-0 flex items-center justify-center" data-testid="button-spinner">
+            <span
+              aria-hidden="true"
+              className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin motion-reduce:animate-[spin_1.5s_linear_infinite]"
+            />
+          </span>
+        </>
+      ) : (
+        label
+      )}
     </button>
   );
 }

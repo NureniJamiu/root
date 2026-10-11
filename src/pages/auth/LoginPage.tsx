@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useRouter } from '../../routing';
 import { useAuth } from '../../auth';
 import { AuthLayout } from './AuthLayout';
@@ -11,15 +11,24 @@ export function LoginPage(): JSX.Element {
   const [password, setPassword] = useState('');
 
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Blocks a second submit (a double click or Enter) before the button re-renders as disabled.
+  const submitting = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
+    setIsSubmitting(true);
     setError(null);
     try {
       await signIn(email, password);
+      // Stays busy until the dashboard loads.
       window.location.href = '/dashboard';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
+      submitting.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -67,6 +76,7 @@ export function LoginPage(): JSX.Element {
           type="submit"
           variant="primary"
           size="md"
+          loading={isSubmitting}
           className="mt-2 w-full text-xs uppercase tracking-wider"
         >
           Sign In

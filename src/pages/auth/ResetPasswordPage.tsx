@@ -24,6 +24,7 @@ export function ResetPasswordPage(): JSX.Element {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     setError(null);
     if (password.length < MIN_PASSWORD_LENGTH) {
       setError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`);
@@ -137,10 +138,10 @@ export function ResetPasswordPage(): JSX.Element {
           type="submit"
           variant="primary"
           size="md"
-          disabled={isSaving}
+          loading={isSaving}
           className="mt-2 w-full text-xs uppercase tracking-wider"
         >
-          {isSaving ? 'Saving…' : 'Change Password'}
+          Change Password
         </Button>
       </form>
     </AuthLayout>

@@ -18,6 +18,7 @@ export function ForgotPasswordPage(): JSX.Element {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSending) return;
     setError(null);
     setIsSending(true);
     try {
@@ -87,10 +88,10 @@ export function ForgotPasswordPage(): JSX.Element {
             type="submit"
             variant="primary"
             size="md"
-            disabled={isSending}
+            loading={isSending}
             className="mt-2 w-full text-xs uppercase tracking-wider"
           >
-            {isSending ? 'Sending…' : 'Send Reset Link'}
+            Send Reset Link
           </Button>
 
           <div className="text-center pt-2 border-t border-sunken">
