@@ -112,14 +112,14 @@ function Hero(): JSX.Element {
             style={{ fontSize: 'clamp(42px, 6.4vw, 100px)', textWrap: 'balance' } as CSSProperties}
           >
             <span className="lp-line" style={delay(100)}>
-              <span>See all your research on one page.</span>
+              <span>Turn messy research into a clear first draft.</span>
             </span>
           </h1>
           <p
             className="lp-fade-up font-serif text-[18px] md:text-[21px] leading-[1.55] text-ink-2 max-w-xl lg:pb-3"
             style={delay(380)}
           >
-            Root is a canvas for students, researchers and writers. Put your question on the first card, branch out
+            Put your question on the first card, branch out
             with what you find, and keep sources, notes and images inside each card. When it makes sense, write it up
             in a document beside the map that cites your cards.
           </p>
@@ -257,7 +257,7 @@ function Statement(): JSX.Element {
         </Reveal>
         <ScrubText
           className="font-serif font-light text-[32px] md:text-[54px] leading-[1.12] tracking-[-0.02em] text-ink"
-          text="Research never goes in a straight line. One source leads to three new questions, and soon your notes are a long scroll you cannot follow. Root keeps every idea on one page, *connected* to where it came from, so you can *see* what you know and what is still missing."
+          text="Research never goes in a straight line.  Root keeps every idea on one page, *connected* to where it came from, so you can *see* what you know and what is still missing."
         />
       </div>
     </section>

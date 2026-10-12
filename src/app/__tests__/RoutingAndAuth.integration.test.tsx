@@ -67,7 +67,7 @@ describe('App Router & Auth Gating Structure', () => {
       render(<App />);
     });
 
-    expect(await screen.findByText(/See all your research on one page./i, {}, LAZY)).toBeInTheDocument();
+    expect(await screen.findByText(/Turn messy research into a clear first draft./i, {}, LAZY)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Start for free/i })).toBeInTheDocument();
   });
 
