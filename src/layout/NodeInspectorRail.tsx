@@ -1,6 +1,15 @@
 import { useMemo } from 'react';
-import { canvasActions, nodeLabel, nodeOrdinals, useCanvasStore, useDocLinksStore } from '../data';
-import type { Edge, Node, NodeType, Side, UUID } from '../data';
+import {
+  canvasActions,
+  evidenceIssueHint,
+  evidenceIssueLabel,
+  evidenceIssues,
+  nodeLabel,
+  nodeOrdinals,
+  useCanvasStore,
+  useDocLinksStore,
+} from '../data';
+import type { Edge, EvidenceIssue, Node, NodeType, Side, UUID } from '../data';
 import type { DragState } from '../canvas';
 import type { SaveStatus } from '../lib/save-queue';
 import { Button } from '../ui/Button';
@@ -162,6 +171,105 @@ function ConnectorPanel({
   );
 }
 
+/** A link that selects another idea on the canvas. */
+function IdeaLink({ node, label }: { readonly node: Node; readonly label: string }): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={() => canvasActions.select(node.id)}
+      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-[2px] border border-rule bg-paper hover:border-ink hover:bg-sunken transition-colors cursor-pointer font-serif text-[13.5px] text-ink"
+      data-testid="evidence-idea-link"
+    >
+      <span className="font-mono text-[9px] text-muted shrink-0">{label}</span>
+      <span className="truncate">{node.title || 'Untitled idea'}</span>
+    </button>
+  );
+}
+
+/** The selected idea's evidence checks, each with what to do about it. */
+function EvidenceSection({
+  issues,
+  byId,
+  labelOf,
+}: {
+  readonly issues: readonly EvidenceIssue[];
+  readonly byId: ReadonlyMap<UUID, Node>;
+  readonly labelOf: (node: Node) => string;
+}): JSX.Element {
+  return (
+    <section className="flex flex-col gap-2" data-testid="inspector-evidence">
+      <SectionLabel>Evidence check</SectionLabel>
+      <ul className="m-0 p-0 list-none flex flex-col gap-2">
+        {issues.map((issue) => (
+          <li
+            key={issue.kind}
+            className="border border-dashed border-danger/40 bg-danger-soft rounded-[2px] p-2.5 flex flex-col gap-1.5"
+            data-testid={`evidence-issue-${issue.kind}`}
+          >
+            <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.06em] text-danger">
+              {evidenceIssueLabel(issue)}
+            </span>
+            <p className="m-0 font-serif text-[13px] leading-[19px] text-ink">{evidenceIssueHint(issue)}</p>
+            {issue.kind === 'open-question' &&
+              issue.questionIds.map((qid) => {
+                const q = byId.get(qid);
+                return q ? <IdeaLink key={qid} node={q} label={labelOf(q)} /> : null;
+              })}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const ISSUE_ORDER: readonly EvidenceIssue['kind'][] = ['unbacked', 'open-question', 'dangling'];
+const ISSUE_GROUP_TITLES: Record<EvidenceIssue['kind'], string> = {
+  unbacked: 'Conclusions with no evidence',
+  'open-question': 'Conclusions resting on open questions',
+  dangling: 'Findings nothing uses',
+};
+
+/** Every evidence check on the canvas, grouped, for when no idea is selected. */
+function EvidenceOverview({
+  issues,
+  byId,
+  labelOf,
+}: {
+  readonly issues: ReadonlyMap<UUID, readonly EvidenceIssue[]>;
+  readonly byId: ReadonlyMap<UUID, Node>;
+  readonly labelOf: (node: Node) => string;
+}): JSX.Element {
+  const groups = ISSUE_ORDER.map((kind) => ({
+    kind,
+    nodes: [...issues]
+      .filter(([, list]) => list.some((i) => i.kind === kind))
+      .map(([id]) => byId.get(id))
+      .filter((n): n is Node => n !== undefined),
+  })).filter((g) => g.nodes.length > 0);
+
+  return (
+    <section className="flex flex-col gap-3 text-left" data-testid="evidence-overview">
+      <SectionLabel>Evidence check</SectionLabel>
+      {groups.length === 0 ? (
+        <p className="m-0 font-serif text-[13px] leading-[19px] text-ink-3" data-testid="evidence-all-clear">
+          Every conclusion has a finding behind it, and every finding is part of the argument.
+        </p>
+      ) : (
+        groups.map((g) => (
+          <div key={g.kind} className="flex flex-col gap-1.5" data-testid={`evidence-group-${g.kind}`}>
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-danger">
+              {ISSUE_GROUP_TITLES[g.kind]} · {g.nodes.length}
+            </span>
+            {g.nodes.map((n) => (
+              <IdeaLink key={n.id} node={n} label={labelOf(n)} />
+            ))}
+          </div>
+        ))
+      )}
+    </section>
+  );
+}
+
 /**
  * The inspector shows the selected idea as a clean read-only page: its type,
  * a large title, its notes and images. Changes are made in the
@@ -188,10 +296,11 @@ export function NodeInspectorRail({
   const selectedEdgeId = useCanvasStore((s) => s.selection.edgeId);
 
   // Indexes built once per canvas change, not once per lookup.
-  const { byId, ordinals } = useMemo(
+  const { byId, ordinals, issues } = useMemo(
     () => ({
       byId: new Map(canvas.nodes.map((n) => [n.id, n])),
       ordinals: nodeOrdinals(canvas),
+      issues: evidenceIssues(canvas),
     }),
     [canvas],
   );
@@ -284,6 +393,10 @@ export function NodeInspectorRail({
                 {nameOf(selectedNode)}
               </h2>
             </div>
+
+            {issues.has(selectedNode.id) && (
+              <EvidenceSection issues={issues.get(selectedNode.id) ?? []} byId={byId} labelOf={labelOf} />
+            )}
 
             {/* Notes */}
             <section className="flex flex-col gap-2">
@@ -451,6 +564,11 @@ export function NodeInspectorRail({
                 ? 'Double-click empty canvas, or use Add Idea, to start.'
                 : 'Click any idea card on the canvas to read it here.'}
             </p>
+            {canvas.nodes.some((n) => n.type === 'conclusion' || n.type === 'finding') && (
+              <div className="w-full">
+                <EvidenceOverview issues={issues} byId={byId} labelOf={labelOf} />
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -26,7 +26,17 @@ import { Fragment, memo } from 'react';
 import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
-import { formatNodeLabel, hasHiddenChildren, hiddenDescendantCount, nodeOrdinal, useCanvasStore, useDocLinksStore } from '../data';
+import {
+  evidenceIssueHint,
+  evidenceIssueLabel,
+  evidenceIssuesFor,
+  formatNodeLabel,
+  hasHiddenChildren,
+  hiddenDescendantCount,
+  nodeOrdinal,
+  useCanvasStore,
+  useDocLinksStore,
+} from '../data';
 import type { Node, Side, UUID } from '../data';
 
 import { CollapseBadge } from './CollapseBadge';
@@ -241,6 +251,7 @@ function Header({ node, isConclusion }: HeaderProps): JSX.Element {
         <div className="flex items-center gap-1.5">
           <TypeBadge type={node.type} />
         </div>
+        <EvidenceBadge nodeId={node.id} />
       </div>
 
       {/* Title */}
@@ -324,6 +335,30 @@ function TypeBadge({ type }: { readonly type: Node['type'] }): JSX.Element {
       />
       {conf.label}
     </div>
+  );
+}
+
+/**
+ * Evidence checks for this idea ("No evidence", "Open question", "Not used").
+ * Selects strings, so the card re-renders only when its own issues change.
+ */
+function EvidenceBadge({ nodeId }: { readonly nodeId: UUID }): JSX.Element | null {
+  const label = useCanvasStore((s) => evidenceIssuesFor(s.canvas, nodeId).map(evidenceIssueLabel).join(' · '));
+  const hint = useCanvasStore((s) => evidenceIssuesFor(s.canvas, nodeId).map(evidenceIssueHint).join('\n'));
+  if (label === '') return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-[2px] rounded-[2px] font-mono text-[9px] leading-[12px] tracking-[0.04em] bg-danger-soft text-danger border border-dashed border-danger/40 select-none whitespace-nowrap"
+      title={hint}
+      data-testid="node-evidence-badge"
+    >
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+      </svg>
+      {label}
+    </span>
   );
 }
 

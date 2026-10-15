@@ -104,6 +104,9 @@ export {
   NODE_TITLE_MAX,
 } from './limits';
 
+export { evidenceIssueHint, evidenceIssueLabel, evidenceIssues, evidenceIssuesFor } from './evidence';
+export type { EvidenceIssue, EvidenceIssueKind } from './evidence';
+
 export { parseCanvas, serializeCanvas } from './serialize';
 export type { ParseCanvasResult } from './serialize';
 
