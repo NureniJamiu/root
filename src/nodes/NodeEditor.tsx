@@ -50,11 +50,13 @@ import {
   NODE_BODY_MAX,
   NODE_TITLE_MAX,
   canvasActions,
+  sameSource,
   useCanvasStore,
 } from '../data';
-import type { ImageEntry, Node, NodeEdits, NodeType, UUID } from '../data';
+import type { ImageEntry, Node, NodeEdits, NodeType, Source, UUID } from '../data';
 import { Button } from '../ui';
 
+import { SourceFields } from './SourceFields';
 import { typeStyles } from './typeStyles';
 
 /* -------------------------------------------------------------------------- */
@@ -168,7 +170,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
   const [draft, setDraft] = useState<NodeEdits | null>(() =>
     node === undefined
       ? null
-      : { title: node.title, body: node.body, type: node.type, images: node.images },
+      : { title: node.title, body: node.body, type: node.type, images: node.images, source: node.source ?? null },
   );
   const isDirty =
     node !== undefined &&
@@ -176,6 +178,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
     (draft.title !== node.title ||
       draft.body !== node.body ||
       draft.type !== node.type ||
+      !sameSource(draft.source ?? undefined, node.source) ||
       draft.images.length !== node.images.length ||
       draft.images.some((img, i) => img.id !== node.images[i]?.id));
 
@@ -601,6 +604,13 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
               data-testid="node-editor-body"
             />
           </div>
+
+          <SourceFields
+            source={draft.source ?? null}
+            onChange={(source: Source | null) => setDraft((d) => (d === null ? d : { ...d, source }))}
+            labelClass={FIELD_LABEL}
+            inputClass={FIELD_INPUT}
+          />
 
           {/* Images */}
           <div className="flex flex-col gap-1.5">

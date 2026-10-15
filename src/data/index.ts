@@ -36,7 +36,7 @@
  *                                                    SaveErrorDetail
  */
 
-export type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
+export type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, Source, SourceKind, UUID } from './types';
 
 export {
   canvasSchema,
@@ -47,6 +47,8 @@ export {
   nodeTypeSchema,
   positionSchema,
   sideSchema,
+  sourceKindSchema,
+  sourceSchema,
 } from './schema';
 
 export {
@@ -102,7 +104,13 @@ export {
   IMAGE_DATA_URL_MAX_BYTES,
   NODE_BODY_MAX,
   NODE_TITLE_MAX,
+  SOURCE_AUTHORS_MAX,
+  SOURCE_QUOTE_MAX,
+  SOURCE_TEXT_MAX,
+  SOURCE_URL_MAX,
 } from './limits';
+
+export { cleanSource, sameSource } from './source';
 
 export { evidenceIssueHint, evidenceIssueLabel, evidenceIssues, evidenceIssuesFor } from './evidence';
 export type { EvidenceIssue, EvidenceIssueKind } from './evidence';

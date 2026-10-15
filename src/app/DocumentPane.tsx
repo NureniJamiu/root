@@ -11,7 +11,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 
 import { emitSaveError } from '../persistence';
-import type { ExportFormat } from '../editor/export';
+import type { CitationMode, ExportFormat } from '../editor/export';
 import { DOCUMENT_TEMPLATES } from '../editor/templates';
 import type { DocumentSummary } from '../lib/documents-api';
 import type { SaveStatus } from '../lib/save-queue';
@@ -45,13 +45,42 @@ function formatUpdated(iso: string): string {
 const EXPORT_OPTIONS: ReadonlyArray<{ readonly format: ExportFormat; readonly label: string; readonly hint: string }> = [
   { format: 'docx', label: 'Word (.docx)', hint: 'Citations become footnotes' },
   { format: 'markdown', label: 'Markdown (.md)', hint: 'Citations become [^1] footnotes' },
+  { format: 'bibtex', label: 'BibTeX (.bib)', hint: 'The sources this document cites' },
 ];
+
+const CITATION_MODES: ReadonlyArray<{ readonly mode: CitationMode; readonly label: string; readonly title: string }> = [
+  { mode: 'notes', label: 'Idea notes', title: 'Footnotes say what each idea is, with the links in its notes' },
+  { mode: 'apa', label: 'APA', title: 'Footnotes and a reference list in APA style, from each idea’s source' },
+  { mode: 'mla', label: 'MLA', title: 'Footnotes and a Works Cited list in MLA style, from each idea’s source' },
+  { mode: 'chicago', label: 'Chicago', title: 'Footnotes and a bibliography in Chicago style, from each idea’s source' },
+];
+
+const CITATION_KEY = 'root-ui:export-citations';
+
+function readCitationPref(): CitationMode {
+  try {
+    const v = localStorage.getItem(CITATION_KEY);
+    return CITATION_MODES.some((m) => m.mode === v) ? (v as CitationMode) : 'notes';
+  } catch {
+    return 'notes';
+  }
+}
 
 /** "Export" and its menu of formats. Exporters load only when one is picked. */
 function ExportMenu({ docs }: { readonly docs: UseDocuments }): JSX.Element {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [citations, setCitations] = useState<CitationMode>(readCitationPref);
   const ref = useRef<HTMLDivElement>(null);
+
+  const pickCitations = (mode: CitationMode): void => {
+    setCitations(mode);
+    try {
+      localStorage.setItem(CITATION_KEY, mode);
+    } catch {
+      /* best-effort */
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -75,8 +104,12 @@ function ExportMenu({ docs }: { readonly docs: UseDocuments }): JSX.Element {
     if (!doc) return;
     setBusy(true);
     try {
-      const { exportDocument } = await import('../editor/export');
-      await exportDocument(format, doc);
+      const { exportDocument, NothingToExport } = await import('../editor/export');
+      try {
+        await exportDocument(format, doc, citations);
+      } catch (err) {
+        emitSaveError({ message: err instanceof NothingToExport ? err.message : 'Export failed. Try again.' });
+      }
     } catch {
       emitSaveError({ message: 'Export failed. Try again.' });
     } finally {
@@ -103,9 +136,30 @@ function ExportMenu({ docs }: { readonly docs: UseDocuments }): JSX.Element {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 z-30 w-[220px] bg-panel border border-rule rounded-[2px] shadow-[0_10px_30px_-12px_rgb(var(--shadow)/0.35)] py-1"
+          className="absolute right-0 top-full mt-1 z-30 w-[260px] bg-panel border border-rule rounded-[2px] shadow-[0_10px_30px_-12px_rgb(var(--shadow)/0.35)] py-1"
           data-testid="doc-export-menu"
         >
+          <div className="px-3 pt-1.5 pb-2 border-b border-rule">
+            <span className="block font-mono text-[9px] uppercase tracking-[0.08em] text-faint mb-1.5">Citations</span>
+            <div className="grid grid-cols-4 gap-0.5 p-0.5 bg-sunken rounded-[2px]" role="radiogroup" aria-label="Citation style">
+              {CITATION_MODES.map((m) => (
+                <button
+                  key={m.mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={citations === m.mode}
+                  onClick={() => pickCitations(m.mode)}
+                  title={m.title}
+                  className={`h-6 rounded-[2px] font-mono text-[9.5px] cursor-pointer whitespace-nowrap ${
+                    citations === m.mode ? 'bg-panel text-ink-strong shadow-[0_0_0_1px_rgb(var(--rule-strong))]' : 'text-muted hover:text-ink-strong'
+                  }`}
+                  data-testid={`btn-citations-${m.mode}`}
+                >
+                  {m.mode === 'notes' ? 'Notes' : m.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {EXPORT_OPTIONS.map((o) => (
             <button
               key={o.format}

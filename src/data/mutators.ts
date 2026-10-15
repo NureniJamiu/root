@@ -14,6 +14,7 @@
 
 import { newId } from './ids';
 import { IMAGE_CAPTION_MAX, IMAGE_DATA_URL_MAX_BYTES, IMAGE_TEXT_MAX } from './limits';
+import { cleanSource } from './source';
 import { now } from './time';
 import {
   computeFacingSides,
@@ -23,7 +24,7 @@ import {
   subtreeIds,
   visibleNodeIds,
 } from './graph';
-import type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, UUID } from './types';
+import type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, Source, UUID } from './types';
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
@@ -178,6 +179,8 @@ export interface NodePatch {
   title?: string;
   body?: string;
   type?: NodeType;
+  /** A new source, or `null` to remove the one recorded. */
+  source?: Source | null;
 }
 
 /**
@@ -189,13 +192,20 @@ export interface NodePatch {
  */
 export function updateNode(c: Canvas, id: UUID, patch: NodePatch): Canvas {
   const ts = now();
-  const nextNodes = replaceNode(c.nodes, id, (n) => ({
-    ...n,
-    ...(patch.title !== undefined ? { title: patch.title } : null),
-    ...(patch.body !== undefined ? { body: patch.body } : null),
-    ...(patch.type !== undefined ? { type: patch.type } : null),
-    updatedAt: ts,
-  }));
+  const nextNodes = replaceNode(c.nodes, id, (n) => {
+    const next: Node = {
+      ...n,
+      ...(patch.title !== undefined ? { title: patch.title } : null),
+      ...(patch.body !== undefined ? { body: patch.body } : null),
+      ...(patch.type !== undefined ? { type: patch.type } : null),
+      updatedAt: ts,
+    };
+    if (patch.source === undefined) return next;
+    const source = patch.source === null ? null : cleanSource(patch.source);
+    if (source) return { ...next, source };
+    const { source: _removed, ...rest } = next;
+    return rest;
+  });
   if (nextNodes === null) return c;
   return { ...c, nodes: nextNodes, updatedAt: ts };
 }

@@ -118,3 +118,44 @@ describe('documentToMarkdown', () => {
     expect(md).toBe('![Chart](https://root.app/api/assets/a.png)\n');
   });
 });
+
+describe('citation styles', () => {
+  const S1 = '00000000-0000-4000-8000-000000000011';
+  const withSource = new Map<string, Node>([
+    ...ideas,
+    [S1, {
+      ...idea(S1, 'finding', 'Sleep consolidates memory'),
+      source: { kind: 'book', title: 'Why We Sleep', authors: ['Matthew Walker'], published: '2017', container: 'Scribner' },
+    }],
+  ]);
+
+  test('a style turns sourced footnotes into references and adds a reference list', () => {
+    const md = documentToMarkdown({
+      title: '',
+      ideas: withSource,
+      content: doc(p(ref(S1, ''), t(' and '), ref(F1, ''))),
+      citations: 'apa',
+    });
+    expect(md).toBe(
+      [
+        'Sleep consolidates memory[^1] and Annual wins 3 to 1[^2]',
+        '',
+        '## References',
+        '',
+        'Walker, M. (2017). *Why We Sleep.* Scribner.',
+        '',
+        '[^1]: Walker, M. (2017). *Why We Sleep.* Scribner.',
+        '[^2]: Annual wins 3 to 1 (Finding). Survey of 400 buyers, see the report. https://example.com/report',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  test('BibTeX lists each cited source once', async () => {
+    const { documentToBibtex } = await import('../export/bibtex');
+    const out = documentToBibtex(doc(p(ref(S1, ''), ref(F1, ''), ref(S1, ''))), withSource);
+    expect(out.count).toBe(1);
+    expect(out.text).toContain('@book{walker2017sleep,');
+    expect(documentToBibtex(doc(p(ref(F1, ''))), withSource).count).toBe(0);
+  });
+});

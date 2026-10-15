@@ -9,7 +9,9 @@
 
 import type { JSONContent } from '@tiptap/core';
 
-import type { Node, NodeType } from '../../data';
+import type { Node, NodeType, Source } from '../../data';
+import { CITATION_STYLES, formatReference, sortKey } from '../../lib/citation';
+import type { CitationStyle, Run } from '../../lib/citation';
 import { markdownToPlainText, parseMarkdown } from '../../lib/markdown';
 import { IDEA_CARD, IDEA_REF } from '../links';
 
@@ -32,9 +34,40 @@ export interface Footnote {
   readonly typeName: string | null;
   readonly excerpt: string;
   readonly links: readonly string[];
+  /** The idea's recorded source, when it has one. */
+  readonly source?: Source;
 }
 
-/** The footnote as one line of plain text. */
+/**
+ * How cited ideas are described: `notes` says what the idea is (title, type,
+ * notes, links); a citation style gives the idea's source as a formal
+ * reference instead, for ideas that have one.
+ */
+export type CitationMode = 'notes' | CitationStyle;
+
+/** The footnote as runs (titles in italics), in `mode`. */
+export function footnoteRuns(note: Footnote, mode: CitationMode = 'notes'): Run[] {
+  if (mode !== 'notes' && note.source) return formatReference(note.source, mode);
+  return [{ text: footnoteText(note) }];
+}
+
+/** The reference list for `notes` in `style`: each source once, sorted. */
+export function referenceList(notes: readonly Footnote[], style: CitationStyle): { title: string; entries: Run[][] } {
+  const seen = new Set<string>();
+  const sources: Source[] = [];
+  for (const n of notes) {
+    if (!n.source) continue;
+    const key = JSON.stringify(n.source);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    sources.push(n.source);
+  }
+  sources.sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+  const title = CITATION_STYLES.find((s) => s.style === style)?.listTitle ?? 'References';
+  return { title, entries: sources.map((s) => formatReference(s, style)) };
+}
+
+/** The footnote as one line of plain text, describing the idea. */
 export function footnoteText(note: Footnote): string {
   const parts = [note.typeName ? `${note.title} (${note.typeName}).` : `${note.title} (no longer on the canvas).`];
   if (note.excerpt) parts.push(note.excerpt);
@@ -101,6 +134,7 @@ export class FootnoteRegistry {
       typeName: idea ? TYPE_NAMES[idea.type] : null,
       excerpt: idea ? excerptOf(idea.body) : '',
       links: idea ? linksOf(idea.body) : [],
+      ...(idea?.source ? { source: idea.source } : {}),
     };
     this.byIdea.set(id, note);
     return note;

@@ -177,6 +177,7 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
         <div className="flex items-center justify-between pt-1.5 border-t border-rule font-mono text-[9px] text-muted tracking-wide select-none">
           <span className="inline-flex items-center gap-2">
             {shortId}
+            {node.source && <SourceBadge source={node.source} />}
             <DocCountBadge nodeId={node.id} />
           </span>
           {node.collapsed || showsHiddenBadge ? (
@@ -358,6 +359,31 @@ function EvidenceBadge({ nodeId }: { readonly nodeId: UUID }): JSX.Element | nul
         <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
       </svg>
       {label}
+    </span>
+  );
+}
+
+/** Where the idea came from, in a word: the site, publication or first author. */
+function SourceBadge({ source }: { readonly source: NonNullable<Node['source']> }): JSX.Element {
+  let label = source.container ?? source.authors?.[0] ?? '';
+  if (!label && source.url) {
+    try {
+      label = new URL(source.url).hostname.replace(/^www\./, '');
+    } catch {
+      label = 'Source';
+    }
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1 rounded-[2px] bg-sunken text-ink-3 max-w-[120px]"
+      title={source.title ? `Source: ${source.title}` : 'Has a source'}
+      data-testid="node-source-badge"
+    >
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true" className="shrink-0">
+        <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+        <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+      </svg>
+      <span className="truncate">{label || 'Source'}</span>
     </span>
   );
 }

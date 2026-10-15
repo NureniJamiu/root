@@ -64,7 +64,8 @@ import type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators
 import { emitSaveError } from './storeEvents';
 import { computeFacingSides, subtreeIds } from './graph';
 import { NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
-import type { Canvas, ImageEntry, NodeType, Position, Side, UUID } from './types';
+import { sameSource } from './source';
+import type { Canvas, ImageEntry, NodeType, Position, Side, Source, UUID } from './types';
 
 /** The values the node editor saves in one go. */
 export interface NodeEdits {
@@ -72,6 +73,8 @@ export interface NodeEdits {
   readonly body: string;
   readonly type: NodeType;
   readonly images: readonly ImageEntry[];
+  /** The idea's source; `null` removes it, absent leaves it as it is. */
+  readonly source?: Source | null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -343,6 +346,7 @@ export const canvasActions = {
     body?: string;
     type?: NodeType;
     parentId?: UUID | null;
+    source?: Source;
   }): UUID | null {
     let created: UUID | null = null;
     commitCanvasWrite(
@@ -359,6 +363,7 @@ export const canvasActions = {
           title: opts.title.slice(0, NODE_TITLE_MAX),
           body: (opts.body ?? '').slice(0, NODE_BODY_MAX),
           type: opts.type ?? 'finding',
+          ...(opts.source ? { source: opts.source } : {}),
         });
       },
       () => ({}),
@@ -480,14 +485,20 @@ export const canvasActions = {
     const had = new Set(node.images.map((img) => img.id));
     const removed = node.images.filter((img) => !keep.has(img.id));
     const added = edits.images.filter((img) => !had.has(img.id));
+    const sourceChanged = edits.source !== undefined && !sameSource(node.source, edits.source ?? undefined);
     const textChanged =
-      node.title !== edits.title || node.body !== edits.body || node.type !== edits.type;
+      node.title !== edits.title || node.body !== edits.body || node.type !== edits.type || sourceChanged;
     if (textChanged || removed.length > 0 || added.length > 0) {
       commitCanvasWrite(
         'saveNodeEdits',
         (s) => {
           let next = textChanged
-            ? mutUpdateNode(s.canvas, id, { title: edits.title, body: edits.body, type: edits.type })
+            ? mutUpdateNode(s.canvas, id, {
+                title: edits.title,
+                body: edits.body,
+                type: edits.type,
+                ...(sourceChanged ? { source: edits.source ?? null } : {}),
+              })
             : s.canvas;
           for (const img of removed) next = mutRemoveImage(next, id, img.id);
           for (const img of added) next = mutAddImage(next, id, img);

@@ -13,7 +13,10 @@ import type { JSONContent } from '@tiptap/core';
 import type { Node } from '../../data';
 import { IDEA_CARD, IDEA_REF } from '../links';
 
-import { FootnoteRegistry, footnoteText, ideaTarget } from './notes';
+import type { Run } from '../../lib/citation';
+
+import { FootnoteRegistry, footnoteRuns, ideaTarget, referenceList } from './notes';
+import type { CitationMode } from './notes';
 
 export interface MarkdownExportInput {
   readonly title: string;
@@ -22,6 +25,13 @@ export interface MarkdownExportInput {
   readonly ideas: ReadonlyMap<string, Node>;
   /** Turns an image `src` into an address that works outside the app (made absolute). */
   readonly resolveSrc?: (src: string) => string;
+  /** How footnotes describe cited ideas; a style also adds a reference list. */
+  readonly citations?: CitationMode;
+}
+
+/** Runs as Markdown, italic runs wrapped in `*`. */
+function runsToMarkdown(runs: readonly Run[]): string {
+  return runs.map((r) => (r.italic ? `*${r.text.replace(/([*_[\]])/g, '\\$1')}*` : r.text.replace(/([[\]])/g, '\\$1'))).join('');
 }
 
 /** Characters that would otherwise start Markdown syntax inside text. */
@@ -172,7 +182,13 @@ function quote(text: string): string {
 }
 
 /** The document as Markdown, its title as the top heading and its citations as footnotes. */
-export function documentToMarkdown({ title, content, ideas, resolveSrc = (s) => s }: MarkdownExportInput): string {
+export function documentToMarkdown({
+  title,
+  content,
+  ideas,
+  resolveSrc = (s) => s,
+  citations = 'notes',
+}: MarkdownExportInput): string {
   const writer = new MarkdownWriter(ideas, resolveSrc);
   const parts: string[] = [];
   if (title.trim()) parts.push(`# ${escapeText(title.trim())}`);
@@ -180,7 +196,11 @@ export function documentToMarkdown({ title, content, ideas, resolveSrc = (s) => 
   if (body) parts.push(body);
   const notes = writer.notes.all();
   if (notes.length > 0) {
-    parts.push(notes.map((n) => `[^${n.number}]: ${footnoteText(n).replace(/([[\]])/g, '\\$1')}`).join('\n'));
+    if (citations !== 'notes') {
+      const list = referenceList(notes, citations);
+      if (list.entries.length > 0) parts.push(`## ${list.title}`, list.entries.map(runsToMarkdown).join('\n\n'));
+    }
+    parts.push(notes.map((n) => `[^${n.number}]: ${runsToMarkdown(footnoteRuns(n, citations))}`).join('\n'));
   }
   return `${parts.join('\n\n')}\n`;
 }

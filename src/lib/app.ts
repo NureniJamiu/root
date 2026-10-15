@@ -21,7 +21,7 @@ import { createDocumentStore, DocumentError } from './document-store';
 import { devMailboxEnabled, lastMailTo } from './mailer';
 import { createProjectStore, ProjectError } from './project-store';
 import type { Sql } from './sql';
-import { createSqlAiStore } from './ai/ai-store';
+import { createRateLimiter, createSqlAiStore } from './ai/ai-store';
 import type { RateLimiter } from './ai/ai-store';
 import { deriveKeyFromSecret } from './ai/keys';
 import { isPlan } from './ai/plans';
@@ -32,6 +32,7 @@ import { readResearchEnv, searchProvidersFor } from './ai/web-search';
 import { createSearchIndex } from './ai/search-index';
 import { createSqlBillingStore } from './billing/billing-store';
 import { createBillingRouter, readBillingEnv } from './billing/routes';
+import { readPage, ReaderError } from './reader';
 import { createStripeClient } from './billing/stripe';
 
 export interface AppDeps {
@@ -311,6 +312,28 @@ export async function createApp({ sql, auth, blobs, aiLimiter, env }: AppDeps): 
       },
     }),
   );
+
+  /* ------------------------------------------------------------------------ */
+  /* Source reader                                                            */
+  /* ------------------------------------------------------------------------ */
+
+  // Fetches a public page for a signed-in person and returns its text and
+  // citation details (see `reader.ts`). Limited per person on each instance.
+  const readerLimiter = createRateLimiter(30, 60_000);
+  app.post('/api/reader', requireUser, express.json({ limit: '8kb' }), async (req, res) => {
+    const url = typeof req.body?.url === 'string' ? req.body.url : '';
+    if (!url) return res.status(400).json({ error: 'Give the address of a web page.' });
+    if (!(await readerLimiter.take(String(res.locals.userId)))) {
+      return res.status(429).json({ error: 'Too many pages at once. Wait a minute and try again.' });
+    }
+    try {
+      return res.json(await readPage(url));
+    } catch (error) {
+      if (error instanceof ReaderError) return res.status(error.status).json({ error: error.message });
+      console.error('reader failed', error);
+      return res.status(500).json({ error: 'The page could not be read.' });
+    }
+  });
 
   /* ------------------------------------------------------------------------ */
   /* Billing (Stripe)                                                         */

@@ -31,6 +31,8 @@ export interface AppHeaderProps {
   readonly onViewModeChange?: (mode: ViewMode) => void;
   /** The AI menu, when the app provides one. */
   readonly aiSlot?: ReactNode;
+  /** The source reader's toggle, before the AI menu. */
+  readonly readerSlot?: ReactNode;
 }
 
 export type ViewMode = 'canvas' | 'split' | 'write';
@@ -88,6 +90,7 @@ export function AppHeader({
   viewMode,
   onViewModeChange,
   aiSlot,
+  readerSlot,
 }: AppHeaderProps): JSX.Element {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
@@ -272,6 +275,8 @@ export function AppHeader({
         <ThemeToggle />
 
         <div className="h-4 w-px bg-rule" />
+
+        {readerSlot}
 
         {aiSlot}
 

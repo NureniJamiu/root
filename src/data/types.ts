@@ -17,6 +17,8 @@ import type {
   nodeTypeSchema,
   positionSchema,
   sideSchema,
+  sourceKindSchema,
+  sourceSchema,
 } from './schema';
 
 /** RFC 4122 UUID string. Alias kept for documentation intent. */
@@ -26,6 +28,8 @@ export type NodeType = z.infer<typeof nodeTypeSchema>;
 export type Position = z.infer<typeof positionSchema>;
 export type ImageEntry = z.infer<typeof imageEntrySchema>;
 export type Side = z.infer<typeof sideSchema>;
+export type Source = z.infer<typeof sourceSchema>;
+export type SourceKind = z.infer<typeof sourceKindSchema>;
 export type Node = z.infer<typeof nodeSchema>;
 export type Edge = z.infer<typeof edgeSchema>;
 export type Canvas = z.infer<typeof canvasSchema>;

@@ -9,9 +9,10 @@ import {
   useCanvasStore,
   useDocLinksStore,
 } from '../data';
-import type { Edge, EvidenceIssue, Node, NodeType, Side, UUID } from '../data';
+import type { Edge, EvidenceIssue, Node, NodeType, Side, Source, UUID } from '../data';
 import type { DragState } from '../canvas';
 import type { SaveStatus } from '../lib/save-queue';
+import { formatReference } from '../lib/citation';
 import { Button } from '../ui/Button';
 import { IDEA_DRAG_MIME, MarkdownText } from '../nodes';
 import { ImageMosaic } from './ImageGallery';
@@ -42,6 +43,8 @@ export interface NodeInspectorRailProps {
   readonly onDescribeImages?: ((nodeId: UUID, all: boolean) => void) | undefined;
   /** Images are being described. */
   readonly isDescribingImages?: boolean;
+  /** Open an idea's source address in the reader. */
+  readonly onReadSource?: ((url: string) => void) | undefined;
 }
 
 const SAVE_LABELS: Record<SaveStatus, string> = {
@@ -171,6 +174,53 @@ function ConnectorPanel({
   );
 }
 
+/** Where the idea came from: the reference (APA), the quoted passage and a link out. */
+function SourceSection({
+  source,
+  onRead,
+}: {
+  readonly source: Source;
+  readonly onRead?: ((url: string) => void) | undefined;
+}): JSX.Element {
+  const href = source.doi ? `https://doi.org/${source.doi}` : source.url;
+  return (
+    <section className="flex flex-col gap-2" data-testid="inspector-source">
+      <SectionLabel>Source</SectionLabel>
+      <p className="m-0 font-serif text-[13.5px] leading-[20px] text-ink break-words" data-testid="inspector-source-reference">
+        {formatReference(source, 'apa').map((r, i) => (r.italic ? <em key={i}>{r.text}</em> : <span key={i}>{r.text}</span>))}
+      </p>
+      {source.quote && (
+        <blockquote className="m-0 pl-3 border-l-2 border-finding font-serif italic text-[13.5px] leading-[20px] text-ink-3 whitespace-pre-wrap">
+          {source.quote}
+        </blockquote>
+      )}
+      {href && (
+        <div className="flex items-center gap-3">
+          {onRead && source.url && (
+            <button
+              type="button"
+              onClick={() => onRead(source.url!)}
+              className="font-mono text-[10px] text-topic hover:underline cursor-pointer"
+              data-testid="inspector-source-read"
+            >
+              Read in Root
+            </button>
+          )}
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-[10px] text-topic hover:underline"
+            data-testid="inspector-source-link"
+          >
+            Open source ↗
+          </a>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** A link that selects another idea on the canvas. */
 function IdeaLink({ node, label }: { readonly node: Node; readonly label: string }): JSX.Element {
   return (
@@ -290,6 +340,7 @@ export function NodeInspectorRail({
   isResearching = false,
   onDescribeImages,
   isDescribingImages = false,
+  onReadSource,
 }: NodeInspectorRailProps): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const selectionId = useCanvasStore((s) => s.selection.nodeId);
@@ -428,6 +479,8 @@ export function NodeInspectorRail({
                 </div>
               )}
             </section>
+
+            {selectedNode.source && <SourceSection source={selectedNode.source} onRead={onReadSource} />}
 
             {/* Images */}
             {selectedNode.images.length > 0 && (

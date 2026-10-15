@@ -20,3 +20,15 @@ export const IMAGE_CAPTION_MAX = 300;
 
 /** Maximum length of the text read out of an image. */
 export const IMAGE_TEXT_MAX = 2_000;
+
+/** Maximum length of a source's title, site or publisher. */
+export const SOURCE_TEXT_MAX = 500;
+
+/** Maximum length of a source's web address. */
+export const SOURCE_URL_MAX = 2_000;
+
+/** Most authors kept for one source. */
+export const SOURCE_AUTHORS_MAX = 30;
+
+/** Maximum length of the passage quoted from a source. */
+export const SOURCE_QUOTE_MAX = 4_000;

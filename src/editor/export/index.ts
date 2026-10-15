@@ -11,10 +11,19 @@ import type { JSONContent } from '@tiptap/core';
 import { useCanvasStore } from '../../data';
 import type { Node } from '../../data';
 
+import { documentToBibtex } from './bibtex';
 import type { LoadedImage } from './docx';
 import { documentToMarkdown } from './markdown';
+import type { CitationMode } from './notes';
 
-export type ExportFormat = 'markdown' | 'docx';
+export type { CitationMode } from './notes';
+
+export type ExportFormat = 'markdown' | 'docx' | 'bibtex';
+
+const EXTENSIONS: Record<ExportFormat, string> = { markdown: 'md', docx: 'docx', bibtex: 'bib' };
+
+/** Thrown when there is nothing to export; its message is meant for the reader. */
+export class NothingToExport extends Error {}
 
 /** Widest an image is placed in a Word page, in pixels (about the text width). */
 const DOCX_IMAGE_MAX_WIDTH = 600;
@@ -40,7 +49,7 @@ export function exportFileName(title: string, format: ExportFormat): string {
       .replace(/\s+/g, ' ')
       .slice(0, 80)
       .trim() || 'Untitled document';
-  return `${base}.${format === 'markdown' ? 'md' : 'docx'}`;
+  return `${base}.${EXTENSIONS[format]}`;
 }
 
 /** Fetch an image and redraw it as a PNG Word can show, scaled to the page. */
@@ -75,15 +84,20 @@ function save(blob: Blob, fileName: string): void {
 export async function exportDocument(
   format: ExportFormat,
   doc: { readonly title: string; readonly content: JSONContent },
+  citations: CitationMode = 'notes',
 ): Promise<void> {
   const ideas = canvasIdeas();
   let blob: Blob;
   if (format === 'markdown') {
-    const text = documentToMarkdown({ title: doc.title, content: doc.content, ideas, resolveSrc: absolute });
+    const text = documentToMarkdown({ title: doc.title, content: doc.content, ideas, resolveSrc: absolute, citations });
     blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+  } else if (format === 'bibtex') {
+    const { text, count } = documentToBibtex(doc.content, ideas);
+    if (count === 0) throw new NothingToExport('None of the ideas this document cites has a source yet.');
+    blob = new Blob([text], { type: 'application/x-bibtex;charset=utf-8' });
   } else {
     const { documentToDocx } = await import('./docx');
-    blob = await documentToDocx({ title: doc.title, content: doc.content, ideas, loadImage });
+    blob = await documentToDocx({ title: doc.title, content: doc.content, ideas, loadImage, citations });
   }
   save(blob, exportFileName(doc.title, format));
 }

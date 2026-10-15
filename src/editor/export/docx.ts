@@ -35,7 +35,10 @@ import type { IParagraphOptions, ParagraphChild } from 'docx';
 import type { Node } from '../../data';
 import { IDEA_CARD, IDEA_REF } from '../links';
 
-import { FootnoteRegistry, footnoteText, ideaTarget } from './notes';
+import type { Run } from '../../lib/citation';
+
+import { FootnoteRegistry, footnoteRuns, ideaTarget, referenceList } from './notes';
+import type { CitationMode } from './notes';
 
 export interface LoadedImage {
   readonly data: ArrayBuffer;
@@ -51,6 +54,12 @@ export interface DocxExportInput {
   readonly ideas: ReadonlyMap<string, Node>;
   /** Fetch an image for embedding; null leaves its alt text in its place. */
   readonly loadImage?: (src: string) => Promise<LoadedImage | null>;
+  /** How footnotes describe cited ideas; a style also adds a reference list. */
+  readonly citations?: CitationMode;
+}
+
+function textRuns(runs: readonly Run[]): TextRun[] {
+  return runs.map((r) => new TextRun({ text: r.text, italics: r.italic === true }));
 }
 
 const ORDERED = 'root-ordered';
@@ -78,6 +87,7 @@ class DocxWriter {
   constructor(
     ideas: ReadonlyMap<string, Node>,
     private readonly loadImage: (src: string) => Promise<LoadedImage | null>,
+    private readonly citations: CitationMode,
   ) {
     this.notes = new FootnoteRegistry(ideas);
   }
@@ -85,7 +95,7 @@ class DocxWriter {
   private footnote(ideaId: string, label: string): FootnoteReferenceRun {
     const note = this.notes.noteFor(ideaId, label);
     const id = this.nextFootnote++;
-    this.footnotes[id] = { children: [new Paragraph({ children: [new TextRun(footnoteText(note))] })] };
+    this.footnotes[id] = { children: [new Paragraph({ children: textRuns(footnoteRuns(note, this.citations)) })] };
     return new FootnoteReferenceRun(id);
   }
 
@@ -260,9 +270,24 @@ class DocxWriter {
 }
 
 /** The document as a .docx file. */
-export async function documentToDocx({ title, content, ideas, loadImage = async () => null }: DocxExportInput): Promise<Blob> {
-  const writer = new DocxWriter(ideas, loadImage);
+export async function documentToDocx({
+  title,
+  content,
+  ideas,
+  loadImage = async () => null,
+  citations = 'notes',
+}: DocxExportInput): Promise<Blob> {
+  const writer = new DocxWriter(ideas, loadImage, citations);
   const body = await writer.blocks(content.content);
+  if (citations !== 'notes') {
+    const list = referenceList(writer.notes.all(), citations);
+    if (list.entries.length > 0) {
+      body.push(new Paragraph({ text: list.title, heading: HeadingLevel.HEADING_1, pageBreakBefore: true }));
+      for (const entry of list.entries) {
+        body.push(new Paragraph({ children: textRuns(entry), indent: { left: 720, hanging: 720 }, spacing: { after: 160 } }));
+      }
+    }
+  }
   const children: Block[] = title.trim() ? [new Paragraph({ text: title.trim(), heading: HeadingLevel.TITLE }), ...body] : body;
   const doc = new Document({
     title: title.trim() || 'Untitled document',

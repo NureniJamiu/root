@@ -21,7 +21,17 @@
 
 import { z } from 'zod';
 
-import { CANVAS_TITLE_MAX, IMAGE_CAPTION_MAX, IMAGE_TEXT_MAX, NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
+import {
+  CANVAS_TITLE_MAX,
+  IMAGE_CAPTION_MAX,
+  IMAGE_TEXT_MAX,
+  NODE_BODY_MAX,
+  NODE_TITLE_MAX,
+  SOURCE_AUTHORS_MAX,
+  SOURCE_QUOTE_MAX,
+  SOURCE_TEXT_MAX,
+  SOURCE_URL_MAX,
+} from './limits';
 
 /* -------------------------------------------------------------------------- */
 /* Primitive schemas                                                          */
@@ -51,6 +61,31 @@ export const imageEntrySchema = z.object({
 
 export const sideSchema = z.enum(['top', 'right', 'bottom', 'left']);
 
+/** What kind of work a source is; picks the citation layout. */
+export const sourceKindSchema = z.enum(['web', 'article', 'book', 'report', 'other']);
+
+/**
+ * Where an idea came from, for citations. Every field is optional: a source
+ * may be no more than a link, or a book with no address at all.
+ */
+export const sourceSchema = z.object({
+  kind: sourceKindSchema,
+  /** The work's own title (the page, article, chapter or book). */
+  title: z.string().max(SOURCE_TEXT_MAX).optional(),
+  /** People or organisations, each as written ("Ada Lovelace" or "Lovelace, Ada"). */
+  authors: z.array(z.string().max(SOURCE_TEXT_MAX)).max(SOURCE_AUTHORS_MAX).optional(),
+  /** Publication date: "2024", "2024-03" or "2024-03-18". */
+  published: z.string().regex(/^\d{4}(-\d{2}(-\d{2})?)?$/).optional(),
+  /** The site, journal or publisher it appeared in. */
+  container: z.string().max(SOURCE_TEXT_MAX).optional(),
+  url: z.string().max(SOURCE_URL_MAX).regex(/^https?:\/\//i).optional(),
+  doi: z.string().max(SOURCE_TEXT_MAX).optional(),
+  /** When the page was read (YYYY-MM-DD), for web sources. */
+  accessed: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** The passage the idea is drawn from. */
+  quote: z.string().max(SOURCE_QUOTE_MAX).optional(),
+});
+
 /* -------------------------------------------------------------------------- */
 /* Node + edge schemas                                                        */
 /* -------------------------------------------------------------------------- */
@@ -61,6 +96,8 @@ export const nodeSchema = z.object({
   body: z.string().max(NODE_BODY_MAX),
   images: z.array(imageEntrySchema),
   type: nodeTypeSchema,
+  /** Where the idea came from; absent when no source is recorded. */
+  source: sourceSchema.optional(),
   position: positionSchema,
   collapsed: z.boolean(),
   createdAt: z.string().datetime(),

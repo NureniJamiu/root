@@ -50,7 +50,7 @@ import {
   useCanvasStore,
   visibleNodeIds,
 } from '../data';
-import type { NodeType, UUID } from '../data';
+import type { NodeType, Position, Source, UUID } from '../data';
 import { DocumentEditorContext } from '../editor/context';
 import type { DocumentEditorServices } from '../editor/context';
 import { insertIdeaIntoDocument, revealBlockInDocument, revealIdeaInDocument } from '../editor/bridge';
@@ -76,6 +76,9 @@ import {
 } from '../persistence';
 import { useOptionalAuth } from '../auth';
 import { billingActions, takeBillingReturn } from '../billing';
+
+import { SourceReader } from '../layout/SourceReader';
+import { Button } from '../ui/Button';
 
 import { DocumentPane } from './DocumentPane';
 import { ToastSurface, showNotice } from './Toasts';
@@ -301,25 +304,42 @@ export function AppShell(): JSX.Element {
     [activeDocumentTitle],
   );
 
+  /** Where a new idea goes: below `parentId` when it is on the canvas, else free space mid-view. */
+  const placeNewIdea = useCallback((parentId: UUID | null): { position: Position; parentId: UUID | null } => {
+    const { canvas: current } = useCanvasStore.getState();
+    if (parentId !== null && current.nodes.some((n) => n.id === parentId)) {
+      return { position: computeChildPosition(current, parentId, getMeasuredSizes()), parentId };
+    }
+    const center = canvasControlsRef.current?.getViewportCenter() ?? { x: 400, y: 300 };
+    return {
+      position: findFreePosition(
+        current,
+        { x: center.x - NEW_CARD_SIZE.width / 2, y: center.y - NEW_CARD_SIZE.height / 2 },
+        getMeasuredSizes(),
+      ),
+      parentId: null,
+    };
+  }, []);
+
+  // A passage lifted from the reader: a card quoting it, hung from the selected idea.
+  const handleExtract = useCallback(
+    (type: 'finding' | 'question', passage: string, source: Source): boolean => {
+      const { title } = ideaFromText(passage);
+      if (!title) return false;
+      const place = placeNewIdea(useCanvasStore.getState().selection.nodeId);
+      return canvasActions.createIdea({ ...place, title, body: '', type, source }) !== null;
+    },
+    [placeNewIdea],
+  );
+
   const editorServices = useMemo<DocumentEditorServices>(
     () => ({
       focusIdea,
       createIdea: (text, parentId) => {
         const { title, body } = ideaFromText(text);
         if (!title) return null;
-        const { canvas: current } = useCanvasStore.getState();
-        const parentKnown = parentId !== null && current.nodes.some((n) => n.id === parentId);
-        const position = parentKnown
-          ? computeChildPosition(current, parentId, getMeasuredSizes())
-          : (() => {
-              const center = canvasControlsRef.current?.getViewportCenter() ?? { x: 400, y: 300 };
-              return findFreePosition(
-                current,
-                { x: center.x - NEW_CARD_SIZE.width / 2, y: center.y - NEW_CARD_SIZE.height / 2 },
-                getMeasuredSizes(),
-              );
-            })();
-        const id = canvasActions.createIdea({ position, title, body, type: 'finding', parentId: parentKnown ? parentId : null });
+        const place = placeNewIdea(parentId);
+        const id = canvasActions.createIdea({ ...place, title, body, type: 'finding' });
         return id ? { id, title } : null;
       },
       uploadImage: async (file) => {
@@ -341,7 +361,7 @@ export function AppShell(): JSX.Element {
       captureIdeas: aiEnabled && captureAllowed ? captureIdeas : undefined,
       rewriteDecided: (kept) => aiApi.feedback({ feature: 'ai.rewrite', offered: 1, accepted: kept ? 1 : 0 }),
     }),
-    [activeProjectId, focusIdea, aiEnabled, captureAllowed, captureIdeas],
+    [activeProjectId, focusIdea, aiEnabled, captureAllowed, captureIdeas, placeNewIdea],
   );
 
   const handleOpenDocument = useCallback(
@@ -381,7 +401,15 @@ export function AppShell(): JSX.Element {
   const aiBusy = useAiProposalStore((s) => s.pending !== null || s.proposal !== null);
   const [isAiSettingsOpen, setAiSettingsOpen] = useState(false);
   const [aiPanel, setAiPanel] = useState<{ open: boolean; tab: AiPanelTab }>({ open: false, tab: 'ask' });
-  const openAiPanel = useCallback((tab: AiPanelTab) => setAiPanel({ open: true, tab }), []);
+  const [reader, setReader] = useState<{ open: boolean; url: string | null }>({ open: false, url: null });
+  const openAiPanel = useCallback((tab: AiPanelTab) => {
+    setReader((r) => ({ ...r, open: false }));
+    setAiPanel({ open: true, tab });
+  }, []);
+  const openReader = useCallback((url: string | null = null) => {
+    setAiPanel((p) => ({ ...p, open: false }));
+    setReader((r) => ({ open: true, url: url ?? r.url }));
+  }, []);
 
   /** Where an AI citation leads: an idea on the canvas, or a passage in a document. */
   const sourceNav = useMemo(
@@ -721,6 +749,26 @@ export function AppShell(): JSX.Element {
             onNavigateHome={() => navigateTo('/')}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            readerSlot={
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => (reader.open ? setReader((r) => ({ ...r, open: false })) : openReader())}
+                aria-pressed={reader.open}
+                disabled={!isReady}
+                className={`text-[11px] px-2 ${reader.open ? 'bg-sunken-2 text-ink-strong' : ''}`}
+                title="Read a web page and turn passages into cited cards"
+                icon={
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2z" />
+                    <path d="M22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z" />
+                  </svg>
+                }
+                data-testid="btn-reader"
+              >
+                Read
+              </Button>
+            }
             aiSlot={
               <AiMenu
                 onMapTopic={handleMapTopic}
@@ -831,8 +879,18 @@ export function AppShell(): JSX.Element {
                 isResearching={researching}
                 onDescribeImages={isReady && aiEnabled ? (id, all) => void handleDescribeImages(id, all) : undefined}
                 isDescribingImages={describingImages}
+                onReadSource={isReady ? (url) => openReader(url) : undefined}
               />
             </div>
+
+            {isReady && (
+              <SourceReader
+                open={reader.open}
+                initialUrl={reader.url}
+                onClose={() => setReader((r) => ({ ...r, open: false }))}
+                onExtract={handleExtract}
+              />
+            )}
 
             {isReady && aiEnabled && (
               <AiPanel
