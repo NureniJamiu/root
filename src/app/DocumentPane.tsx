@@ -8,8 +8,10 @@
  * opened, so the canvas never pays for it.
  */
 
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 
+import { emitSaveError } from '../persistence';
+import type { ExportFormat } from '../editor/export';
 import { DOCUMENT_TEMPLATES } from '../editor/templates';
 import type { DocumentSummary } from '../lib/documents-api';
 import type { SaveStatus } from '../lib/save-queue';
@@ -38,6 +40,89 @@ function formatUpdated(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+const EXPORT_OPTIONS: ReadonlyArray<{ readonly format: ExportFormat; readonly label: string; readonly hint: string }> = [
+  { format: 'docx', label: 'Word (.docx)', hint: 'Citations become footnotes' },
+  { format: 'markdown', label: 'Markdown (.md)', hint: 'Citations become [^1] footnotes' },
+];
+
+/** "Export" and its menu of formats. Exporters load only when one is picked. */
+function ExportMenu({ docs }: { readonly docs: UseDocuments }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent): void => {
+      if (!ref.current?.contains(e.target as globalThis.Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const run = async (format: ExportFormat): Promise<void> => {
+    setOpen(false);
+    const doc = docs.current();
+    if (!doc) return;
+    setBusy(true);
+    try {
+      const { exportDocument } = await import('../editor/export');
+      await exportDocument(format, doc);
+    } catch {
+      emitSaveError({ message: 'Export failed. Try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`h-7 px-2 rounded-[2px] font-mono text-[10px] transition-colors cursor-pointer disabled:cursor-wait disabled:opacity-60 ${
+          open ? 'bg-sunken-2 text-ink-strong' : 'text-muted hover:text-ink-strong hover:bg-sunken'
+        }`}
+        title="Download this document with its citations as footnotes"
+        data-testid="btn-doc-export"
+      >
+        {busy ? 'Exporting…' : 'Export'}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 z-30 w-[220px] bg-panel border border-rule rounded-[2px] shadow-[0_10px_30px_-12px_rgb(var(--shadow)/0.35)] py-1"
+          data-testid="doc-export-menu"
+        >
+          {EXPORT_OPTIONS.map((o) => (
+            <button
+              key={o.format}
+              type="button"
+              role="menuitem"
+              onClick={() => void run(o.format)}
+              className="w-full text-left px-3 py-2 flex flex-col gap-0.5 hover:bg-sunken cursor-pointer"
+              data-testid={`btn-export-${o.format}`}
+            >
+              <span className="font-serif text-[14px] text-ink-strong">{o.label}</span>
+              <span className="font-mono text-[9.5px] text-muted">{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export interface DocumentPaneProps {
@@ -144,6 +229,7 @@ export function DocumentPane({
             >
               Outline
             </button>
+            <ExportMenu docs={docs} />
           </>
         ) : (
           <span className="flex-1 font-mono text-[11px] font-medium tracking-[0.04em] uppercase text-ink">Documents</span>

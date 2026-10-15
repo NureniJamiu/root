@@ -87,6 +87,8 @@ export interface UseDocuments {
   readonly resolveConflict: (choice: 'stored' | 'mine') => void;
   /** Send pending edits now. */
   readonly flush: () => Promise<void>;
+  /** The open document as it stands, unsaved edits included (for export). */
+  readonly current: () => { readonly title: string; readonly content: JSONContent } | null;
 }
 
 function linkedIdeas(content: JSONContent): string[] {
@@ -347,6 +349,7 @@ export function useDocuments(projectId: string): UseDocuments {
   );
 
   const flush = useCallback(() => queue.flush(), [queue]);
+  const current = useCallback(() => latestRef.current, []);
 
   return {
     documents,
@@ -363,5 +366,6 @@ export function useDocuments(projectId: string): UseDocuments {
     remove,
     resolveConflict,
     flush,
+    current,
   };
 }
