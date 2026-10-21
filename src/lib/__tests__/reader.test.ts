@@ -1,7 +1,15 @@
 // @vitest-environment node
 import { describe, expect, test } from 'vitest';
 
-import { isFetchableUrl, normaliseDate, readPage, ReaderError } from '../reader';
+import { isFetchableUrl, isReaderPdf, normaliseDate, readPage as readAny, ReaderError } from '../reader';
+import type { ReaderPage } from '../reader';
+
+/** Read a page that is expected to be HTML. */
+async function readPage(url: string, fetchImpl?: typeof fetch): Promise<ReaderPage> {
+  const read = await readAny(url, fetchImpl);
+  if (isReaderPdf(read)) throw new Error('expected a web page');
+  return read;
+}
 
 const PAGE = `<!doctype html><html><head>
 <title>Sleep and memory | Science Daily</title>
@@ -143,9 +151,16 @@ describe('readPage', () => {
     expect(read.blocks).toHaveLength(3);
   });
 
-  test('refuses PDFs and other files with a clear message', async () => {
-    const pdf = fakeFetch({ 'https://example.com/a.pdf': () => new Response('%PDF', { headers: { 'content-type': 'application/pdf' } }) });
-    await expect(readPage('https://example.com/a.pdf', pdf)).rejects.toThrow('PDFs cannot be read here yet.');
+  test('passes PDFs back as bytes, and refuses files that only claim to be one', async () => {
+    const pdf = fakeFetch({
+      'https://example.com/a.pdf': () => new Response('%PDF-1.4 …', { headers: { 'content-type': 'application/pdf' } }),
+      'https://example.com/fake.pdf': () => new Response('<html>', { headers: { 'content-type': 'application/pdf' } }),
+      'https://example.com/a.zip': () => new Response('PK', { headers: { 'content-type': 'application/zip' } }),
+    });
+    const read = await readAny('https://example.com/a.pdf', pdf);
+    expect(isReaderPdf(read) && new TextDecoder().decode(read.bytes)).toBe('%PDF-1.4 …');
+    await expect(readAny('https://example.com/fake.pdf', pdf)).rejects.toThrow('says it is a PDF, but it is not one');
+    await expect(readAny('https://example.com/a.zip', pdf)).rejects.toThrow('not a web page or a PDF');
     await expect(readPage('http://localhost/x')).rejects.toThrow('That is not a public web address.');
   });
 });

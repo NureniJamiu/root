@@ -12,8 +12,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
 import type { NodeType, Source } from '../data';
-import { readSource } from '../lib/reader-api';
-import type { ReaderPage } from '../lib/reader-api';
+import { readPdfFile, readSource } from '../lib/reader-api';
+import type { ReadResult, ReaderPage } from '../lib/reader-api';
 import { today } from '../nodes/SourceFields';
 import { Button } from '../ui/Button';
 
@@ -96,16 +96,33 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
     setSelected(null);
     const result = await readSource(/^[a-z]+:\/\//i.test(target) ? target : `https://${target}`, controller.signal);
     if (controller.signal.aborted) return;
+    show(result);
+  }, []);
+
+  const show = (result: ReadResult): void => {
     setLoading(false);
     if (result.ok) {
       setPage(result.page);
       setAddress(result.page.url);
       setExtracted(0);
+      setPasting(false);
       bodyRef.current?.scrollTo({ top: 0 });
     } else if (result.message) {
       setError(result.message);
     }
-  }, []);
+  };
+
+  /** A PDF from the person's computer, read in the browser. */
+  const openFile = async (file: File): Promise<void> => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(true);
+    setError(null);
+    setSelected(null);
+    show(await readPdfFile(file));
+  };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   // Opening on an idea's source loads it straight away.
   useEffect(() => {
@@ -169,7 +186,28 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
       aria-label="Source reader"
       aria-hidden={!open}
       data-testid="source-reader"
+      data-dragging={dragging ? 'true' : 'false'}
+      onDragOver={(e) => {
+        if (![...e.dataTransfer.types].includes('Files')) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as globalThis.Node | null)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        e.preventDefault();
+        setDragging(false);
+        void openFile(file);
+      }}
     >
+      {dragging && (
+        <div className="absolute inset-0 z-20 m-3 flex items-center justify-center border-2 border-dashed border-topic bg-panel/90 rounded-[4px] pointer-events-none">
+          <span className="font-serif text-[16px] text-ink-strong">Drop a PDF to read it</span>
+        </div>
+      )}
       <div className="flex items-center gap-2 px-3 h-11 border-b border-rule shrink-0">
         <span className="flex-1 font-mono text-[11px] font-medium tracking-[0.04em] uppercase text-ink">Reader</span>
         <Button size="sm" variant="ghost" onClick={onClose} aria-label="Close reader" data-testid="source-reader-close">
@@ -183,7 +221,7 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
           inputMode="url"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="Paste the address of an article or page"
+          placeholder="Address of an article, page or PDF"
           aria-label="Page address"
           className="flex-1 min-w-0 h-8 px-2.5 bg-panel text-ink border border-rule-strong rounded-[2px] font-mono text-[11.5px] outline-none placeholder:text-faint focus:border-topic"
           data-testid="source-reader-url"
@@ -191,6 +229,29 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
         <Button size="sm" variant="cobalt" type="submit" disabled={loading || !address.trim()} data-testid="source-reader-go">
           {loading ? 'Reading…' : 'Read'}
         </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          type="button"
+          disabled={loading}
+          onClick={() => fileRef.current?.click()}
+          title="Open a PDF from your computer (or drop one here)"
+          data-testid="source-reader-open-pdf"
+        >
+          PDF…
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void openFile(file);
+          }}
+          data-testid="source-reader-file"
+        />
       </form>
 
       <div ref={bodyRef} className="relative flex-1 min-h-0 overflow-y-auto px-6 py-5" onMouseUp={onSelectionEnd} onKeyUp={onSelectionEnd}>
@@ -252,8 +313,8 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
           <div className="pt-6 text-center">
             <h3 className="m-0 mb-1.5 font-serif text-[18px] font-normal text-ink-strong">Read a source here</h3>
             <p className="m-0 mx-auto max-w-[320px] font-serif text-[13px] leading-[20px] text-ink-3">
-              Open a web page, select a passage, and turn it into a Finding or a Question. The card keeps the quote and
-              the page as its source, ready to cite.
+              Open a web page or a PDF, select a passage, and turn it into a Finding or a Question. The card keeps the
+              quote and the page as its source, ready to cite.
             </p>
             <button
               type="button"
@@ -284,7 +345,13 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
             )}
             <div className="mt-5 flex flex-col gap-3.5 font-serif text-[15px] leading-[25px] text-ink select-text" data-testid="source-reader-text">
               {page.blocks.map((b, i) =>
-                b.kind === 'heading' ? (
+                b.kind === 'page' ? (
+                  <div key={i} className="flex items-center gap-2 mt-2 font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint select-none" aria-hidden="true">
+                    <span className="h-px flex-1 bg-rule" />
+                    {b.text}
+                    <span className="h-px flex-1 bg-rule" />
+                  </div>
+                ) : b.kind === 'heading' ? (
                   <h3 key={i} className="m-0 mt-2 font-serif text-[17px] font-medium text-ink-strong">
                     {b.text}
                   </h3>

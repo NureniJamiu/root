@@ -113,3 +113,51 @@ test('paste text from a site the reader cannot open', async ({ dashboard: page }
   await expect(card).toHaveAttribute('data-node-type', 'question');
   await expect(card.getByTestId('node-source-badge')).toHaveText('journal.example.org');
 });
+
+const PAPER = [
+  { text: 'Sleep and Memory in Older Adults', y: 720, size: 20 },
+  { text: 'Older adults who napped after learning recalled more of the', y: 680 },
+  { text: 'word list the next morning than those who stayed awake.', y: 666 },
+  { text: 'Results held after controlling for age. doi:10.5555/sleep.2023.42', y: 630 },
+];
+
+test('open a PDF from the computer and extract a passage', async ({ dashboard: page }) => {
+  const { makePdf } = await import('./pdf');
+  await page.getByTestId('btn-reader').click();
+  await page.getByTestId('source-reader-file').setInputFiles({
+    name: 'older-adults.pdf',
+    mimeType: 'application/pdf',
+    buffer: makePdf(PAPER, { title: 'Sleep and Memory in Older Adults', author: 'Grace Hopper; Alan Turing', created: '20230512' }),
+  });
+  await expect(page.getByTestId('source-reader-title')).toHaveText('Sleep and Memory in Older Adults');
+  const text = page.getByTestId('source-reader-text');
+  await expect(text).toContainText('Older adults who napped after learning recalled more of the word list the next morning');
+
+  await text.getByText('Older adults who napped').click({ clickCount: 3 });
+  await page.getByTestId('source-reader-extract-finding').click();
+  await page.getByTestId('source-reader-close').click();
+
+  const card = page.locator('[data-testid^="node-card-"]');
+  await expect(card).toHaveCount(1);
+  await card.click();
+  await expect(page.getByTestId('inspector-source-reference')).toHaveText(
+    'Hopper, G., & Turing, A. (2023). Sleep and Memory in Older Adults. https://doi.org/10.5555/sleep.2023.42',
+  );
+});
+
+test('read a PDF link through the server', async ({ dashboard: page }) => {
+  const { makePdf } = await import('./pdf');
+  await page.route('**/api/reader', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { 'content-type': 'application/pdf', 'x-reader-url': 'https://example.org/papers/older-adults.pdf' },
+      body: makePdf(PAPER),
+    }),
+  );
+  await page.getByTestId('btn-reader').click();
+  await page.getByTestId('source-reader-url').fill('https://example.org/papers/older-adults.pdf');
+  await page.getByTestId('source-reader-go').click();
+  // No title in the PDF's information: the largest type on the first page stands in.
+  await expect(page.getByTestId('source-reader-title')).toHaveText('Sleep and Memory in Older Adults');
+  await expect(page.getByTestId('source-reader-text')).toContainText('Results held after controlling for age.');
+});

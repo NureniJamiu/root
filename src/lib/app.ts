@@ -32,7 +32,7 @@ import { readResearchEnv, searchProvidersFor } from './ai/web-search';
 import { createSearchIndex } from './ai/search-index';
 import { createSqlBillingStore } from './billing/billing-store';
 import { createBillingRouter, readBillingEnv } from './billing/routes';
-import { readPage, ReaderError } from './reader';
+import { isReaderPdf, readPage, ReaderError } from './reader';
 import { createStripeClient } from './billing/stripe';
 
 export interface AppDeps {
@@ -327,7 +327,15 @@ export async function createApp({ sql, auth, blobs, aiLimiter, env }: AppDeps): 
       return res.status(429).json({ error: 'Too many pages at once. Wait a minute and try again.' });
     }
     try {
-      return res.json(await readPage(url));
+      const read = await readPage(url);
+      if (isReaderPdf(read)) {
+        // The browser reads the PDF itself; say where it finally came from.
+        res.setHeader('content-type', 'application/pdf');
+        res.setHeader('x-reader-url', encodeURI(read.url));
+        res.setHeader('content-security-policy', "default-src 'none'; sandbox");
+        return res.send(Buffer.from(read.bytes));
+      }
+      return res.json(read);
     } catch (error) {
       if (error instanceof ReaderError) return res.status(error.status).json({ error: error.message });
       console.error('reader failed', error);

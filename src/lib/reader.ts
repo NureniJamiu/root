@@ -6,6 +6,8 @@
  * The page is a stranger's: only public http(s) addresses on the standard
  * ports are fetched, every redirect is checked the same way, the body is cut
  * off at `READER_MAX_BYTES`, and what comes back is plain text, never markup.
+ * A PDF is passed back as its bytes (checked to be a PDF) for the browser to
+ * read with pdf.js.
  * Parsing is a small, dependency-free pass over the HTML (no DOM on the
  * server); it favours the page's `<article>` or `<main>` and drops
  * navigation, scripts and boilerplate.
@@ -15,12 +17,15 @@ import type { SourceKind } from '../data';
 
 export const READER_MAX_BYTES = 3 * 1024 * 1024;
 export const READER_TIMEOUT_MS = 12_000;
+/** Largest PDF the reader fetches. */
+export const READER_PDF_MAX_BYTES = 25 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 /** Most paragraphs returned for one page. */
 const MAX_BLOCKS = 600;
 
 export interface ReaderBlock {
-  readonly kind: 'heading' | 'paragraph' | 'quote' | 'item';
+  /** `page` marks where a PDF page begins; its text is "Page 3". */
+  readonly kind: 'heading' | 'paragraph' | 'quote' | 'item' | 'page';
   readonly text: string;
 }
 
@@ -285,6 +290,32 @@ export function pageDetails(html: string, url: URL): Omit<ReaderPage, 'blocks' |
 /* Fetching                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/** The body as bytes, or null when it is longer than `max`. */
+async function readBytes(res: Response, max: number): Promise<Uint8Array | null> {
+  const reader = res.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return all;
+}
+
+/** The body as text, cut off at `READER_MAX_BYTES` (a long page is still worth reading). */
 async function readCapped(res: Response): Promise<string> {
   const reader = res.body?.getReader();
   if (!reader) return '';
@@ -325,8 +356,19 @@ export function isBrowserCheck(html: string): boolean {
   return /enable javascript (to proceed|and cookies to continue)/i.test(html) && readableBlocks(html).length < 3;
 }
 
-/** Fetch and read the page at `raw`. Throws `ReaderError` with a message for people. */
-export async function readPage(raw: string, fetchImpl: typeof fetch = fetch): Promise<ReaderPage> {
+/** A PDF the reader fetched; the browser extracts its text (see `pdfText.ts`). */
+export interface ReaderPdf {
+  /** The address it was finally read from, after redirects. */
+  readonly url: string;
+  readonly bytes: Uint8Array;
+}
+
+/**
+ * Fetch `raw` with the reader's checks: a public address, every redirect
+ * checked, cookies kept along the chain, a time limit. Returns the final
+ * response (status 2xx) and where it came from.
+ */
+async function fetchChecked(raw: string, fetchImpl: typeof fetch): Promise<{ res: Response; url: URL }> {
   const start = isFetchableUrl(raw.trim());
   if (!start) throw new ReaderError('That is not a public web address.', 400);
   let url: URL = start;
@@ -341,7 +383,7 @@ export async function readPage(raw: string, fetchImpl: typeof fetch = fetch): Pr
         redirect: 'manual',
         signal: AbortSignal.timeout(READER_TIMEOUT_MS),
         headers: {
-          accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
+          accept: 'text/html,application/xhtml+xml;q=0.9,application/pdf;q=0.8,*/*;q=0.1',
           'user-agent': 'Mozilla/5.0 (compatible; RootReader/1.0)',
           ...(cookies.size > 0 ? { cookie: [...cookies].map(([k, v]) => `${k}=${v}`).join('; ') } : {}),
         },
@@ -364,9 +406,24 @@ export async function readPage(raw: string, fetchImpl: typeof fetch = fetch): Pr
   }
   if (!res) throw new ReaderError('The page redirects too many times.', 502);
   if (!res.ok) throw new ReaderError(`The site answered ${res.status}.`, 502);
+  return { res, url };
+}
+
+/**
+ * Fetch and read the page at `raw`: a web page comes back as text blocks,
+ * a PDF as its bytes for the browser to read. Throws `ReaderError` with a
+ * message for people.
+ */
+export async function readPage(raw: string, fetchImpl: typeof fetch = fetch): Promise<ReaderPage | ReaderPdf> {
+  const { res, url } = await fetchChecked(raw, fetchImpl);
   const type = res.headers.get('content-type') ?? '';
-  if (/application\/pdf/i.test(type)) throw new ReaderError('PDFs cannot be read here yet.', 415);
-  if (type && !/text\/html|application\/xhtml/i.test(type)) throw new ReaderError('That address is not a web page.', 415);
+  if (/application\/pdf/i.test(type) || (!type && /\.pdf$/i.test(url.pathname))) {
+    const bytes = await readBytes(res, READER_PDF_MAX_BYTES);
+    if (!bytes) throw new ReaderError(`That PDF is larger than ${READER_PDF_MAX_BYTES / 1024 / 1024} MB.`, 413);
+    if (!isPdf(bytes)) throw new ReaderError('That address says it is a PDF, but it is not one.', 415);
+    return { url: url.href, bytes };
+  }
+  if (type && !/text\/html|application\/xhtml/i.test(type)) throw new ReaderError('That address is not a web page or a PDF.', 415);
   const html = await readCapped(res);
   if (isBrowserCheck(html)) {
     throw new ReaderError(
@@ -377,4 +434,13 @@ export async function readPage(raw: string, fetchImpl: typeof fetch = fetch): Pr
   const blocks = readableBlocks(html);
   if (blocks.length === 0) throw new ReaderError('No readable text was found on that page.', 422);
   return { url: url.href, ...pageDetails(html, url), blocks };
+}
+
+/** Does `bytes` start like a PDF (`%PDF-`)? */
+export function isPdf(bytes: Uint8Array): boolean {
+  return bytes.length >= 5 && String.fromCharCode(...bytes.subarray(0, 5)) === '%PDF-';
+}
+
+export function isReaderPdf(read: ReaderPage | ReaderPdf): read is ReaderPdf {
+  return 'bytes' in read;
 }
