@@ -66,6 +66,9 @@ export function pageFromPaste(text: string, address: string): ReaderPage {
   return { url, title: host || 'Pasted text', authors: [], published: null, siteName: host || null, doi: null, kind: 'web', blocks };
 }
 
+/** Half the width of the floating "Extract as" actions, so they stay inside the reader. */
+const ACTIONS_HALF_WIDTH = 124;
+
 interface Selected {
   readonly text: string;
   /** Where to float the actions, inside the scrolling body. */
@@ -83,6 +86,8 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
   const [pasting, setPasting] = useState(false);
   const [pasted, setPasted] = useState('');
   const bodyRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  const pointerDownRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async (url: string) => {
@@ -135,30 +140,54 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // Follow the selection as it settles (a multi-click can finish after the last
+  // mouseup), but not while a drag is still extending it.
+  useEffect(() => {
+    const onChange = (): void => {
+      if (!pointerDownRef.current) onSelectionEnd();
+    };
+    document.addEventListener('selectionchange', onChange);
+    return () => document.removeEventListener('selectionchange', onChange);
+  }, []);
+
   const onSubmit = (e: FormEvent): void => {
     e.preventDefault();
     void load(address);
   };
 
-  /** Track a selection made inside the page text. */
+  /**
+   * Track a selection made inside the page text. A triple-click selects a whole
+   * paragraph and may end the selection in whatever follows the text, so the
+   * selection is trimmed to the page text rather than rejected.
+   */
   const onSelectionEnd = (): void => {
     const sel = window.getSelection();
     const body = bodyRef.current;
-    if (!sel || sel.isCollapsed || !body || !body.contains(sel.anchorNode) || !body.contains(sel.focusNode)) {
+    const pageText = textRef.current;
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !body || !pageText) {
       setSelected(null);
       return;
     }
-    const text = sel.toString().replace(/\s+/g, ' ').trim();
+    const range = sel.getRangeAt(0).cloneRange();
+    const bounds = document.createRange();
+    bounds.selectNodeContents(pageText);
+    if (!range.intersectsNode(pageText)) {
+      setSelected(null);
+      return;
+    }
+    if (range.compareBoundaryPoints(Range.START_TO_START, bounds) < 0) range.setStart(bounds.startContainer, bounds.startOffset);
+    if (range.compareBoundaryPoints(Range.END_TO_END, bounds) > 0) range.setEnd(bounds.endContainer, bounds.endOffset);
+    const text = range.toString().replace(/\s+/g, ' ').trim();
     if (text.length < 3) {
       setSelected(null);
       return;
     }
-    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    const rect = range.getBoundingClientRect();
     const box = body.getBoundingClientRect();
     setSelected({
       text,
       top: rect.top - box.top + body.scrollTop - 38,
-      left: Math.min(Math.max(rect.left - box.left + rect.width / 2, 90), box.width - 90),
+      left: Math.min(Math.max(rect.left - box.left + rect.width / 2, ACTIONS_HALF_WIDTH), box.width - ACTIONS_HALF_WIDTH),
     });
   };
 
@@ -254,7 +283,18 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
         />
       </form>
 
-      <div ref={bodyRef} className="relative flex-1 min-h-0 overflow-y-auto px-6 py-5" onMouseUp={onSelectionEnd} onKeyUp={onSelectionEnd}>
+      <div
+        ref={bodyRef}
+        className="relative flex-1 min-h-0 overflow-y-auto px-6 py-5"
+        onMouseDown={() => {
+          pointerDownRef.current = true;
+        }}
+        onMouseUp={() => {
+          pointerDownRef.current = false;
+          onSelectionEnd();
+        }}
+        onKeyUp={onSelectionEnd}
+      >
         {error && (
           <p className="m-0 mb-4 px-3 py-2 bg-danger-soft text-danger font-serif text-[13px] rounded-[2px]" role="alert" data-testid="source-reader-error">
             {error}
@@ -343,7 +383,7 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
                 Open the original ↗
               </a>
             )}
-            <div className="mt-5 flex flex-col gap-3.5 font-serif text-[15px] leading-[25px] text-ink select-text" data-testid="source-reader-text">
+            <div ref={textRef} className="mt-5 flex flex-col gap-3.5 font-serif text-[15px] leading-[25px] text-ink select-text" data-testid="source-reader-text">
               {page.blocks.map((b, i) =>
                 b.kind === 'page' ? (
                   <div key={i} className="flex items-center gap-2 mt-2 font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint select-none" aria-hidden="true">
@@ -371,7 +411,7 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
 
         {selected && (
           <div
-            className="absolute z-10 -translate-x-1/2 flex items-center gap-1 p-1 bg-inverse rounded-[3px] shadow-[0_8px_20px_-8px_rgb(var(--shadow)/0.5)]"
+            className="absolute z-10 -translate-x-1/2 flex items-center gap-1 p-1 whitespace-nowrap select-none bg-inverse rounded-[3px] shadow-[0_8px_20px_-8px_rgb(var(--shadow)/0.5)]"
             style={{ top: Math.max(selected.top, 4), left: selected.left }}
             onMouseDown={(e) => e.preventDefault()}
             data-testid="source-reader-actions"
