@@ -58,6 +58,29 @@ test('extract a passage from the reader as a cited finding', async ({ dashboard:
   await expect(page.locator('[data-testid^="node-card-"]').getByTestId('node-source-badge')).toHaveText('Science Daily');
 });
 
+test('a selection that runs past the end of the page text still extracts the passage', async ({ dashboard: page }) => {
+  await page.route('**/api/reader', (route) => route.fulfill({ json: PAGE }));
+  await page.getByTestId('btn-reader').click();
+  await page.getByTestId('source-reader-url').fill('news.example.com/sleep');
+  await page.getByTestId('source-reader-go').click();
+  await expect(page.getByTestId('source-reader-title')).toHaveText('Sleep and memory');
+
+  // What a triple-click on the last paragraph can do: end the selection in whatever follows the text.
+  await page.evaluate(() => {
+    const paragraph = [...document.querySelectorAll('[data-testid="source-reader-text"] p')].pop()!;
+    const range = document.createRange();
+    range.setStart(paragraph.firstChild!, 0);
+    range.setEnd(document.querySelector('[data-testid="source-reader-status"]')!, 0);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+  await page.getByTestId('source-reader-extract-finding').click();
+  await expect(page.locator('[data-testid^="node-card-"]').getByTestId('node-title')).toHaveText(
+    'People who slept after learning remembered 20% more the next day.',
+  );
+});
+
 test('record a source by hand and export with an APA reference list', async ({ dashboard: page }) => {
   await addIdea(page);
   await page.getByTestId('node-editor-title').fill('Sleep consolidates memory');
