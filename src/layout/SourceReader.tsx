@@ -66,6 +66,9 @@ export function pageFromPaste(text: string, address: string): ReaderPage {
   return { url, title: host || 'Pasted text', authors: [], published: null, siteName: host || null, doi: null, kind: 'web', blocks };
 }
 
+/** Half the width of the floating "Extract as" actions, so they stay inside the reader. */
+const ACTIONS_HALF_WIDTH = 124;
+
 interface Selected {
   readonly text: string;
   /** Where to float the actions, inside the scrolling body. */
@@ -184,7 +187,7 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
     setSelected({
       text,
       top: rect.top - box.top + body.scrollTop - 38,
-      left: Math.min(Math.max(rect.left - box.left + rect.width / 2, 90), box.width - 90),
+      left: Math.min(Math.max(rect.left - box.left + rect.width / 2, ACTIONS_HALF_WIDTH), box.width - ACTIONS_HALF_WIDTH),
     });
   };
 
@@ -408,7 +411,7 @@ export function SourceReader({ open, initialUrl, onClose, onExtract }: SourceRea
 
         {selected && (
           <div
-            className="absolute z-10 -translate-x-1/2 flex items-center gap-1 p-1 select-none bg-inverse rounded-[3px] shadow-[0_8px_20px_-8px_rgb(var(--shadow)/0.5)]"
+            className="absolute z-10 -translate-x-1/2 flex items-center gap-1 p-1 whitespace-nowrap select-none bg-inverse rounded-[3px] shadow-[0_8px_20px_-8px_rgb(var(--shadow)/0.5)]"
             style={{ top: Math.max(selected.top, 4), left: selected.left }}
             onMouseDown={(e) => e.preventDefault()}
             data-testid="source-reader-actions"

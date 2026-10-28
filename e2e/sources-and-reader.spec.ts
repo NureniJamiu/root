@@ -81,6 +81,35 @@ test('a selection that runs past the end of the page text still extracts the pas
   );
 });
 
+test('the extract actions stay on one line inside the reader for a word at the end of a line', async ({ dashboard: page }) => {
+  // A taller, wrapped toolbar covered the passage, so the third click of a triple-click landed on it.
+  const long = 'People who slept after learning remembered twenty percent more of the word list the next day than those who stayed awake all night long.';
+  await page.route('**/api/reader', (route) => route.fulfill({ json: { ...PAGE, blocks: [{ kind: 'paragraph', text: long }] } }));
+  await page.getByTestId('btn-reader').click();
+  await page.getByTestId('source-reader-url').fill('news.example.com/sleep');
+  await page.getByTestId('source-reader-go').click();
+  await expect(page.getByTestId('source-reader-title')).toHaveText('Sleep and memory');
+
+  // Select the word furthest to the right.
+  await page.evaluate(() => {
+    const text = document.querySelector('[data-testid="source-reader-text"] p')!.firstChild!;
+    let best: Range | null = null;
+    for (const m of text.textContent!.matchAll(/\S{3,}/g)) {
+      const range = document.createRange();
+      range.setStart(text, m.index!);
+      range.setEnd(text, m.index! + m[0].length);
+      if (!best || range.getBoundingClientRect().right > best.getBoundingClientRect().right) best = range;
+    }
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(best!);
+  });
+  const actions = (await page.getByTestId('source-reader-actions').boundingBox())!;
+  const reader = (await page.getByTestId('source-reader').boundingBox())!;
+  expect(actions.height).toBeLessThanOrEqual(34);
+  expect(actions.x + actions.width).toBeLessThanOrEqual(reader.x + reader.width);
+});
+
 test('record a source by hand and export with an APA reference list', async ({ dashboard: page }) => {
   await addIdea(page);
   await page.getByTestId('node-editor-title').fill('Sleep consolidates memory');
