@@ -22,8 +22,8 @@ import { ReactNodeViewRenderer } from '@tiptap/react';
 import Suggestion from '@tiptap/suggestion';
 import { createElement } from 'react';
 
-import { useCanvasStore } from '../data';
-import type { NodeType } from '../data';
+import { nodeTypeLabel, useCanvasStore } from '../data';
+import { typeColor } from '../nodes';
 
 import { placeCursorAfterBlock } from './bridge';
 import type { DocumentEditorServices } from './context';
@@ -33,13 +33,6 @@ import type { MenuItem } from './suggestionMenu';
 import { IDEA_CARD, IDEA_REF, IdeaCard, IdeaRef, schemaExtensions } from './schema';
 
 export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-
-const TYPE_HINT: Record<NodeType, string> = {
-  topic: 'Topic',
-  finding: 'Finding',
-  question: 'Question',
-  conclusion: 'Conclusion',
-};
 
 /* -------------------------------------------------------------------------- */
 /* @ ideas                                                                    */
@@ -69,8 +62,8 @@ export function matchIdeas(query: string, limit = 8): IdeaItem[] {
       id: n.id,
       title: title || 'Untitled idea',
       label: title || 'Untitled idea',
-      hint: TYPE_HINT[n.type],
-      color: `rgb(var(--${n.type}))`,
+      hint: nodeTypeLabel(n.type),
+      color: typeColor(n.type),
     }));
 }
 

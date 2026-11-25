@@ -241,4 +241,86 @@ describe('NodeEditor — component', () => {
     expect(useCanvasStore.getState().canvas.nodes).toHaveLength(0);
     expect(useCanvasStore.getState().editor.openNodeId).toBeNull();
   });
+
+  /* ---------------------------------------------------------------------- */
+  /* M0 S4 — grouped type picker and registry-generated fields              */
+  /* ---------------------------------------------------------------------- */
+
+  it('groups the type picker by family, general first', async () => {
+    await act(async () => {
+      render(<NodeEditor nodeId={nodeId} onClose={vi.fn()} />);
+    });
+    const general = screen.getByTestId('node-editor-type-family-general');
+    const framing = screen.getByTestId('node-editor-type-family-framing');
+    expect(general).toHaveAccessibleName('General');
+    expect(framing).toHaveAccessibleName('Problem framing');
+    expect(general.compareDocumentPosition(framing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const t of ['topic', 'finding', 'question', 'conclusion']) {
+      expect(general).toContainElement(screen.getByTestId(`node-editor-type-${t}`));
+    }
+    for (const t of ['problem', 'objective', 'research-question', 'hypothesis', 'variable']) {
+      expect(framing).toContainElement(screen.getByTestId(`node-editor-type-${t}`));
+    }
+    expect(screen.getByTestId('node-editor-type-research-question')).toHaveTextContent('Research question');
+  });
+
+  it('shows no field editor for a type without fields', async () => {
+    await act(async () => {
+      render(<NodeEditor nodeId={nodeId} onClose={vi.fn()} />);
+    });
+    expect(screen.queryByTestId('node-editor-fields')).toBeNull();
+  });
+
+  it("shows the picked type's fields and saves the chosen values", async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<NodeEditor nodeId={nodeId} onClose={vi.fn()} />);
+    });
+    await user.click(screen.getByTestId('node-editor-type-variable'));
+    const role = screen.getByTestId('node-editor-field-role');
+    const level = screen.getByTestId('node-editor-field-measurementLevel');
+    expect(screen.getByText('Measurement level')).toBeInTheDocument();
+    expect(role).toHaveValue('');
+    await user.selectOptions(role, 'independent');
+    await user.selectOptions(level, 'interval');
+    await user.click(screen.getByTestId('node-editor-save'));
+    const node = useCanvasStore.getState().canvas.nodes[0]!;
+    expect(node.type).toBe('variable');
+    expect(node.fields).toEqual({ role: 'independent', measurementLevel: 'interval' });
+  });
+
+  it('keeps a field value while trying other types, and saves only what the saved type defines', async () => {
+    const user = userEvent.setup();
+    await act(async () => {
+      render(<NodeEditor nodeId={nodeId} onClose={vi.fn()} />);
+    });
+    await user.click(screen.getByTestId('node-editor-type-objective'));
+    await user.selectOptions(screen.getByTestId('node-editor-field-scope'), 'specific');
+    await user.click(screen.getByTestId('node-editor-type-hypothesis'));
+    expect(screen.queryByTestId('node-editor-field-scope')).toBeNull();
+    expect(screen.getByTestId('node-editor-field-form')).toBeInTheDocument();
+    await user.click(screen.getByTestId('node-editor-type-objective'));
+    expect(screen.getByTestId('node-editor-field-scope')).toHaveValue('specific');
+    await user.click(screen.getByTestId('node-editor-type-research-question'));
+    await user.click(screen.getByTestId('node-editor-save'));
+    const node = useCanvasStore.getState().canvas.nodes[0]!;
+    expect(node.type).toBe('research-question');
+    expect(node.fields).toEqual({});
+  });
+
+  it('clearing a field back to "Not specified" removes it', async () => {
+    const user = userEvent.setup();
+    act(() => {
+      canvasActions.saveNodeEdits(nodeId, { title: '', body: '', type: 'objective', fields: { scope: 'general' }, images: [] });
+      canvasActions.openEditor(nodeId);
+    });
+    await act(async () => {
+      render(<NodeEditor nodeId={nodeId} onClose={vi.fn()} />);
+    });
+    const scope = screen.getByTestId('node-editor-field-scope');
+    expect(scope).toHaveValue('general');
+    await user.selectOptions(scope, '');
+    await user.click(screen.getByTestId('node-editor-save'));
+    expect(useCanvasStore.getState().canvas.nodes[0]!.fields).toEqual({});
+  });
 });

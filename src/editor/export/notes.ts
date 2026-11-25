@@ -9,18 +9,12 @@
 
 import type { JSONContent } from '@tiptap/core';
 
-import type { Node, NodeType, Source } from '../../data';
+import { nodeTypeLabel } from '../../data';
+import type { Node, Source } from '../../data';
 import { CITATION_STYLES, formatReference, sortKey } from '../../lib/citation';
 import type { CitationStyle, Run } from '../../lib/citation';
 import { markdownToPlainText, parseMarkdown } from '../../lib/markdown';
 import { IDEA_CARD, IDEA_REF } from '../links';
-
-const TYPE_NAMES: Record<NodeType, string> = {
-  topic: 'Topic',
-  finding: 'Finding',
-  question: 'Question',
-  conclusion: 'Conclusion',
-};
 
 /** Longest stretch of an idea's notes quoted in its footnote. */
 export const NOTE_EXCERPT_MAX = 240;
@@ -131,7 +125,7 @@ export class FootnoteRegistry {
       number: this.byIdea.size + 1,
       ideaId: id,
       title: this.titleOf(id, label),
-      typeName: idea ? TYPE_NAMES[idea.type] : null,
+      typeName: idea ? nodeTypeLabel(idea.type) : null,
       excerpt: idea ? excerptOf(idea.body) : '',
       links: idea ? linksOf(idea.body) : [],
       ...(idea?.source ? { source: idea.source } : {}),

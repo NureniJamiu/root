@@ -160,3 +160,50 @@ export type NodeFields<T extends NodeTypeId> = z.infer<(typeof NODE_TYPES)[T]['f
 export function fieldsSchemaFor<T extends NodeTypeId>(type: T): (typeof NODE_TYPES)[T]['fields'] {
   return NODE_TYPES[type].fields;
 }
+
+/** The type's name as shown on cards and in pickers ("Research question"). */
+export function nodeTypeLabel(type: NodeTypeId): string {
+  return NODE_TYPES[type].label;
+}
+
+/** One field of a type, as a choice between fixed values. */
+export interface NodeFieldChoice {
+  readonly key: string;
+  readonly options: readonly string[];
+}
+
+/**
+ * The fields of a type, in registry order, as the choices an editor offers.
+ * Every M0 field is an optional choice between fixed values; a field of any
+ * other kind is left out (the registry test keeps that from happening).
+ */
+export function fieldChoices(type: NodeTypeId): NodeFieldChoice[] {
+  const shape = (NODE_TYPES[type].fields as z.AnyZodObject).shape as Record<string, z.ZodTypeAny>;
+  const choices: NodeFieldChoice[] = [];
+  for (const [key, schema] of Object.entries(shape)) {
+    const inner = schema instanceof z.ZodOptional ? (schema.unwrap() as z.ZodTypeAny) : schema;
+    if (inner instanceof z.ZodEnum) choices.push({ key, options: inner.options as string[] });
+  }
+  return choices;
+}
+
+/**
+ * The fields `type` keeps from `fields`: each one the type defines, with a
+ * value it accepts. Everything else is dropped. Used when a card is retyped.
+ */
+export function fieldsForType(type: NodeTypeId, fields: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const shape = (NODE_TYPES[type].fields as z.AnyZodObject).shape as Record<string, z.ZodTypeAny>;
+  const kept: Record<string, unknown> = {};
+  for (const [key, schema] of Object.entries(shape)) {
+    if (!(key in fields)) continue;
+    const parsed = schema.safeParse(fields[key]);
+    if (parsed.success && parsed.data !== undefined) kept[key] = parsed.data;
+  }
+  return kept;
+}
+
+/** Whether two `fields` records hold the same values. */
+export function sameFields(a: Readonly<Record<string, unknown>>, b: Readonly<Record<string, unknown>>): boolean {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => Object.is(a[k], b[k]));
+}

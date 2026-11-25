@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { ENABLED_NODE_TYPE_IDS, nodeTypeLabel } from '../data';
 import type { NodeType } from '../data';
+import { typeColor } from '../nodes';
 import { Button } from '../ui/Button';
 import { Kbd } from '../ui/Kbd';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -42,21 +44,6 @@ const VIEW_MODES: ReadonlyArray<{ mode: ViewMode; label: string; hint: string }>
   { mode: 'split', label: 'Split', hint: 'Canvas and document side by side (Alt+2)' },
   { mode: 'write', label: 'Write', hint: 'Document only (Alt+3)' },
 ];
-
-const TYPE_LABELS: Record<NodeType, string> = {
-  topic: 'Topic',
-  finding: 'Finding',
-  question: 'Question',
-  conclusion: 'Conclusion',
-};
-
-/** The colour of each type, shown as a dot beside the highlight dropdown. */
-const TYPE_COLORS: Record<NodeType, string> = {
-  topic: 'rgb(var(--topic))',
-  finding: 'rgb(var(--finding))',
-  question: 'rgb(var(--question))',
-  conclusion: 'rgb(var(--conclusion))',
-};
 
 const GUIDE_ITEMS: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
   { keys: ['Space', 'Drag'], label: 'Pan the canvas' },
@@ -239,7 +226,7 @@ export function AppHeader({
               <span
                 className="pointer-events-none absolute left-2.5 w-2 h-2 rounded-full"
                 style={{
-                  background: activeTypeFilter ? TYPE_COLORS[activeTypeFilter] : 'transparent',
+                  background: activeTypeFilter ? typeColor(activeTypeFilter) : 'transparent',
                   border: activeTypeFilter ? 'none' : '1px solid rgb(var(--rule-strong))',
                 }}
                 aria-hidden="true"
@@ -252,9 +239,9 @@ export function AppHeader({
                 data-testid="type-filter-select"
               >
                 <option value="">All</option>
-                {(Object.keys(TYPE_LABELS) as NodeType[]).map((type) => (
+                {ENABLED_NODE_TYPE_IDS.map((type) => (
                   <option key={type} value={type}>
-                    {TYPE_LABELS[type]}
+                    {nodeTypeLabel(type)}
                   </option>
                 ))}
               </select>

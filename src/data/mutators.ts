@@ -14,7 +14,7 @@
 
 import { newId } from './ids';
 import { IMAGE_CAPTION_MAX, IMAGE_DATA_URL_MAX_BYTES, IMAGE_TEXT_MAX } from './limits';
-import { FALLBACK_RELATION, markEdited, researcherProvenance } from './model';
+import { FALLBACK_RELATION, fieldsForType, markEdited, researcherProvenance } from './model';
 import type { Provenance } from './model';
 import { CANVAS_SCHEMA_VERSION } from './schema';
 import { cleanSource } from './source';
@@ -200,6 +200,8 @@ export interface NodePatch {
   title?: string;
   body?: string;
   type?: NodeType;
+  /** New values for the type's own fields; replaces the ones recorded. */
+  fields?: Readonly<Record<string, unknown>>;
   /** A new source, or `null` to remove the one recorded. */
   source?: Source | null;
 }
@@ -209,18 +211,28 @@ export interface NodePatch {
  * R4.6). Fields absent from the patch are preserved. `updatedAt` is bumped
  * on both the node and the canvas whenever the node exists.
  *
+ * Retyping keeps the type fields the new type also defines and drops the
+ * rest; patched `fields` are likewise trimmed to what the type defines.
+ *
  * Unknown `id` returns `c` unchanged.
  */
 export function updateNode(c: Canvas, id: UUID, patch: NodePatch): Canvas {
   const ts = now();
   const edits =
-    patch.title !== undefined || patch.body !== undefined || patch.type !== undefined || patch.source !== undefined;
+    patch.title !== undefined ||
+    patch.body !== undefined ||
+    patch.type !== undefined ||
+    patch.fields !== undefined ||
+    patch.source !== undefined;
   const nextNodes = replaceNode(c.nodes, id, (n) => {
+    const type = patch.type ?? n.type;
     const next: Node = {
       ...n,
       ...(patch.title !== undefined ? { title: patch.title } : null),
       ...(patch.body !== undefined ? { body: patch.body } : null),
-      ...(patch.type !== undefined ? { type: patch.type } : null),
+      type,
+      fields:
+        patch.type !== undefined || patch.fields !== undefined ? fieldsForType(type, patch.fields ?? n.fields) : n.fields,
       // Editing an idea that came from AI makes it the researcher's (`edited`).
       provenance: edits ? markEdited(n.provenance) : n.provenance,
       updatedAt: ts,

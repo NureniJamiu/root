@@ -38,6 +38,14 @@ export const promptCanvasSchema = z.object({
 });
 export type PromptCanvas = z.infer<typeof promptCanvasSchema>;
 
+/**
+ * The types a model may suggest. The canvas holds the problem-framing types
+ * too, but which AI features may propose them, and the prompts that explain
+ * them, arrive with the AI contract widening (M0 plan slice S7, D9). Until
+ * then suggestions stay on the general family.
+ */
+export const suggestedTypeSchema = z.enum(['topic', 'finding', 'question', 'conclusion']);
+
 /* -------------------------------------------------------------------------- */
 /* Requests                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -183,7 +191,7 @@ export const ideaSuggestionSchema = z.object({
   key: z.string().min(1).max(40),
   title: z.string().min(1),
   body: z.string(),
-  type: nodeTypeSchema,
+  type: suggestedTypeSchema,
   parent: z.string().nullable(),
 });
 export type IdeaSuggestion = z.infer<typeof ideaSuggestionSchema>;
@@ -230,7 +238,7 @@ export const tidyOutputSchema = z.object({
       kind: z.enum(['retype', 'retitle', 'connect']),
       ref: z.string(),
       /** retype: the better type. */
-      type: nodeTypeSchema.nullable(),
+      type: suggestedTypeSchema.nullable(),
       /** retitle: the better title. */
       title: z.string().nullable(),
       /** connect: the idea to connect to (ref is the one it leads from). */
@@ -348,7 +356,7 @@ export interface ReviewResponse extends AiResultMeta {
 }
 
 export type TidySuggestion =
-  | { readonly kind: 'retype'; readonly ideaId: string; readonly type: z.infer<typeof nodeTypeSchema>; readonly reason: string }
+  | { readonly kind: 'retype'; readonly ideaId: string; readonly type: z.infer<typeof suggestedTypeSchema>; readonly reason: string }
   | { readonly kind: 'retitle'; readonly ideaId: string; readonly title: string; readonly reason: string }
   | { readonly kind: 'connect'; readonly sourceId: string; readonly targetId: string; readonly reason: string };
 

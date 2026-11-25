@@ -5,7 +5,8 @@
  * The toolbar exposes these actions (design.md §Node UI Layer):
  *   - `add-child`  — insert a new idea connected from this one and open its editor.
  *   - `edit`       — open the `NodeEditor` on this node (images are attached there).
- *   - `cycle-type` — cycle `topic → finding → question → conclusion → topic`.
+ *   - `cycle-type` — cycle through the types of the card's family
+ *                    (`topic → finding → question → conclusion → topic`).
  *   - `collapse` / `expand` — hide or show every connected idea at once.
  *   - reveal arrow — opens `ChildRevealMenu` to show or hide connected
  *                    ideas one at a time, in any order.
@@ -23,7 +24,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { ReactNode, Ref } from 'react';
 
-import { canvasActions, descendantCount, hasHiddenChildren, useCanvasStore } from '../data';
+import { canvasActions, descendantCount, familyTypes, hasHiddenChildren, nodeTypeLabel, useCanvasStore } from '../data';
 import type { Node, NodeType, UUID } from '../data';
 
 import { ChildRevealMenu } from './ChildRevealMenu';
@@ -56,20 +57,14 @@ function selectHasChildren(nodeId: UUID) {
 }
 
 /**
- * The cycle order used by the type button. Follows the four-button
- * order rendered by the future `NodeEditor` (task 11.1) so the two paths
- * surface the same mental model: `topic → finding → question →
- * conclusion → topic`.
+ * The next type in the card's own family, in picker order, wrapping round.
+ * For the general family that is `topic → finding → question → conclusion →
+ * topic`, the order the `NodeEditor` lists them. A type change across
+ * families goes through the editor's type picker.
  */
-const NEXT_TYPE: { readonly [K in NodeType]: NodeType } = {
-  topic: 'finding',
-  finding: 'question',
-  question: 'conclusion',
-  conclusion: 'topic',
-};
-
 function nextType(current: NodeType): NodeType {
-  return NEXT_TYPE[current];
+  const family = familyTypes(current);
+  return family[(family.indexOf(current) + 1) % family.length] ?? current;
 }
 
 export interface HoverToolbarProps {
@@ -171,7 +166,7 @@ export function HoverToolbar({ node }: HoverToolbarProps): JSX.Element {
           <PencilIcon />
         </ToolbarButton>
         <ToolbarButton
-          label={`Change card type (current: ${node.type})`}
+          label={`Change card type (current: ${nodeTypeLabel(node.type)})`}
           onClick={onCycleType}
           testId="btn-cycle-type"
         >

@@ -145,6 +145,7 @@ The palette establishes an authoritative, high-legibility scholarly environment 
 - **Finding Node (`#2d7a4c`):** Deep botanical green reserved for verified facts, data points, citations, and validated outcomes.
 - **Question Node (`#de5052`):** Crimson coral highlighting active inquiries, unresolved hypotheses, and critical anomalies.
 - **Conclusion Node (`#521010`):** Deep oxblood signaling consolidated theses, synthesized outcomes, and definitive closures.
+- **Problem-Framing Family (`#5b3fa0`, token `--framing`):** Deep violet shared by every problem-framing type (Problem statement, Objective, Research question, Hypothesis, Variable). Types beyond the four above take their family's colour rather than one each, and every card carries a mono type label ("RESEARCH QUESTION"), so the type never depends on colour alone. In dark mode the token lifts to `#b29cec`.
 
 ## Typography
 
@@ -199,6 +200,7 @@ Components follow desktop-first information density, featuring sharp hairline fr
 - **Finding Node:** Tagged with `#2d7a4c` metadata label; citation indicator anchored in `#2d7a4c`.
 - **Question Node:** Border rule highlighted in `#de5052`; query indicator flagged with monospaced question mark token in coral crimson.
 - **Conclusion Node:** Bordered in rich `#521010` oxblood; headline text styled in italicized transitional serif.
+- **Problem-Framing Nodes:** Border, top accent bar and type label in `#5b3fa0` violet (`--framing`). The label names the exact type in uppercase mono, since the family shares one colour.
 
 ### Text Input & Filter Fields
 - Minimalist architectural box: `#ffffff` surface, `1px solid #ebebeb` default border, `2px` radius. Focus transition (`150ms`) upgrades border to `1px solid #000000` without glow rings. Placeholder copy rendered in `#595959`.

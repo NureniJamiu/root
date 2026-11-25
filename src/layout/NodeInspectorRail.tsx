@@ -6,15 +6,16 @@ import {
   evidenceIssues,
   nodeLabel,
   nodeOrdinals,
+  nodeTypeLabel,
   useCanvasStore,
   useDocLinksStore,
 } from '../data';
-import type { Edge, EvidenceIssue, Node, NodeType, Side, Source, UUID } from '../data';
+import type { Edge, EvidenceIssue, Node, Side, Source, UUID } from '../data';
 import type { DragState } from '../canvas';
 import type { SaveStatus } from '../lib/save-queue';
 import { formatReference } from '../lib/citation';
 import { Button } from '../ui/Button';
-import { IDEA_DRAG_MIME, MarkdownText } from '../nodes';
+import { IDEA_DRAG_MIME, MarkdownText, typeColor } from '../nodes';
 import { ImageMosaic } from './ImageGallery';
 
 export interface NodeInspectorRailProps {
@@ -70,13 +71,6 @@ function SaveIndicator({ status }: { readonly status: SaveStatus }): JSX.Element
     </div>
   );
 }
-
-const TYPE_LABELS: Record<NodeType, { readonly label: string; readonly color: string }> = {
-  topic: { label: 'Topic', color: 'rgb(var(--topic))' },
-  finding: { label: 'Finding', color: 'rgb(var(--finding))' },
-  question: { label: 'Question', color: 'rgb(var(--question))' },
-  conclusion: { label: 'Conclusion', color: 'rgb(var(--conclusion))' },
-};
 
 /** Small uppercase heading over a section of the read-only view. */
 function SectionLabel({ children }: { readonly children: string }): JSX.Element {
@@ -365,7 +359,9 @@ export function NodeInspectorRail({
   const nameOf = (node: Node): string => node.title || 'Untitled idea';
 
   const isSelectedDragging = dragInfo && selectedNode && dragInfo.nodeId === selectedNode.id;
-  const type = selectedNode ? TYPE_LABELS[selectedNode.type] : null;
+  const type = selectedNode
+    ? { label: nodeTypeLabel(selectedNode.type), color: typeColor(selectedNode.type) }
+    : null;
 
   return (
     <aside

@@ -9,18 +9,17 @@
 
 import type { CSSProperties } from 'react';
 
+import { ENABLED_NODE_TYPE_IDS } from '../data';
 import type { NodeType } from '../data';
+import { typeColor } from '../nodes';
 
 /** Edge type name registered with React Flow for every connector. */
 export const CONNECTOR_EDGE_TYPE = 'connector' as const;
 
-/** Stroke colour for a connector leaving an idea of each type. */
-export const EDGE_COLOR_BY_TYPE: Readonly<Record<NodeType, string>> = Object.freeze({
-  topic: 'rgb(var(--topic))',
-  finding: 'rgb(var(--finding))',
-  question: 'rgb(var(--question))',
-  conclusion: 'rgb(var(--conclusion))',
-});
+/** Stroke colour for a connector leaving an idea of each type (its type or family colour). */
+export const EDGE_COLOR_BY_TYPE: Readonly<Record<NodeType, string>> = Object.freeze(
+  Object.fromEntries(ENABLED_NODE_TYPE_IDS.map((type) => [type, typeColor(type)])) as Record<NodeType, string>,
+);
 
 /** Neutral stroke used when the source type is unknown. */
 export const EDGE_STROKE_COLOR = 'rgb(var(--muted))' as const;

@@ -52,6 +52,7 @@ const config: Config = {
       finding: { DEFAULT: tok('finding'), fill: tok('finding-fill') },
       question: { DEFAULT: tok('question'), fill: tok('question-fill') },
       conclusion: { DEFAULT: tok('conclusion'), fill: tok('conclusion-fill') },
+      framing: tok('framing'),
       accent: { DEFAULT: tok('accent'), strong: tok('accent-strong'), deep: tok('accent-deep') },
       'on-accent': tok('on-accent'),
       danger: {
@@ -97,6 +98,7 @@ const config: Config = {
         finding: tok('finding'),
         question: tok('question'),
         conclusion: tok('conclusion'),
+        framing: tok('framing'),
       },
       primary: {
         DEFAULT: tok('accent-strong'),

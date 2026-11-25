@@ -1,12 +1,11 @@
 /**
  * Property 8: typeStyles palette conformance
  *
- * Every color value in `typeStyles[t]` for every `NodeType` `t` is one of
- * the DESIGN.md §Style Foundations palette colors (color.text.* and
- * color.surface.*). Also asserts that `SELECTION_BORDER_COLOR` is in the
- * palette.
+ * Every color value in `typeStyles[t]` for every enabled `NodeType` `t` is
+ * one of the DESIGN.md §Style Foundations palette colors. Also asserts that
+ * `SELECTION_BORDER_COLOR` is in the palette.
  *
- * This is a deterministic exhaustive check over all four NodeTypes — not a
+ * This is a deterministic exhaustive check over every enabled type — not a
  * fast-check property — because the input space is finite and fully enumerable.
  *
  * Validates: Requirements 4.7
@@ -15,7 +14,8 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { typeStyles, SELECTION_BORDER_COLOR, PALETTE as RAW_PALETTE } from '../typeStyles';
+import { typeStyles, SELECTION_BORDER_COLOR, PALETTE as RAW_PALETTE, typeColorToken } from '../typeStyles';
+import { ENABLED_NODE_TYPE_IDS } from '../../data';
 import type { NodeType } from '../../data';
 
 // ---------------------------------------------------------------------------
@@ -25,12 +25,7 @@ import type { NodeType } from '../../data';
 // ---------------------------------------------------------------------------
 const PALETTE: ReadonlySet<string> = new Set(Object.values(RAW_PALETTE));
 
-const NODE_TYPES: ReadonlyArray<NodeType> = [
-  'topic',
-  'finding',
-  'question',
-  'conclusion',
-];
+const NODE_TYPES: ReadonlyArray<NodeType> = ENABLED_NODE_TYPE_IDS;
 
 describe('Property 8: typeStyles palette conformance', () => {
   it('every border, background, and text color is in the DESIGN.md palette', () => {
@@ -46,21 +41,29 @@ describe('Property 8: typeStyles palette conformance', () => {
     }
   });
 
-  it('the four NodeType pairings are pairwise distinct', () => {
-    // Two pairings are considered distinct if any of their three slots differ.
+  it('types with different colour tokens have distinct pairings', () => {
+    // The four general types each have their own colour; the other types
+    // share their family's colour (D11), so only different tokens must differ.
     for (let i = 0; i < NODE_TYPES.length; i++) {
       for (let j = i + 1; j < NODE_TYPES.length; j++) {
-        const a = typeStyles[NODE_TYPES[i]!];
-        const b = typeStyles[NODE_TYPES[j]!];
-        const same =
-          a.border === b.border &&
-          a.background === b.background &&
-          a.text === b.text;
-        expect(
-          same,
-          `typeStyles['${NODE_TYPES[i]}'] and typeStyles['${NODE_TYPES[j]}'] are identical pairings`,
-        ).toBe(false);
+        const ta = NODE_TYPES[i]!;
+        const tb = NODE_TYPES[j]!;
+        if (typeColorToken(ta) === typeColorToken(tb)) continue;
+        const a = typeStyles[ta];
+        const b = typeStyles[tb];
+        const same = a.border === b.border && a.background === b.background && a.text === b.text;
+        expect(same, `typeStyles['${ta}'] and typeStyles['${tb}'] are identical pairings`).toBe(false);
       }
+    }
+  });
+
+  it('the four general types keep their own colours and the framing family shares --framing', () => {
+    expect(typeStyles.topic.border).toBe('rgb(var(--topic))');
+    expect(typeStyles.finding.border).toBe('rgb(var(--finding))');
+    expect(typeStyles.question.border).toBe('rgb(var(--question))');
+    expect(typeStyles.conclusion.border).toBe('rgb(var(--conclusion))');
+    for (const t of ['problem', 'objective', 'research-question', 'hypothesis', 'variable'] as const) {
+      expect(typeStyles[t].border).toBe('rgb(var(--framing))');
     }
   });
 

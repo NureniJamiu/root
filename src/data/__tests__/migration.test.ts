@@ -155,7 +155,9 @@ describe('schema v2', () => {
   });
 
   test('accepts only the types and relations the app exposes today', () => {
-    const retyped = { ...valid, nodes: valid.nodes.map((n, i) => (i === 0 ? { ...n, type: 'objective' } : n)) };
+    const framing = { ...valid, nodes: valid.nodes.map((n, i) => (i === 0 ? { ...n, type: 'objective' } : n)) };
+    expect(canvasSchema.safeParse(framing).success).toBe(true);
+    const retyped = { ...valid, nodes: valid.nodes.map((n, i) => (i === 0 ? { ...n, type: 'methodology' } : n)) };
     expect(canvasSchema.safeParse(retyped).success).toBe(false);
     const related = { ...valid, edges: valid.edges.map((e) => ({ ...e, relationType: 'supports' })) };
     expect(canvasSchema.safeParse(related).success).toBe(false);

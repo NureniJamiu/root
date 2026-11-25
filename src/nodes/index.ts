@@ -30,6 +30,8 @@ export {
 } from './toolbarCallbacks';
 export type { ToolbarCallbacks } from './toolbarCallbacks';
 
+export { typeColor, typeColorToken } from './typeStyles';
+export type { TypeColorToken } from './typeStyles';
 export { MarkdownText } from './MarkdownText';
 export type { MarkdownTextProps } from './MarkdownText';
 

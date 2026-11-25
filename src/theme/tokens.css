@@ -43,6 +43,7 @@
   --finding: 45 122 76;        /* #2d7a4c */
   --question: 222 80 82;       /* #de5052 */
   --conclusion: 82 16 16;      /* #521010 */
+  --framing: 91 63 160;        /* #5b3fa0, the problem-framing family */
 
   /* Idea types and actions as fills under white text */
   --accent: 0 81 195;
@@ -106,6 +107,7 @@
   --finding: 96 190 134;       /* #60be86 */
   --question: 245 124 122;     /* #f57c7a */
   --conclusion: 208 146 170;   /* #d092aa, oxblood lifted to a dusty wine */
+  --framing: 178 156 236;      /* #b29cec, violet lifted for dark panels */
 
   --accent: 46 104 214;        /* #2e68d6 */
   --accent-strong: 36 92 196;

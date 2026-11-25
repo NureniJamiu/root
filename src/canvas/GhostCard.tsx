@@ -8,7 +8,7 @@ import { memo } from 'react';
 import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
-import { aiProposalActions } from '../data';
+import { aiProposalActions, nodeTypeLabel } from '../data';
 import type { GhostIdea, Side } from '../data';
 import { EDGE_COLOR_BY_TYPE } from './edgeStyles';
 import { sourceHandleId, targetHandleId } from './reconnect';
@@ -26,13 +26,6 @@ const SIDES: ReadonlyArray<readonly [Side, RFPosition]> = [
   ['bottom', RFPosition.Bottom],
   ['left', RFPosition.Left],
 ];
-
-const TYPE_LABEL: Record<GhostIdea['type'], string> = {
-  topic: 'Topic',
-  finding: 'Finding',
-  question: 'Question',
-  conclusion: 'Conclusion',
-};
 
 function GhostCardImpl({ data }: NodeProps<GhostCardData>): JSX.Element {
   const { idea, included } = data;
@@ -72,7 +65,7 @@ function GhostCardImpl({ data }: NodeProps<GhostCardData>): JSX.Element {
       <div className="p-3 flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-[9px] uppercase tracking-wider" style={{ color: accent }}>
-            {TYPE_LABEL[idea.type]} · suggested
+            {nodeTypeLabel(idea.type)} · suggested
           </span>
           <span
             aria-hidden="true"

@@ -61,6 +61,7 @@ import {
   updateNode as mutUpdateNode,
 } from './mutators';
 import type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators';
+import { fieldsForType, sameFields } from './model';
 import type { Provenance } from './model';
 import { emitSaveError } from './storeEvents';
 import { computeFacingSides, subtreeIds } from './graph';
@@ -73,6 +74,8 @@ export interface NodeEdits {
   readonly title: string;
   readonly body: string;
   readonly type: NodeType;
+  /** The type's own fields; absent leaves them as they are (trimmed to `type`). */
+  readonly fields?: Readonly<Record<string, unknown>>;
   readonly images: readonly ImageEntry[];
   /** The idea's source; `null` removes it, absent leaves it as it is. */
   readonly source?: Source | null;
@@ -478,7 +481,7 @@ export const canvasActions = {
   },
 
   /**
-   * Commit everything the editor changed on `id` (text, type and images) as
+   * Commit everything the editor changed on `id` (text, type, fields and images) as
    * one undo step, then close the editor. Nothing is written when the
    * values already match the node.
    */
@@ -490,8 +493,14 @@ export const canvasActions = {
     const removed = node.images.filter((img) => !keep.has(img.id));
     const added = edits.images.filter((img) => !had.has(img.id));
     const sourceChanged = edits.source !== undefined && !sameSource(node.source, edits.source ?? undefined);
+    const fieldsChanged =
+      edits.fields !== undefined && !sameFields(node.fields, fieldsForType(edits.type, edits.fields));
     const textChanged =
-      node.title !== edits.title || node.body !== edits.body || node.type !== edits.type || sourceChanged;
+      node.title !== edits.title ||
+      node.body !== edits.body ||
+      node.type !== edits.type ||
+      fieldsChanged ||
+      sourceChanged;
     if (textChanged || removed.length > 0 || added.length > 0) {
       commitCanvasWrite(
         'saveNodeEdits',
@@ -501,6 +510,7 @@ export const canvasActions = {
                 title: edits.title,
                 body: edits.body,
                 type: edits.type,
+                ...(edits.fields !== undefined ? { fields: edits.fields } : {}),
                 ...(sourceChanged ? { source: edits.source ?? null } : {}),
               })
             : s.canvas;
