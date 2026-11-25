@@ -53,16 +53,20 @@ All origins carry `edited: boolean`, which turns true once the researcher edits 
 
 Rules run over a `GraphView` and return `Issue`s carrying `ruleId` and `ruleVersion`.
 
-| Id | Fires when |
-|---|---|
-| `conclusion-unbacked` | no finding backs the conclusion (directly or through questions or conclusions) |
-| `conclusion-open-question` | the conclusion rests on a question nothing answers |
-| `finding-dangling` | the finding connects to nothing that uses it |
-| `rq-without-objective` | a research question has no `addresses` edge to an objective |
-| `objective-without-rq` | an objective has no research question addressing it |
-| `hypothesis-without-variable` | a hypothesis `involves` no variable |
-| `objective-off-problem` | a problem statement exists but this objective does not address it |
-| `relation-invalid` | an edge's relation is not allowed for its endpoint types |
+The engine lives in `../rules/`. Typed rules read connectors in their semantic direction (`orient`), so a connector drawn either way round counts; a connector whose relation does not fit has no meaning for them.
+
+| Id | Version | Fires when |
+|---|---|---|
+| `conclusion-unbacked` | 2 | no finding backs the conclusion, directly or through questions, research questions or conclusions; `contradicts` never backs |
+| `conclusion-open-question` | 2 | the conclusion rests on a question or research question no finding answers |
+| `finding-dangling` | 1 | the finding connects to nothing that uses it (a contradicting finding is used) |
+| `rq-without-objective` | 1 | a research question has no `addresses` edge to an objective, itself or through a question it `refines` |
+| `objective-without-rq` | 1 | no research question addresses the objective, or any objective that `refines` it |
+| `objective-off-problem` | 1 | a problem statement exists but the objective does not address it, itself or through an objective it `refines` |
+| `hypothesis-without-variable` | 1 | a hypothesis `involves` no variable |
+| `relation-invalid` | 1 | a connector's relation is not allowed for its endpoint types; one issue per card the connectors start from |
+
+On a canvas of general types with only `related-to` connectors (every migrated v1 canvas) only the first three rules can fire, with the same results as before M0 (property-tested in `rules/__tests__/framing.test.ts`).
 
 ## Stages (`stages.ts`)
 

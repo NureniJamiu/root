@@ -68,7 +68,7 @@ describe('conclusions resting on open questions', () => {
     expect(issuesFor(c, id('c1'))).toEqual([
       {
         ruleId: 'conclusion-open-question',
-        ruleVersion: 1,
+        ruleVersion: 2,
         nodeIds: [id('c1'), id('q1'), id('q2')],
         edgeIds: [],
         label: '2 open questions',

@@ -330,7 +330,7 @@ describe('/api/ai', () => {
         ['gap', 'finding-dangling'],
         ['gap', null],
       ]);
-      expect(body.issues[0].ruleVersion).toBe(1);
+      expect(body.issues[0].ruleVersion).toBe(2);
       const free = await start({ projects, model, plan: 'free' });
       expect((await free.call('/review', { body: { projectId: PROJECT } })).status).toBe(403);
     });

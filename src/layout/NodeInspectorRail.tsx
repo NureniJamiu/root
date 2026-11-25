@@ -312,7 +312,24 @@ const ISSUE_GROUPS: readonly { readonly ruleId: RuleId; readonly slug: string; r
   { ruleId: 'conclusion-unbacked', slug: 'unbacked', title: 'Conclusions with no evidence' },
   { ruleId: 'conclusion-open-question', slug: 'open-question', title: 'Conclusions resting on open questions' },
   { ruleId: 'finding-dangling', slug: 'dangling', title: 'Findings nothing uses' },
+  { ruleId: 'rq-without-objective', slug: 'rq-without-objective', title: 'Research questions with no objective' },
+  { ruleId: 'objective-without-rq', slug: 'objective-without-rq', title: 'Objectives no research question addresses' },
+  { ruleId: 'objective-off-problem', slug: 'objective-off-problem', title: 'Objectives not tied to the problem' },
+  { ruleId: 'hypothesis-without-variable', slug: 'hypothesis-without-variable', title: 'Hypotheses with no variables' },
+  { ruleId: 'relation-invalid', slug: 'relation-invalid', title: "Cards with connectors that don't fit" },
 ];
+
+/** Types some check looks at; the overview shows once the canvas holds one of them. */
+const CHECKED_TYPES: ReadonlySet<string> = new Set([
+  'conclusion',
+  'finding',
+  'research-question',
+  'objective',
+  'hypothesis',
+]);
+
+/** Types only the problem-framing checks look at. */
+const FRAMING_CHECKED: ReadonlySet<string> = new Set(['research-question', 'objective', 'hypothesis']);
 
 const issueSlug = (ruleId: RuleId): string => ISSUE_GROUPS.find((g) => g.ruleId === ruleId)?.slug ?? ruleId;
 
@@ -326,6 +343,7 @@ function EvidenceOverview({
   readonly byId: ReadonlyMap<UUID, Node>;
   readonly labelOf: (node: Node) => string;
 }): JSX.Element {
+  const framing = [...byId.values()].some((n) => FRAMING_CHECKED.has(n.type));
   const groups = ISSUE_GROUPS.map(({ ruleId, slug, title }) => ({
     slug,
     title,
@@ -340,7 +358,9 @@ function EvidenceOverview({
       <SectionLabel>Evidence check</SectionLabel>
       {groups.length === 0 ? (
         <p className="m-0 font-serif text-[13px] leading-[19px] text-ink-3" data-testid="evidence-all-clear">
-          Every conclusion has a finding behind it, and every finding is part of the argument.
+          {framing
+            ? 'Every check passes: research questions, objectives and hypotheses are linked, and the argument is backed.'
+            : 'Every conclusion has a finding behind it, and every finding is part of the argument.'}
         </p>
       ) : (
         groups.map((g) => (
@@ -657,7 +677,7 @@ export function NodeInspectorRail({
                 ? 'Double-click empty canvas, or use Add Idea, to start.'
                 : 'Click any idea card on the canvas to read it here.'}
             </p>
-            {canvas.nodes.some((n) => n.type === 'conclusion' || n.type === 'finding') && (
+            {(issues.size > 0 || canvas.nodes.some((n) => CHECKED_TYPES.has(n.type))) && (
               <div className="w-full">
                 <EvidenceOverview issues={issues} byId={byId} labelOf={labelOf} />
               </div>

@@ -10,9 +10,20 @@
 import type { GraphView, Issue, Rule } from '../model/rules';
 import type { UUID } from '../types';
 import { conclusionOpenQuestion, conclusionUnbacked, findingDangling } from './evidence';
+import { hypothesisWithoutVariable, objectiveOffProblem, objectiveWithoutRq, rqWithoutObjective } from './framing';
+import { relationInvalid } from './relations';
 
 /** Every rule, in the order their issues are listed. */
-export const RULES: readonly Rule[] = [conclusionUnbacked, conclusionOpenQuestion, findingDangling];
+export const RULES: readonly Rule[] = [
+  conclusionUnbacked,
+  conclusionOpenQuestion,
+  findingDangling,
+  rqWithoutObjective,
+  objectiveWithoutRq,
+  objectiveOffProblem,
+  hypothesisWithoutVariable,
+  relationInvalid,
+];
 
 const NONE: readonly Issue[] = [];
 const results = new WeakMap<GraphView, readonly Issue[]>();
