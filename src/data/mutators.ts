@@ -159,7 +159,7 @@ export function addNode(c: Canvas, opts: NewNodeOptions): Canvas {
 export function addChild(
   c: Canvas,
   parentId: UUID,
-  opts: NewNodeOptions & { sourceSide?: Side; targetSide?: Side },
+  opts: NewNodeOptions & { sourceSide?: Side; targetSide?: Side; relationType?: RelationId },
 ): Canvas {
   const parent = c.nodes.find((n) => n.id === parentId);
   if (parent === undefined) return c;
@@ -176,7 +176,8 @@ export function addChild(
     // A side that was asked for is the user's choice, so it stays put.
     sourcePinned: opts.sourceSide !== undefined,
     targetPinned: opts.targetSide !== undefined,
-    relationType: FALLBACK_RELATION,
+    // Only what the caller says the connector means: a new child is a plain link otherwise.
+    relationType: opts.relationType ?? FALLBACK_RELATION,
     provenance: child.provenance,
   };
   const nodes = c.nodes.map((n) =>
@@ -610,7 +611,7 @@ function rejectEnds(c: Canvas, ends: ConnectorEnds, ignoreId?: UUID): string | n
  * otherwise with the validity map's default relation for the two card types
  * (`related-to` when the pair has none).
  */
-export function connect(c: Canvas, ends: ConnectorEnds, relationType?: RelationId): Canvas {
+export function connect(c: Canvas, ends: ConnectorEnds, relationType?: RelationId, provenance?: Provenance): Canvas {
   const from = c.nodes.find((n) => n.id === ends.source);
   const to = c.nodes.find((n) => n.id === ends.target);
   if (from === undefined || to === undefined || rejectEnds(c, ends) !== null) return c;
@@ -623,7 +624,7 @@ export function connect(c: Canvas, ends: ConnectorEnds, relationType?: RelationI
     sourcePinned: ends.sourcePinned ?? false,
     targetPinned: ends.targetPinned ?? false,
     relationType: relationType ?? defaultRelation(from.type, to.type),
-    provenance: researcherProvenance(),
+    provenance: provenance ?? researcherProvenance(),
   };
   return { ...c, edges: [...c.edges, edge], updatedAt: now() };
 }

@@ -78,7 +78,11 @@ export interface CanvasLike {
     /** Only what AI image descriptions wrote is read; the pictures never are. */
     readonly images?: ReadonlyArray<{ readonly caption?: string | undefined; readonly text?: string | undefined }>;
   }>;
-  readonly edges: ReadonlyArray<{ readonly source: string; readonly target: string }>;
+  readonly edges: ReadonlyArray<{
+    readonly source: string;
+    readonly target: string;
+    readonly relationType?: PromptCanvas['edges'][number]['relationType'];
+  }>;
 }
 
 /** An idea's notes followed by its described images, within `PROMPT_BODY_MAX`. */
@@ -117,7 +121,7 @@ export function toPromptCanvas(canvas: CanvasLike, mustInclude: readonly string[
     edges: canvas.edges
       .filter((e) => ids.has(e.source) && ids.has(e.target))
       .slice(0, PROMPT_NODES_MAX * 4)
-      .map((e) => ({ source: e.source, target: e.target })),
+      .map((e) => ({ source: e.source, target: e.target, relationType: e.relationType ?? 'related-to' })),
   };
 }
 

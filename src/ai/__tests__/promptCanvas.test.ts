@@ -19,6 +19,6 @@ describe('toPromptCanvas', () => {
     expect(promptCanvasSchema.safeParse(prompt).success).toBe(true);
     expect(prompt.nodes[0]!.body).toHaveLength(2_000);
     expect(JSON.stringify(prompt)).not.toContain('data:image');
-    expect(prompt.edges).toEqual([{ source: root, target: canvas.nodes[1]!.id }]);
+    expect(prompt.edges).toEqual([{ source: root, target: canvas.nodes[1]!.id, relationType: 'related-to' }]);
   });
 });

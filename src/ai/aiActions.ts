@@ -42,6 +42,7 @@ function toGhosts(ideas: readonly IdeaSuggestion[], positions: ReadonlyMap<strin
     body: i.body,
     type: i.type,
     parentKey: i.parent,
+    relation: i.relation ?? null,
     position: positions.get(i.key) ?? { x: 0, y: 0 },
   }));
 }

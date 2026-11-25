@@ -29,6 +29,7 @@ const idea = (key: string, parent: string | null, title = `Idea ${key}`) => ({
   body: 'Why it matters.',
   type: 'finding' as const,
   parent,
+  relation: null,
 });
 
 describe('cleanSuggestions', () => {
@@ -36,6 +37,7 @@ describe('cleanSuggestions', () => {
     const out = cleanSuggestions([idea('a', null), idea('a', 'a'), idea('c', 'zzz'), idea('d', 'd')], {
       max: 10,
       anchorAll: false,
+      types: ['finding'],
     });
     expect(out.map((i) => i.key)).toEqual(['a', 'a_', 'c', 'd']);
     expect(out.map((i) => i.parent)).toEqual([null, 'a', 'a', 'a']);
@@ -45,6 +47,7 @@ describe('cleanSuggestions', () => {
     const out = cleanSuggestions([idea('a', null, '  '), idea('b', 'x'), idea('c', 'b'), idea('d', null)], {
       max: 2,
       anchorAll: true,
+      types: ['finding'],
     });
     expect(out).toHaveLength(2);
     expect(out.every((i) => i.parent === null)).toBe(true);
@@ -165,19 +168,19 @@ describe('phase 2 features', () => {
     const { suggestTidy } = await import('../features');
     const model = jsonModel({
       suggestions: [
-        { kind: 'retype', ref: 'I3', type: 'question', title: null, to: null, reason: 'Already a question.' },
-        { kind: 'retype', ref: 'I2', type: 'conclusion', title: null, to: null, reason: 'It judges.' },
-        { kind: 'retitle', ref: 'I3', type: null, title: 'Do naps help memory?', to: null, reason: 'Clearer.' },
-        { kind: 'connect', ref: 'I1', type: null, title: null, to: 'I2', reason: 'Already connected.' },
-        { kind: 'connect', ref: 'I2', type: null, title: null, to: 'I3', reason: 'Related.' },
-        { kind: 'connect', ref: 'I2', type: null, title: null, to: 'I40', reason: 'Unknown.' },
+        { kind: 'retype', ref: 'I3', type: 'question', title: null, to: null, relation: null, reason: 'Already a question.' },
+        { kind: 'retype', ref: 'I2', type: 'conclusion', title: null, to: null, relation: null, reason: 'It judges.' },
+        { kind: 'retitle', ref: 'I3', type: null, title: 'Do naps help memory?', to: null, relation: null, reason: 'Clearer.' },
+        { kind: 'connect', ref: 'I1', type: null, title: null, to: 'I2', relation: null, reason: 'Already connected.' },
+        { kind: 'connect', ref: 'I2', type: null, title: null, to: 'I3', relation: null, reason: 'Related.' },
+        { kind: 'connect', ref: 'I2', type: null, title: null, to: 'I40', relation: null, reason: 'Unknown.' },
       ],
     });
     const result = await suggestTidy(model, { canvas });
     expect(result.output).toEqual([
       { kind: 'retype', ideaId: B, type: 'conclusion', reason: 'It judges.' },
       { kind: 'retitle', ideaId: C, title: 'Do naps help memory?', reason: 'Clearer.' },
-      { kind: 'connect', sourceId: B, targetId: C, reason: 'Related.' },
+      { kind: 'connect', sourceId: B, targetId: C, relation: null, reason: 'Related.' },
     ]);
   });
 
@@ -190,8 +193,8 @@ describe('phase 2 features', () => {
     };
     const model = jsonModel({
       suggestions: [
-        { kind: 'retype', ref: 'I4', type: 'question', title: null, to: null, reason: 'Reads as a question.' },
-        { kind: 'retitle', ref: 'I4', type: null, title: 'Short naps improve recall', to: null, reason: 'Clearer.' },
+        { kind: 'retype', ref: 'I4', type: 'question', title: null, to: null, relation: null, reason: 'Reads as a question.' },
+        { kind: 'retitle', ref: 'I4', type: null, title: 'Short naps improve recall', to: null, relation: null, reason: 'Clearer.' },
       ],
     });
     const result = await suggestTidy(model, { canvas: framed });

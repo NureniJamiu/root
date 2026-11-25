@@ -65,7 +65,7 @@ async function mockAi(page: Page): Promise<void> {
         ...meta,
         ideas: [
           { key: 'c1', title: 'Sleep strengthens memory', body: '', type: 'finding', parent: null },
-          { key: 'c2', title: 'How much sleep is enough?', body: '', type: 'question', parent: 'c1' },
+          { key: 'c2', title: 'How much sleep is enough?', body: '', type: 'question', parent: 'c1', relation: 'answers' },
         ],
       },
     }),
@@ -220,8 +220,11 @@ test('make ideas from selected document text', async ({ dashboard: page }) => {
   await page.getByTestId('doc-ai-capture').click();
 
   await expect(page.getByTestId('ghost-card-c1')).toBeVisible();
+  // The suggested connector says what it means before anything is added.
+  await expect(page.locator('.react-flow__edge-text')).toHaveText('answers');
   await page.getByTestId('ai-accept').click();
   await expect(cards(page)).toHaveCount(2);
+  await expect(page.locator('[data-testid^="connector-label-"]')).toHaveText('answers');
 });
 
 test('research a question card and keep a finding with its sources', async ({ dashboard: page }) => {

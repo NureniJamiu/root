@@ -10,7 +10,11 @@ import { z } from 'zod';
 
 import { nodeTypeSchema } from '../../data/schema';
 import { NODE_TITLE_MAX } from '../../data/limits';
+import type { EnabledNodeTypeId } from '../../data/model/enabled';
+import { relationIdSchema } from '../../data/model/relations';
+import type { RelationId } from '../../data/model/relations';
 import type { RuleId } from '../../data/model/rules';
+import { typesFor } from './vocabulary';
 import type { AiModel, AiProvider, KeyedProvider } from './models';
 import type { AiFeature, Feature, Plan } from './plans';
 
@@ -22,7 +26,11 @@ import type { AiFeature, Feature, Plan } from './plans';
 export const PROMPT_BODY_MAX = 2_000;
 export const PROMPT_NODES_MAX = 600;
 
-/** A canvas reduced to what a model needs: no images, positions or styling. */
+/**
+ * A canvas reduced to what a model needs: no images, positions or styling.
+ * Connectors carry what they mean; one sent without a relation (a tab from
+ * before typed connectors) reads as `related-to`.
+ */
 export const promptCanvasSchema = z.object({
   title: z.string().max(200),
   nodes: z
@@ -35,17 +43,18 @@ export const promptCanvasSchema = z.object({
       }),
     )
     .max(PROMPT_NODES_MAX),
-  edges: z.array(z.object({ source: z.string().uuid(), target: z.string().uuid() })).max(PROMPT_NODES_MAX * 4),
+  edges: z
+    .array(z.object({ source: z.string().uuid(), target: z.string().uuid(), relationType: relationIdSchema.optional() }))
+    .max(PROMPT_NODES_MAX * 4),
 });
 export type PromptCanvas = z.infer<typeof promptCanvasSchema>;
 
 /**
- * The types a model may suggest. The canvas holds the problem-framing types
- * too, but which AI features may propose them, and the prompts that explain
- * them, arrive with the AI contract widening (M0 plan slice S7, D9). Until
- * then suggestions stay on the general family.
+ * The types tidy may move a card between. Which features may propose which
+ * types comes from the registry (`NodeTypeDefinition.ai`, see `vocabulary.ts`):
+ * the problem-framing types come only from captured text (D9).
  */
-export const suggestedTypeSchema = z.enum(['topic', 'finding', 'question', 'conclusion']);
+export const tidyTypeSchema = z.enum(typesFor('ai.tidy'));
 
 /* -------------------------------------------------------------------------- */
 /* Requests                                                                   */
@@ -187,15 +196,26 @@ export const keyRequestSchema = z.object({
 /**
  * One suggested idea. `key` is a short local name ("i1") so suggestions can
  * hang from each other; `parent` is another suggestion's key, or null.
+ * `relation` is what the connector from its parent (or from the idea being
+ * expanded) means, or null for a plain link; the clean-up keeps it only when
+ * the validity map allows it between the two types.
  */
 export const ideaSuggestionSchema = z.object({
   key: z.string().min(1).max(40),
   title: z.string().min(1),
   body: z.string(),
-  type: suggestedTypeSchema,
+  type: nodeTypeSchema,
   parent: z.string().nullable(),
+  relation: relationIdSchema.nullable(),
 });
 export type IdeaSuggestion = z.infer<typeof ideaSuggestionSchema>;
+
+/** What a model returns when it suggests ideas of `types` only. */
+export function ideaSuggestionsSchemaFor<T extends EnabledNodeTypeId>(types: readonly [T, ...T[]]) {
+  return z.object({
+    ideas: z.array(ideaSuggestionSchema.extend({ type: z.enum(types as unknown as [T, ...T[]]) })).min(1),
+  });
+}
 
 export const ideaSuggestionsSchema = z.object({
   ideas: z.array(ideaSuggestionSchema).min(1),
@@ -236,14 +256,16 @@ export type ReviewOutput = z.infer<typeof reviewOutputSchema>;
 export const tidyOutputSchema = z.object({
   suggestions: z.array(
     z.object({
-      kind: z.enum(['retype', 'retitle', 'connect']),
+      kind: z.enum(['retype', 'retitle', 'connect', 'relate']),
       ref: z.string(),
       /** retype: the better type. */
-      type: suggestedTypeSchema.nullable(),
+      type: tidyTypeSchema.nullable(),
       /** retitle: the better title. */
       title: z.string().nullable(),
-      /** connect: the idea to connect to (ref is the one it leads from). */
+      /** connect, relate: the other idea (ref is the one the connector leads from). */
       to: z.string().nullable(),
+      /** connect: what the new connector means, or null. relate: the meaning for a plain connector. */
+      relation: relationIdSchema.nullable(),
       reason: z.string(),
     }),
   ),
@@ -358,9 +380,24 @@ export interface ReviewResponse extends AiResultMeta {
 }
 
 export type TidySuggestion =
-  | { readonly kind: 'retype'; readonly ideaId: string; readonly type: z.infer<typeof suggestedTypeSchema>; readonly reason: string }
+  | { readonly kind: 'retype'; readonly ideaId: string; readonly type: z.infer<typeof tidyTypeSchema>; readonly reason: string }
   | { readonly kind: 'retitle'; readonly ideaId: string; readonly title: string; readonly reason: string }
-  | { readonly kind: 'connect'; readonly sourceId: string; readonly targetId: string; readonly reason: string };
+  /** A new connector; `relation` null makes it a plain `related-to` link. */
+  | {
+      readonly kind: 'connect';
+      readonly sourceId: string;
+      readonly targetId: string;
+      readonly relation: RelationId | null;
+      readonly reason: string;
+    }
+  /** Give the `related-to` connector between two ideas a meaning. */
+  | {
+      readonly kind: 'relate';
+      readonly sourceId: string;
+      readonly targetId: string;
+      readonly relation: RelationId;
+      readonly reason: string;
+    };
 
 export interface TidyResponse extends AiResultMeta {
   readonly suggestions: TidySuggestion[];

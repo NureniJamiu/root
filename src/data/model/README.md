@@ -78,6 +78,12 @@ The canvas schema accepts only the node types and relations listed in `enabled.t
 
 Retyping a card keeps the fields the new type also defines (with a value it accepts) and drops the rest (`fieldsForType`). The hover toolbar's type button cycles within the card's family; changing family goes through the editor's type picker.
 
+## What the AI may propose (`src/lib/ai/vocabulary.ts`)
+
+Each type's `ai` list names the features that may propose it: map, expand and tidy stay on the general family; capture may also propose problem-framing types; research proposes findings and questions. Prompts list only those types (from `aiGuide`) and the typed relations among them (from the map), and each feature's output schema allows only its types.
+
+A suggestion may carry the relation of its connector to its parent. The clean-up keeps it only when the map allows it for the two types; anything else becomes a plain `related-to` link. Ghost connectors show the relation as a label, an idea re-hung because its parent was switched off loses its relation, and tidy can propose a meaning (`relate`) only for a connector that is still `related-to`. Accepted suggestions and tidy connectors are recorded with `ai` provenance.
+
 ## Workspace (`workspace.ts`)
 
 `canvas.workspace` is optional: `{ intake?: { answer, answeredAt }, focusStage? }`. The intake answers are `no-topic`, `has-topic`, `objectives-drafted`, `collected-data` and `writing-up`, one per row of the D10 intake table.

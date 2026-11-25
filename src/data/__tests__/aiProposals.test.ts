@@ -13,6 +13,7 @@ const ghost = (key: string, parentKey: string | null, x = 0): GhostIdea => ({
   body: `Notes ${key}`,
   type: 'finding',
   parentKey,
+  relation: null,
   position: { x, y: 0 },
 });
 
@@ -157,5 +158,64 @@ describe('AI proposals', () => {
     canvasActions.undo();
     canvasActions.connect({ source: ids.f!, target: ids.c!, sourceSide: 'right', targetSide: 'left' });
     expect(canvas().edges[0]!.relationType).toBe('supports');
+  });
+
+  it('adds each connector with the relation its suggestion showed', () => {
+    aiProposalActions.propose(
+      proposal({
+        ideas: [
+          { ...ghost('q', null), type: 'question' },
+          { ...ghost('f', 'q', 400), relation: 'answers' },
+          { ...ghost('c', 'f', 800), type: 'conclusion', relation: 'supports' },
+        ],
+      }),
+    );
+    const ids = aiProposalActions.accept();
+    expect(canvas().edges.map((e) => [e.source, e.target, e.relationType, e.provenance.origin])).toEqual([
+      [ids.q, ids.f, 'answers', 'ai'],
+      [ids.f, ids.c, 'supports', 'ai'],
+    ]);
+  });
+
+  it('drops the relation of an idea re-hung because its parent was left out', () => {
+    const p = proposal({
+      ideas: [
+        { ...ghost('t', null), type: 'topic' },
+        { ...ghost('q', 't', 400), type: 'question' },
+        { ...ghost('f', 'q', 800), relation: 'answers' },
+      ],
+      excluded: ['q'],
+    });
+    expect(includedIdeas(p).map((i) => [i.key, i.parentKey, i.relation])).toEqual([
+      ['t', null, null],
+      ['f', 't', null],
+    ]);
+    aiProposalActions.propose(p);
+    aiProposalActions.accept();
+    expect(canvas().edges.map((e) => e.relationType)).toEqual(['related-to']);
+  });
+
+  it('gives a plain connector the meaning a tidy suggestion showed, and only a plain one', () => {
+    aiProposalActions.propose(
+      proposal({ ideas: [ghost('f', null), { ...ghost('c', 'f', 400), type: 'conclusion' }, { ...ghost('g', null, 800) }] }),
+    );
+    const ids = aiProposalActions.accept();
+    const plain = canvas().edges[0]!;
+    const tidy = { origin: 'ai' as const, ai: { feature: 'ai.tidy' as const, model: 'Gemini', acceptedAt: '2026-01-01T00:00:00.000Z' }, edited: false };
+    const applied = canvasActions.applyEdits(
+      {
+        updates: [],
+        connections: [{ source: ids.g!, target: ids.c!, relation: 'supports' }],
+        // Drawn f → c; the suggestion names the pair the other way round.
+        relations: [{ source: ids.c!, target: ids.f!, relation: 'supports' }],
+      },
+      tidy,
+    );
+    expect(applied).toBe(2);
+    const after = canvas().edges;
+    expect(after.find((e) => e.id === plain.id)).toMatchObject({ relationType: 'supports', provenance: { edited: true } });
+    expect(after.find((e) => e.source === ids.g)).toMatchObject({ relationType: 'supports', provenance: tidy });
+    // A connector that already means something is left alone.
+    expect(canvasActions.applyEdits({ updates: [], connections: [], relations: [{ source: ids.f!, target: ids.c!, relation: 'contradicts' }] })).toBe(0);
   });
 });

@@ -50,14 +50,15 @@ import { FitViewIcon, NodeCard, ZoomInIcon, ZoomOutIcon } from '../nodes';
 import { AiReviewBar } from './AiReviewBar';
 import { BranchToolbarGroup, WalkthroughBar } from './BranchControls';
 import { GHOST_NODE_TYPE, GhostCard } from './GhostCard';
+import { ghostEdges } from './ghostEdges';
 import type { GhostCardData } from './GhostCard';
 import { ConnectorEdge } from './ConnectorEdge';
-import { CONNECTION_LINE_STYLE, CONNECTOR_EDGE_TYPE, EDGE_COLOR_BY_TYPE, EDGE_DASH, EDGE_STROKE_COLOR } from './edgeStyles';
+import { CONNECTION_LINE_STYLE, CONNECTOR_EDGE_TYPE } from './edgeStyles';
 import { getMeasuredSizes, setMeasuredSize } from './measuredSizes';
 import type { NodeSize } from './measuredSizes';
 import { relayoutEdges, useReactFlowGraph } from './useReactFlowGraph';
 import { useBranchMotion } from './useBranchMotion';
-import { connectionToEnds, handleIdToSide, nearestSide, sourceHandleId, targetHandleId } from './reconnect';
+import { connectionToEnds, handleIdToSide, nearestSide } from './reconnect';
 import { NODE_HEIGHT, computeTreeLayout, findFreePosition } from './placement';
 
 /* -------------------------------------------------------------------------- */
@@ -684,7 +685,6 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   const ghosts = useMemo(() => {
     if (!proposal) return { nodes: [], edges: [] };
     const excluded = new Set(proposal.excluded);
-    const byKey = new Map(proposal.ideas.map((i) => [i.key, i]));
     const anchor = proposal.anchorId ? canvas.nodes.find((n) => n.id === proposal.anchorId) : undefined;
     const nodes = proposal.ideas.map((idea) => ({
       id: ghostId(idea.key),
@@ -696,29 +696,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
       connectable: false,
       zIndex: 5,
     }));
-    const edges: RFEdge[] = [];
-    for (const idea of proposal.ideas) {
-      const parent = idea.parentKey !== null ? byKey.get(idea.parentKey) : undefined;
-      const from = parent ? { id: ghostId(parent.key), position: parent.position, type: parent.type } : anchor;
-      if (!from) continue;
-      const { sourceSide, targetSide } = computeFacingSides(from.position, idea.position);
-      const on = !excluded.has(idea.key) && (!parent || !excluded.has(parent.key));
-      edges.push({
-        id: `ai-ghost-edge:${idea.key}`,
-        source: from.id,
-        target: ghostId(idea.key),
-        sourceHandle: sourceHandleId(sourceSide),
-        targetHandle: targetHandleId(targetSide),
-        focusable: false,
-        updatable: false,
-        style: {
-          stroke: on ? EDGE_COLOR_BY_TYPE[from.type] : EDGE_STROKE_COLOR,
-          strokeWidth: 1.5,
-          strokeDasharray: EDGE_DASH,
-          opacity: on ? 0.8 : 0.35,
-        },
-      });
-    }
+    const edges = ghostEdges(proposal, anchor);
     return { nodes, edges };
   }, [proposal, canvas.nodes]);
 
