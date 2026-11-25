@@ -111,7 +111,8 @@ export interface UseProjects {
   readonly activeProjectId: string;
   readonly isLoading: boolean;
   readonly saveStatus: SaveStatus;
-  readonly createProject: () => Promise<void>;
+  /** Create a project and open it. Resolves to its id once it is on screen, or null. */
+  readonly createProject: () => Promise<string | null>;
   readonly selectProject: (id: string) => Promise<void>;
   readonly deleteProject: (id: string) => Promise<void>;
 }
@@ -319,17 +320,18 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjects {
     [activate, loadCanvasFor],
   );
 
-  const createProject = useCallback(async () => {
+  const createProject = useCallback(async (): Promise<string | null> => {
     const seq = ++switchSeqRef.current;
     const canvas: Canvas = { ...emptyCanvas(), title: nextProjectTitle(projectsRef.current) };
     const created = await createProjectApi({ id: canvas.id, title: canvas.title, canvas });
     if (!created) {
       emitSaveError({ message: 'Could not create the project. Check your connection and try again.' });
-      return;
+      return null;
     }
     setProjects((prev) => [created, ...prev.filter((p) => p.id !== created.id)]);
-    if (seq !== switchSeqRef.current) return; // the user opened another project meanwhile
+    if (seq !== switchSeqRef.current) return null; // the user opened another project meanwhile
     activate(created.id, canvas);
+    return created.id;
   }, [activate]);
 
   const deleteProject = useCallback(

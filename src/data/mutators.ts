@@ -15,7 +15,7 @@
 import { newId } from './ids';
 import { IMAGE_CAPTION_MAX, IMAGE_DATA_URL_MAX_BYTES, IMAGE_TEXT_MAX } from './limits';
 import { FALLBACK_RELATION, defaultRelation, fieldsForType, markEdited, researcherProvenance } from './model';
-import type { Provenance, RelationId } from './model';
+import type { Provenance, RelationId, Workspace } from './model';
 import { CANVAS_SCHEMA_VERSION } from './schema';
 import { cleanSource } from './source';
 import { now } from './time';
@@ -544,6 +544,25 @@ export function expandMany(c: Canvas, ids: Iterable<UUID>): Canvas {
 export function setCanvasTitle(c: Canvas, title: string): Canvas {
   if (c.title === title) return c;
   return { ...c, title, updatedAt: now() };
+}
+
+/**
+ * Merge `patch` into the canvas's workspace state (intake answer, focus
+ * stage). A key set to `undefined` is removed. Returns `c` unchanged when
+ * nothing changes.
+ */
+export function setWorkspace(c: Canvas, patch: { readonly [K in keyof Workspace]?: Workspace[K] | undefined }): Canvas {
+  const current: Workspace = c.workspace ?? {};
+  const next: Record<string, unknown> = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) delete next[key];
+    else next[key] = value;
+  }
+  const same =
+    Object.keys(next).length === Object.keys(current).length &&
+    Object.keys(next).every((k) => JSON.stringify(next[k]) === JSON.stringify((current as Record<string, unknown>)[k]));
+  if (same) return c;
+  return { ...c, workspace: next as Workspace, updatedAt: now() };
 }
 
 /* -------------------------------------------------------------------------- */

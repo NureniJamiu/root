@@ -29,6 +29,8 @@ export interface StructuralIndexRailProps {
   readonly onSelectProject?: (id: string) => void;
   readonly onNewProject?: () => void;
   readonly onDeleteProject?: (id: string) => void;
+  /** Run the intake for the open project again ("where are you with this research?"). */
+  readonly onSetStartingPoint?: ((id: string) => void) | undefined;
   readonly onNavigateHome?: () => void;
   readonly user?: RailUser | null;
   readonly onSignOut?: () => void;
@@ -55,6 +57,7 @@ export function StructuralIndexRail({
   onSelectProject,
   onNewProject,
   onDeleteProject,
+  onSetStartingPoint,
   onNavigateHome,
   user,
   onSignOut,
@@ -166,6 +169,24 @@ export function StructuralIndexRail({
                 <span className={`font-serif text-[14px] leading-[20px] truncate ${isActive ? 'font-medium' : ''}`}>{title}</span>
               </button>
 
+              {isActive && onSetStartingPoint && !isConfirmingDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSetStartingPoint(project.id);
+                  }}
+                  className="shrink-0 w-6 h-6 inline-flex items-center justify-center text-muted hover:text-ink-strong hover:bg-sunken-2 rounded-[2px] transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer"
+                  title="Set where you are with this research"
+                  aria-label={`Set the starting point of ${title}`}
+                  data-testid={`btn-starting-point-${project.id}`}
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="m15.5 8.5-2 5-5 2 2-5z" />
+                  </svg>
+                </button>
+              )}
               {onDeleteProject &&
                 (isConfirmingDelete ? (
                   <button

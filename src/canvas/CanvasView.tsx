@@ -125,6 +125,8 @@ export interface CanvasViewProps {
   readonly onTogglePan?: () => void;
   /** When set, ideas of other types are dimmed so this type stands out. */
   readonly highlightType?: NodeType | null;
+  /** When set, ideas outside the stage in focus (of other types) are dimmed. Nothing is hidden. */
+  readonly focusTypes?: ReadonlySet<NodeType> | null;
   readonly onRFPropsMounted?: (props: CanvasViewProbeProps) => void;
   readonly onControlsReady?: (controls: CanvasViewControls) => void;
   readonly onDragChange?: (dragState: DragState | null) => void;
@@ -144,6 +146,7 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     isPanActive = false,
     onTogglePan,
     highlightType = null,
+    focusTypes = null,
     onRFPropsMounted,
     onControlsReady,
     onDragChange,
@@ -595,26 +598,31 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   // What React Flow renders: derived nodes plus selection, measured sizes and
   // the type-highlight dimming. Rebuilt only when one of those changes.
   const baseNodes = useMemo(() => {
-    const typeById = highlightType
+    const typeById = highlightType || focusTypes
       ? new Map(canvas.nodes.map((n) => [n.id, n.type]))
       : null;
     return derivedNodes.map((dn) => {
       const size = sizes.get(dn.id);
+      const type = typeById?.get(dn.id);
+      const dimmed =
+        typeById !== null &&
+        ((highlightType !== null && type !== highlightType) || (focusTypes !== null && (type === undefined || !focusTypes.has(type))));
       return {
         ...dn,
         selected: dn.id === selectedNodeId || multiSelected.has(dn.id),
         ...(size ? { width: size.width, height: size.height } : {}),
         ...(typeById
           ? {
+              ...(dimmed ? { className: 'root-dimmed' } : {}),
               style: {
-                opacity: typeById.get(dn.id) === highlightType ? 1 : 0.25,
+                opacity: dimmed ? 0.25 : 1,
                 transition: 'opacity 150ms ease-out',
               },
             }
           : {}),
       };
     });
-  }, [derivedNodes, sizes, selectedNodeId, multiSelected, canvas.nodes, highlightType]);
+  }, [derivedNodes, sizes, selectedNodeId, multiSelected, canvas.nodes, highlightType, focusTypes]);
 
   // Selected ideas that are on screen, for the branch controls.
   const selectedIds = useMemo(() => {
