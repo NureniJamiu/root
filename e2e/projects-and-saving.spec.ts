@@ -137,6 +137,49 @@ test('a failed save is shown as not saved, then recovers on its own', async ({ d
   expect((await getProject(page, project!.id)).canvas.nodes[0]!.title).toBe('Typed during the outage');
 });
 
+test('an older tab cannot save over a newer canvas, and the app offers a reload', async ({ dashboard: page }) => {
+  await createRootTitled(page, 'Typed in the new version');
+  await waitForSaved(page);
+  const [project] = await listProjects(page);
+
+  // What a tab still running the pre-v2 bundle would send: the same canvas
+  // with the fields it does not know stripped.
+  const stored = (await getProject(page, project!.id)).canvas as unknown as Record<string, unknown> & {
+    nodes: Array<Record<string, unknown>>;
+    edges: Array<Record<string, unknown>>;
+  };
+  const { schemaVersion: _version, ...rest } = stored;
+  const stale = {
+    ...rest,
+    title: 'Saved by an old tab',
+    nodes: stored.nodes.map(({ fields: _f, provenance: _p, ...node }) => node),
+    edges: stored.edges.map(({ relationType: _r, provenance: _p, ...edge }) => edge),
+  };
+  const refused = await page.request.put(`/api/projects/${project!.id}`, { data: { canvas: stale } });
+  expect(refused.status()).toBe(409);
+  expect(await refused.json()).toMatchObject({ code: 'stale-schema' });
+  expect((await getProject(page, project!.id)).canvas.nodes[0]!.title).toBe('Typed in the new version');
+
+  // This tab sees the same refusal for its next save.
+  await page.route('**/api/projects/*', (route) =>
+    route.request().method() === 'PUT'
+      ? route.fulfill({
+          status: 409,
+          json: { error: 'This project was saved by a newer version of Root. Reload the page to continue.', code: 'stale-schema' },
+        })
+      : route.continue(),
+  );
+  await page.locator('[data-testid^="node-card-"]').first().click();
+  await page.getByTestId('btn-inspector-edit').click();
+  await page.getByTestId('node-editor-title').fill('Edited after the upgrade');
+  await page.getByTestId('node-editor-save').click();
+  await expect(page.getByTestId('save-status')).toHaveAttribute('data-status', 'error', { timeout: 10_000 });
+  const toast = page.getByTestId('toast').filter({ hasText: 'newer version of Root' });
+  await expect(toast).toContainText('Not saved');
+  await expect(toast.getByTestId('toast-reload')).toBeVisible();
+  await page.unroute('**/api/projects/*');
+});
+
 test('closing the page right after an edit does not lose it', async ({ dashboard: page }) => {
   await createRootTitled(page, 'Seed');
   await waitForSaved(page);

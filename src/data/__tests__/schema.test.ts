@@ -27,6 +27,8 @@ function makeNode(id: UUID, overrides: Partial<Node> = {}): Node {
     body: '',
     images: [],
     type: 'topic',
+    fields: {},
+    provenance: { origin: 'researcher', edited: false },
     position: { x: 0, y: 0 },
     collapsed: false,
     createdAt: TIMESTAMP,
@@ -46,12 +48,14 @@ function makeEdge(source: UUID, target: UUID, overrides: Partial<Edge> = {}): Ed
     targetSide: 'left',
     sourcePinned: false,
     targetPinned: false,
+    relationType: 'related-to',
+    provenance: { origin: 'researcher', edited: false },
     ...overrides,
   };
 }
 
 function makeCanvas(nodes: Node[], edges: Edge[] = []): Canvas {
-  return { id: CANVAS_ID, title: '', nodes, edges, updatedAt: TIMESTAMP };
+  return { id: CANVAS_ID, schemaVersion: 2, title: '', nodes, edges, updatedAt: TIMESTAMP };
 }
 
 function messages(result: ReturnType<typeof canvasSchema.safeParse>): string[] {

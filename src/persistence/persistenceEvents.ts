@@ -30,6 +30,8 @@
 export interface SaveErrorDetail {
   /** Compact human-readable description of the write failure. */
   message: string;
+  /** Saving cannot work again until the page reloads; the toast offers a Reload button. */
+  reload?: boolean;
 }
 
 /**

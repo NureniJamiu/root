@@ -17,6 +17,7 @@ async function seed(page: Page): Promise<void> {
       const ts = new Date().toISOString();
       const card = (id: string, type: string, title: string, x: number) => ({
         id, type, title, body: '', position: { x, y: 200 }, collapsed: false, images: [], createdAt: ts, updatedAt: ts,
+        fields: {}, provenance: { origin: 'researcher', edited: false },
       });
       store.setState({
         canvas: {
@@ -28,7 +29,7 @@ async function seed(page: Page): Promise<void> {
           ],
           edges: [{
             id: ids.edge, source: ids.conclusion, target: ids.question, sourceSide: 'right', targetSide: 'left',
-            sourcePinned: false, targetPinned: false,
+            sourcePinned: false, targetPinned: false, relationType: 'related-to', provenance: { origin: 'researcher', edited: false },
           }],
         },
         selection: { nodeId: null, edgeId: null },
@@ -72,6 +73,7 @@ test('evidence checks flag gaps on cards and in the inspector, and clear once re
         edges: [...canvas.edges, {
           id: 'c0000000-0000-4000-8000-0000000000e2', source: question, target: finding,
           sourceSide: 'right', targetSide: 'left', sourcePinned: false, targetPinned: false,
+          relationType: 'related-to', provenance: { origin: 'researcher', edited: false },
         }],
       },
       selection: { nodeId: null, edgeId: null },
@@ -80,4 +82,45 @@ test('evidence checks flag gaps on cards and in the inspector, and clear once re
 
   await expect(page.getByTestId('node-evidence-badge')).toHaveCount(0);
   await expect(page.getByTestId('evidence-all-clear')).toBeVisible();
+});
+
+test('a canvas saved before schema v2 opens with the same cards, connectors and badges', async ({ dashboard: page }) => {
+  const projectId = crypto.randomUUID();
+  const ts = new Date().toISOString();
+  // Stored the way the app saved canvases before v2: no schemaVersion, no
+  // fields, provenance or relation types.
+  const v1Card = (id: string, type: string, title: string, x: number) => ({
+    id, type, title, body: '', position: { x, y: 200 }, collapsed: false, images: [], createdAt: ts, updatedAt: ts,
+  });
+  const v1 = {
+    id: projectId, title: 'Before v2', updatedAt: ts,
+    nodes: [
+      v1Card(CONCLUSION, 'conclusion', 'Lead with annual', 80),
+      v1Card(QUESTION, 'question', 'Keep a free tier?', 480),
+      v1Card(FINDING, 'finding', 'Annual wins 3 to 1', 880),
+    ],
+    edges: [{
+      id: EDGE, source: CONCLUSION, target: QUESTION, sourceSide: 'right', targetSide: 'left',
+      sourcePinned: false, targetPinned: false,
+    }],
+  };
+  const created = await page.request.post('/api/projects', { data: { id: projectId, title: v1.title, canvas: v1 } });
+  expect(created.ok()).toBeTruthy();
+  await page.evaluate((id) => localStorage.setItem('root-ui:active-project-id', id), projectId);
+  await page.reload();
+
+  await expect(page.locator('[data-testid^="node-card-"]')).toHaveCount(3, { timeout: 15_000 });
+  await expect(page.locator('.react-flow__edge')).toHaveCount(1);
+  await expect(card(page, CONCLUSION).getByTestId('node-evidence-badge')).toHaveText('No evidence · Open question');
+  await expect(card(page, FINDING).getByTestId('node-evidence-badge')).toHaveText('Not used');
+  await expect(card(page, QUESTION).getByTestId('node-evidence-badge')).toHaveCount(0);
+  await expect(card(page, CONCLUSION).getByTestId('node-title')).toHaveText('Lead with annual');
+
+  // The stored canvas is now v2, with nothing inferred for the old items.
+  const stored = (await (await page.request.get(`/api/projects/${projectId}`)).json()) as {
+    canvas: { schemaVersion: number; nodes: Array<{ provenance: { origin: string } }>; edges: Array<{ relationType: string }> };
+  };
+  expect(stored.canvas.schemaVersion).toBe(2);
+  expect(stored.canvas.nodes.map((n) => n.provenance.origin)).toEqual(['unrecorded', 'unrecorded', 'unrecorded']);
+  expect(stored.canvas.edges.map((e) => e.relationType)).toEqual(['related-to']);
 });

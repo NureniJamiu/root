@@ -16,6 +16,7 @@ import type {
   nodeSchema,
   nodeTypeSchema,
   positionSchema,
+  relationTypeSchema,
   sideSchema,
   sourceKindSchema,
   sourceSchema,
@@ -25,6 +26,7 @@ import type {
 export type UUID = string;
 
 export type NodeType = z.infer<typeof nodeTypeSchema>;
+export type RelationType = z.infer<typeof relationTypeSchema>;
 export type Position = z.infer<typeof positionSchema>;
 export type ImageEntry = z.infer<typeof imageEntrySchema>;
 export type Side = z.infer<typeof sideSchema>;

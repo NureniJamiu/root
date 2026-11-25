@@ -17,80 +17,28 @@
  */
 
 import { canvasSchema } from './schema';
-import type { Canvas, Edge, ImageEntry, Node, Position } from './types';
+import type { Canvas } from './types';
 
 /* -------------------------------------------------------------------------- */
 /* Stable field ordering                                                      */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Rebuild a `Position` with a fixed key order.
+ * Rebuild a JSON value with the keys of every object in sorted order. Array
+ * order is preserved as-is (node and edge order is meaningful). Every key is
+ * kept, so a field added to the schema is serialized without listing it here.
  */
-function orderedPosition(p: Position): Position {
-  return { x: p.x, y: p.y };
-}
-
-/**
- * Rebuild an `ImageEntry` with a fixed key order: id, dataUrl, addedAt.
- */
-function orderedImage(img: ImageEntry): ImageEntry {
-  return {
-    id: img.id,
-    dataUrl: img.dataUrl,
-    addedAt: img.addedAt,
-  };
-}
-
-/**
- * Rebuild a `Node` with a fixed key order:
- * id, title, body, images, type, position, collapsed, createdAt, updatedAt.
- */
-function orderedNode(n: Node): Node {
-  return {
-    id: n.id,
-    title: n.title,
-    body: n.body,
-    images: n.images.map(orderedImage),
-    type: n.type,
-    position: orderedPosition(n.position),
-    collapsed: n.collapsed,
-    createdAt: n.createdAt,
-    updatedAt: n.updatedAt,
-  };
-}
-
-/**
- * Rebuild an `Edge` with a fixed key order:
- * id, source, target, sourceSide, targetSide, sourcePinned, targetPinned.
- */
-function orderedEdge(e: Edge): Edge {
-  return {
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    sourceSide: e.sourceSide,
-    targetSide: e.targetSide,
-    sourcePinned: e.sourcePinned,
-    targetPinned: e.targetPinned,
-  };
-}
-
-/**
- * Rebuild a `Canvas` with a fixed key order:
- * id, title, nodes, edges, updatedAt.
- *
- * Node array order is preserved as-is; only the *field* order within each
- * object is normalized. Callers that need a canonical node ordering should
- * do that upstream.
- */
-function orderedCanvas(c: Canvas): Canvas {
-  return {
-    id: c.id,
-    title: c.title,
-    nodes: c.nodes.map(orderedNode),
-    edges: c.edges.map(orderedEdge),
-    updatedAt: c.updatedAt,
-  };
+function ordered(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(ordered);
+  if (typeof value === 'object' && value !== null) {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.keys(record)
+        .sort()
+        .map((key) => [key, ordered(record[key])]),
+    );
+  }
+  return value;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -105,7 +53,7 @@ function orderedCanvas(c: Canvas): Canvas {
  * before persistence.
  */
 export function serializeCanvas(c: Canvas): string {
-  return JSON.stringify(orderedCanvas(c));
+  return JSON.stringify(ordered(c));
 }
 
 /**

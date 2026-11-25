@@ -58,6 +58,7 @@ async function setup(page: Page, options: SetupOptions = {}): Promise<void> {
       const ts = new Date().toISOString();
       const card = (id: string, type: string, title: string, position: { x: number; y: number }) => ({
         id, type, title, body: `${title} notes.`, position, collapsed: false, images: [], createdAt: ts, updatedAt: ts,
+        fields: {}, provenance: { origin: 'researcher', edited: false },
       });
       const nodes = [
         card(ids.a, 'topic', 'Node Alpha', posA),
@@ -67,7 +68,7 @@ async function setup(page: Page, options: SetupOptions = {}): Promise<void> {
       const edges = edge
         ? [{
             id: ids.edge, source: ids.a, target: ids.b, sourceSide: 'right', targetSide: 'left',
-            sourcePinned: false, targetPinned: false, ...edge,
+            sourcePinned: false, targetPinned: false, relationType: 'related-to', provenance: { origin: 'researcher', edited: false }, ...edge,
           }]
         : [];
       store.setState({
@@ -522,8 +523,9 @@ test.describe('E2E: empty canvas and new ideas', () => {
 
 test.describe('E2E: projects saved before connectors were first-class', () => {
   test('27. A canvas saved with parentId opens with its cards connected', async ({ dashboard: page }) => {
-    const list = await (await page.request.get('/api/projects')).json() as Array<{ id: string }>;
-    const projectId = list[0]!.id;
+    // The user's first project is already v2 and the server refuses to save an
+    // older canvas over it, so the old project arrives as a project of its own.
+    const projectId = crypto.randomUUID();
     const ts = new Date().toISOString();
     const node = (id: string, title: string, parentId: string | null, x: number) => ({
       id, parentId, title, body: '', images: [], type: 'topic', position: { x, y: 200 }, collapsed: false, createdAt: ts, updatedAt: ts,
@@ -532,8 +534,9 @@ test.describe('E2E: projects saved before connectors were first-class', () => {
       id: projectId, title: 'Old project', updatedAt: ts,
       nodes: [node(NODE_A_ID, 'Old root', null, 80), node(NODE_B_ID, 'Old child', NODE_A_ID, 480)],
     };
-    const put = await page.request.put(`/api/projects/${projectId}`, { data: { title: 'Old project', canvas: legacy } });
-    expect(put.ok()).toBeTruthy();
+    const created = await page.request.post('/api/projects', { data: { id: projectId, title: 'Old project', canvas: legacy } });
+    expect(created.ok()).toBeTruthy();
+    await page.evaluate((id) => localStorage.setItem('root-ui:active-project-id', id), projectId);
 
     await page.reload();
     await expect(page.locator('[data-testid^="node-card-"]')).toHaveCount(2, { timeout: 15_000 });

@@ -12,7 +12,7 @@
  *                                              Position, ImageEntry, UUID
  *   - Zod schemas         (from `./schema`)  — canvasSchema, nodeSchema,
  *                                              nodeTypeSchema, positionSchema,
- *                                              imageEntrySchema
+ *                                              imageEntrySchema, migrateCanvas
  *   - Pure mutators       (from `./mutators`) — emptyCanvas, addNode,
  *                                              addChild, connect, updateEdge,
  *                                              removeEdge, updateNode, ...
@@ -21,6 +21,8 @@
  *                                              computeFacingSides, ...
  *   - Serialization       (from `./serialize`) — serializeCanvas, parseCanvas,
  *                                              ParseCanvasResult
+ *   - Typed-graph contract (from `./model`)  — NODE_TYPES, RELATIONS,
+ *                                              orient, provenanceSchema, ...
  *
  * What is intentionally NOT exported:
  *   - `./ids` (`newId`) and `./time` (`now`) — internal helpers used by the
@@ -36,15 +38,31 @@
  *                                                    SaveErrorDetail
  */
 
-export type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, Source, SourceKind, UUID } from './types';
+export type {
+  Canvas,
+  Edge,
+  ImageEntry,
+  Node,
+  NodeType,
+  Position,
+  RelationType,
+  Side,
+  Source,
+  SourceKind,
+  UUID,
+} from './types';
 
 export {
+  CANVAS_SCHEMA_VERSION,
   canvasSchema,
+  canvasSchemaVersion,
   edgeSchema,
   imageEntrySchema,
+  migrateCanvas,
   migrateLegacyCanvas,
   nodeSchema,
   nodeTypeSchema,
+  relationTypeSchema,
   positionSchema,
   sideSchema,
   sourceKindSchema,
@@ -137,5 +155,6 @@ export type { CanvasState, NodeEdits } from './store';
 export { docLinksActions, useDocLinksStore } from './docLinks';
 export type { DocLinksState } from './docLinks';
 
+export * from './model';
 export { emitSaveError, onSaveError } from './storeEvents';
 export type { SaveErrorDetail } from './storeEvents';

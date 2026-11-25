@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import { z } from 'zod';
 
 import { CANVAS_TITLE_MAX } from '../data/limits';
-import { canvasSchema, migrateLegacyCanvas } from '../data/schema';
+import { CANVAS_SCHEMA_VERSION, canvasSchema, canvasSchemaVersion, migrateCanvas } from '../data/schema';
 import type { Canvas } from '../data/types';
 import { blobKeys } from './blob-store';
 import type { BlobStore } from './blob-store';
@@ -40,7 +40,7 @@ export interface ProjectDetail extends ProjectSummary {
 export class ProjectError extends Error {
   constructor(
     readonly status: 400 | 409,
-    readonly code: 'invalid' | 'exists' | 'missing-image',
+    readonly code: 'invalid' | 'exists' | 'missing-image' | 'stale-schema',
     message: string,
   ) {
     super(message);
@@ -78,7 +78,28 @@ function parseInput<T extends z.ZodTypeAny>(schema: T, input: unknown): z.output
 }
 
 function blankCanvas(id: string, title: string, now: string): Canvas {
-  return { id, title, nodes: [], edges: [], updatedAt: now };
+  return { id, schemaVersion: CANVAS_SCHEMA_VERSION, title, nodes: [], edges: [], updatedAt: now };
+}
+
+/**
+ * Refuse a save whose canvas is older than the one stored. A browser tab
+ * still running an older bundle drops the fields it does not know (Zod strips
+ * unknown keys), so letting it save would silently erase them.
+ */
+function refuseDowngrade(incoming: unknown, storedJson: string): void {
+  let stored: unknown;
+  try {
+    stored = JSON.parse(storedJson);
+  } catch {
+    return; // an unreadable stored canvas has nothing left to protect
+  }
+  if (canvasSchemaVersion(incoming) < canvasSchemaVersion(stored)) {
+    throw new ProjectError(
+      409,
+      'stale-schema',
+      'This project was saved by a newer version of Root. Reload the page to continue.',
+    );
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -172,7 +193,7 @@ export function createProjectStore(sql: Sql, blobs?: BlobStore) {
   async function hydrate(projectId: string, row: ProjectRow): Promise<Canvas> {
     let parsed: Canvas;
     try {
-      parsed = migrateLegacyCanvas(JSON.parse(row.canvas)) as Canvas;
+      parsed = migrateCanvas(JSON.parse(row.canvas)) as Canvas;
     } catch {
       return blankCanvas(row.id, row.title, row.updatedAt);
     }
@@ -267,6 +288,7 @@ export function createProjectStore(sql: Sql, blobs?: BlobStore) {
       const body = parseInput(updateInputSchema, input);
       const existing = await sql.first<ProjectRow>(SELECT_ROW, id, userId);
       if (!existing) return null;
+      if (body.canvas) refuseDowngrade((input as { canvas?: unknown }).canvas, existing.canvas);
 
       const now = new Date().toISOString();
       const title = body.title ?? body.canvas?.title ?? existing.title;

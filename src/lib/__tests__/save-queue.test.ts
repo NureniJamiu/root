@@ -125,6 +125,15 @@ describe('createSaveQueue', () => {
     expect(statuses.at(-1)).toBe('error');
   });
 
+  it('passes the server’s reason to onError, so a stale tab can be told to reload', async () => {
+    const send = vi.fn<Send>().mockResolvedValue({ ok: false, message: 'Reload', fatal: true, code: 'stale-schema' });
+    const onError = vi.fn();
+    const queue = createSaveQueue<string>({ send, delayMs: 500, onError });
+    queue.schedule('a', 'v1');
+    await vi.advanceTimersByTimeAsync(500);
+    expect(onError).toHaveBeenCalledWith('a', 'Reload', 'stale-schema');
+    expect(send).toHaveBeenCalledTimes(1);
+  });
   it('a newer edit replaces the snapshot held for retry', async () => {
     const send = vi
       .fn<Send>()

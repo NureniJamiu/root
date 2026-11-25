@@ -170,17 +170,19 @@ export function useProjects(options: UseProjectsOptions = {}): UseProjects {
           ok: false,
           message: result.message ?? 'Save failed',
           fatal: !retryable,
+          ...(result.code ? { code: result.code } : {}),
         };
       },
       onStatus: (status) => {
         setSaveStatus(status);
         if (status === 'saved') errorShownRef.current = false;
       },
-      onError: (_projectId, message) => {
+      onError: (_projectId, message, code) => {
         // One toast per failure streak; the queue keeps retrying quietly.
         if (errorShownRef.current) return;
         errorShownRef.current = true;
-        emitSaveError({ message });
+        // A newer version of the app saved this project: only a reload can fix it.
+        emitSaveError({ message, ...(code === 'stale-schema' ? { reload: true } : {}) });
       },
     });
   }

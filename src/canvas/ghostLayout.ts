@@ -7,6 +7,7 @@
  * otherwise to the right of everything already there. Pure geometry.
  */
 
+import { FALLBACK_RELATION, unrecordedProvenance } from '../data';
 import type { Canvas, Edge, Node, NodeType, Position, UUID } from '../data';
 import type { NodeSizes } from './measuredSizes';
 import { NODE_HEIGHT, NODE_WIDTH, computeChildPosition, computeTreeLayout, findFreePosition } from './placement';
@@ -27,6 +28,9 @@ function placeholder(id: string, position: Position, type: NodeType): Node {
     body: '',
     images: [],
     type,
+    fields: {},
+    // Layout only: placeholders never reach the canvas.
+    provenance: unrecordedProvenance(),
     position,
     collapsed: false,
     createdAt: '',
@@ -74,6 +78,8 @@ export function layoutMap(
           targetSide: 'top',
           sourcePinned: false,
           targetPinned: false,
+          relationType: FALLBACK_RELATION,
+          provenance: unrecordedProvenance(),
         }),
       ),
   };

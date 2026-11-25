@@ -11,7 +11,11 @@
 
 import { create } from 'zustand';
 
+import type { AiFeature } from '../lib/ai/plans';
+import { PROVENANCE_MODEL_MAX } from './limits';
+import { aiProvenance } from './model';
 import { canvasActions } from './store';
+import { now } from './time';
 import type { NodeType, Position, UUID } from './types';
 
 export interface GhostIdea {
@@ -26,6 +30,17 @@ export interface GhostIdea {
 }
 
 export type AiProposalKind = 'map' | 'expand' | 'capture' | 'research';
+
+/** The AI feature each kind of proposal comes from, recorded on accepted ideas. */
+const FEATURE_BY_KIND = {
+  map: 'ai.map',
+  expand: 'ai.expand',
+  capture: 'ai.capture',
+  research: 'ai.research',
+} as const satisfies Record<AiProposalKind, AiFeature>;
+
+/** Recorded when a proposal carries no model label, which the provenance shape requires. */
+const UNKNOWN_MODEL = 'Unknown model';
 
 export interface AiProposal {
   readonly kind: AiProposalKind;
@@ -127,6 +142,11 @@ export const aiProposalActions = {
         body: i.body,
         type: i.type,
       })),
+      aiProvenance({
+        feature: FEATURE_BY_KIND[proposal.kind],
+        model: proposal.modelLabel.trim().slice(0, PROVENANCE_MODEL_MAX) || UNKNOWN_MODEL,
+        acceptedAt: now(),
+      }),
     );
     useAiProposalStore.setState({ proposal: null });
     decisionListener?.(proposal.kind, proposal.ideas.length, included.length);

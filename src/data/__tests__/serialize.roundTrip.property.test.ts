@@ -32,8 +32,9 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
+import { canvasSchema } from '../schema';
 import { parseCanvas, serializeCanvas } from '../serialize';
-import { arbCanvas } from './arbitraries';
+import { arbCanvas, arbRichCanvas } from './arbitraries';
 
 describe('Feature: root-mvp, Property 16: Serialization round-trip', () => {
   test('parseCanvas(serializeCanvas(c)) === { ok: true, canvas: c\' } with c\' deep-equal to c', () => {
@@ -52,6 +53,37 @@ describe('Feature: root-mvp, Property 16: Serialization round-trip', () => {
         }
       }),
       { numRuns: 100 },
+    );
+  });
+
+  // Canvases that also carry sources, image captions, hidden connectors,
+  // every provenance origin and a workspace: nothing may be dropped or added.
+  test('keeps every field, through serializeCanvas and through the JSON the app saves', () => {
+    fc.assert(
+      fc.property(arbRichCanvas, (c) => {
+        const result = parseCanvas(serializeCanvas(c));
+        expect(result.ok).toBe(true);
+        if (result.ok) expect(result.canvas).toStrictEqual(c);
+
+        const saved = canvasSchema.safeParse(JSON.parse(JSON.stringify(c)));
+        expect(saved.success).toBe(true);
+        if (saved.success) expect(saved.data).toStrictEqual(c);
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  test('serializes two equal canvases to the same string whatever their key order', () => {
+    fc.assert(
+      fc.property(arbRichCanvas, (c) => {
+        const reversed = JSON.parse(JSON.stringify(c), (_key, value: unknown) =>
+          value && typeof value === 'object' && !Array.isArray(value)
+            ? Object.fromEntries(Object.entries(value).reverse())
+            : value,
+        ) as typeof c;
+        expect(serializeCanvas(reversed)).toBe(serializeCanvas(c));
+      }),
+      { numRuns: 50 },
     );
   });
 });

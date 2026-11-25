@@ -45,12 +45,14 @@ describe('deleteSubtree semantics', () => {
     const node = (id: string) => ({
       id, title: '', body: '', images: [], type: 'topic' as const,
       position: { x: 0, y: 0 }, collapsed: false, createdAt: ts, updatedAt: ts,
+      fields: {}, provenance: { origin: 'researcher' as const, edited: false },
     });
     const edge = (source: string, target: string) => ({
       id: crypto.randomUUID(), source, target, sourceSide: 'right' as const, targetSide: 'left' as const, sourcePinned: false, targetPinned: false,
+      relationType: 'related-to' as const, provenance: { origin: 'researcher' as const, edited: false },
     });
     const c = {
-      id: crypto.randomUUID(), title: '', updatedAt: ts,
+      id: crypto.randomUUID(), schemaVersion: 2 as const, title: '', updatedAt: ts,
       nodes: [node(ids.a), node(ids.b), node(ids.shared), node(ids.only)],
       edges: [edge(ids.a, ids.shared), edge(ids.b, ids.shared), edge(ids.a, ids.only)],
     };

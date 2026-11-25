@@ -43,6 +43,8 @@ function makeNode(overrides: Partial<Node> & { id: UUID }): Node {
     body: overrides.body ?? '',
     images: overrides.images ?? [],
     type: overrides.type ?? 'topic',
+    fields: overrides.fields ?? {},
+    provenance: overrides.provenance ?? { origin: 'researcher', edited: false },
     position: overrides.position ?? { x: 0, y: 0 },
     collapsed: overrides.collapsed ?? false,
     createdAt: overrides.createdAt ?? TIMESTAMP,
@@ -51,12 +53,16 @@ function makeNode(overrides: Partial<Node> & { id: UUID }): Node {
 }
 
 function makeEdge(source: UUID, target: UUID, id: UUID = '30000000-0000-4000-8000-000000000001'): Edge {
-  return { id, source, target, sourceSide: 'right', targetSide: 'left', sourcePinned: false, targetPinned: false };
+  return {
+    id, source, target, sourceSide: 'right', targetSide: 'left', sourcePinned: false, targetPinned: false,
+    relationType: 'related-to', provenance: { origin: 'researcher', edited: false },
+  };
 }
 
 function makeCanvas(nodes: Node[], edges: Edge[] = []): Canvas {
   return {
     id: CANVAS_ID,
+    schemaVersion: 2,
     title: '',
     nodes,
     edges,

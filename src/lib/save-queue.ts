@@ -23,6 +23,8 @@ export type SaveOutcome =
       readonly message: string;
       /** The server refused the request itself; retrying cannot help. */
       readonly fatal?: boolean;
+      /** Machine-readable reason from the server, passed on to `onError`. */
+      readonly code?: string;
     };
 
 export interface SaveQueueOptions<T> {
@@ -32,7 +34,7 @@ export interface SaveQueueOptions<T> {
     options: { readonly keepalive: boolean },
   ) => Promise<SaveOutcome>;
   readonly onStatus?: (status: SaveStatus) => void;
-  readonly onError?: (projectId: string, message: string) => void;
+  readonly onError?: (projectId: string, message: string, code?: string) => void;
   /** Quiet period before a scheduled snapshot is sent. */
   readonly delayMs?: number;
   /** First retry delay after a failed save; doubles up to `maxRetryMs`. */
@@ -104,7 +106,7 @@ export function createSaveQueue<T>(options: SaveQueueOptions<T>): SaveQueue<T> {
         continue;
       }
 
-      options.onError?.(projectId, outcome.message);
+      options.onError?.(projectId, outcome.message, outcome.code);
       if (outcome.fatal) {
         // Nothing to retry; the next edit will try again.
         setStatus('error');
