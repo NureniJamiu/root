@@ -109,7 +109,7 @@ describe('AI panel', () => {
     vi.spyOn(aiApi, 'tidy').mockResolvedValue({
       suggestions: [
         { kind: 'retype', ideaId: a, type: 'conclusion', reason: 'It judges.' },
-        { kind: 'connect', sourceId: a, targetId: b, reason: 'Related.' },
+        { kind: 'connect', sourceId: a, targetId: b, relation: null, reason: 'Related.' },
       ],
       model: { id: 'm', label: 'Gemini' },
       allowance: config('pro').allowance,
@@ -126,6 +126,33 @@ describe('AI panel', () => {
     expect(canvas.edges).toHaveLength(0);
     expect(feedback).toHaveBeenCalledWith({ feature: 'ai.tidy', offered: 2, accepted: 1 });
     expect(screen.getByRole('status').textContent).toContain('Applied 1 change');
+  });
+
+  it('spells out connector meanings in tidy suggestions and applies them as shown', async () => {
+    const { a, b } = seedCanvas();
+    canvasActions.loadCanvas(
+      updateNode(
+        updateNode(
+          connect(useCanvasStore.getState().canvas, { source: a, target: b, sourceSide: 'right', targetSide: 'left' }, 'related-to'),
+          a,
+          { type: 'finding' },
+        ),
+        b,
+        { type: 'question' },
+      ),
+    );
+    vi.spyOn(aiApi, 'tidy').mockResolvedValue({
+      suggestions: [{ kind: 'relate', sourceId: a, targetId: b, relation: 'answers', reason: 'It answers it.' }],
+      model: { id: 'm', label: 'Gemini' },
+      allowance: config('pro').allowance,
+      ownKey: false,
+    });
+    vi.spyOn(aiApi, 'feedback').mockImplementation(() => undefined);
+    render(<AiPanel projectId={PROJECT} open tab="tidy" onTabChange={() => {}} onClose={() => {}} nav={nav} />);
+    fireEvent.click(screen.getByTestId('ai-tidy-run'));
+    expect(await screen.findByText('Mark the connector as “Sleep helps memory” answers “Naps”')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('ai-tidy-apply'));
+    expect(useCanvasStore.getState().canvas.edges[0]).toMatchObject({ source: a, target: b, relationType: 'answers' });
   });
 
   it('writes speaker notes and shows them during the walkthrough', async () => {
@@ -160,7 +187,7 @@ describe('AI panel', () => {
   it('turns research into suggestions with where they came from', async () => {
     const { a } = seedCanvas();
     vi.spyOn(aiApi, 'research').mockResolvedValue({
-      ideas: [{ key: 'r1', title: 'Naps help', body: 'Sources:\n- [Nap](https://en.wikipedia.org/wiki/Nap)', type: 'finding', parent: null }],
+      ideas: [{ key: 'r1', title: 'Naps help', body: 'Sources:\n- [Nap](https://en.wikipedia.org/wiki/Nap)', type: 'finding', parent: null, relation: 'answers' }],
       queries: ['naps'],
       sourcesRead: 3,
       searched: ['Wikipedia', 'OpenAlex'],

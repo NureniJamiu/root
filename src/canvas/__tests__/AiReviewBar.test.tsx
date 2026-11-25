@@ -24,8 +24,8 @@ describe('AiReviewBar', () => {
       kind: 'map',
       anchorId: null,
       ideas: [
-        { key: 'a', title: 'A', body: '', type: 'topic', parentKey: null, position: { x: 0, y: 0 } },
-        { key: 'b', title: 'B', body: '', type: 'finding', parentKey: 'a', position: { x: 0, y: 300 } },
+        { key: 'a', title: 'A', body: '', type: 'topic', parentKey: null, relation: null, position: { x: 0, y: 0 } },
+        { key: 'b', title: 'B', body: '', type: 'finding', parentKey: 'a', relation: null, position: { x: 0, y: 300 } },
       ],
       excluded: ['b'],
       modelLabel: 'Gemini',

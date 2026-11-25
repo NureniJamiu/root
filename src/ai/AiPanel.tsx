@@ -10,8 +10,18 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { presentationOrder, walkthroughActions } from '../canvas';
-import { canvasActions, scriptText, speakerNotesActions, useCanvasStore, useSpeakerNotesStore } from '../data';
-import type { NodePatch, UUID } from '../data';
+import {
+  aiProvenance,
+  canvasActions,
+  nodeTypeLabel,
+  relationLabel,
+  scriptText,
+  speakerNotesActions,
+  useCanvasStore,
+  useSpeakerNotesStore,
+} from '../data';
+import type { Node, NodePatch, RelationId, UUID } from '../data';
+import { PROVENANCE_MODEL_MAX } from '../data/limits';
 import type { ReviewIssue, ReviewKind, TidySuggestion } from '../lib/ai/contracts';
 import { FEATURE_LABELS, cheapestPlanFor, PLAN_DEFINITIONS } from '../lib/ai/plans';
 import type { Feature } from '../lib/ai/plans';
@@ -381,15 +391,24 @@ function ReviewTab({ projectId, nav }: { readonly projectId: string; readonly na
 /* Tidy                                                                       */
 /* -------------------------------------------------------------------------- */
 
-function describeTidy(s: TidySuggestion, titleOf: (id: UUID) => string | null): string | null {
-  if (s.kind === 'connect') {
-    const a = titleOf(s.sourceId);
-    const b = titleOf(s.targetId);
-    return a !== null && b !== null ? `Connect “${a}” → “${b}”` : null;
+/**
+ * A suggestion in words. A connector's relation is always spelled out, read
+ * from the first idea to the second, so nothing gets a meaning the person did
+ * not see (principle 0.3).
+ */
+function describeTidy(s: TidySuggestion, nodeOf: (id: UUID) => Node | undefined): string | null {
+  const name = (n: Node) => n.title || 'Untitled idea';
+  if (s.kind === 'connect' || s.kind === 'relate') {
+    const a = nodeOf(s.sourceId);
+    const b = nodeOf(s.targetId);
+    if (!a || !b) return null;
+    const reads = (relation: RelationId) => `“${name(a)}” ${relationLabel(relation, a.type, b.type)} “${name(b)}”`;
+    if (s.kind === 'relate') return `Mark the connector as ${reads(s.relation)}`;
+    return s.relation ? `Connect so that ${reads(s.relation)}` : `Connect “${name(a)}” → “${name(b)}”`;
   }
-  const t = titleOf(s.ideaId);
-  if (t === null) return null;
-  return s.kind === 'retype' ? `Make “${t}” a ${s.type}` : `Rename “${t}” to “${s.title}”`;
+  const n = nodeOf(s.ideaId);
+  if (!n) return null;
+  return s.kind === 'retype' ? `Make “${name(n)}” a ${nodeTypeLabel(s.type).toLowerCase()}` : `Rename “${name(n)}” to “${s.title}”`;
 }
 
 function TidyTab(): JSX.Element {
@@ -406,10 +425,7 @@ function TidyTab(): JSX.Element {
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
 
-  const titleOf = (id: UUID): string | null => {
-    const node = nodes.find((n) => n.id === id);
-    return node ? node.title || 'Untitled idea' : null;
-  };
+  const nodeOf = (id: UUID): Node | undefined => nodes.find((n) => n.id === id);
 
   const run = async (): Promise<void> => {
     controller.current = new AbortController();
@@ -427,18 +443,24 @@ function TidyTab(): JSX.Element {
     }
   };
 
-  const shown = state.status === 'done' ? state.suggestions.map((s, i) => ({ s, i, text: describeTidy(s, titleOf) })).filter((x) => x.text !== null) : [];
+  const shown = state.status === 'done' ? state.suggestions.map((s, i) => ({ s, i, text: describeTidy(s, nodeOf) })).filter((x) => x.text !== null) : [];
   const chosen = shown.filter((x) => !skipped.has(x.i));
 
   const apply = (): void => {
     const updates: Array<{ id: UUID; patch: NodePatch }> = [];
-    const connections: Array<{ source: UUID; target: UUID }> = [];
+    const connections: Array<{ source: UUID; target: UUID; relation: RelationId | null }> = [];
+    const relations: Array<{ source: UUID; target: UUID; relation: RelationId }> = [];
     for (const { s } of chosen) {
-      if (s.kind === 'connect') connections.push({ source: s.sourceId, target: s.targetId });
+      if (s.kind === 'connect') connections.push({ source: s.sourceId, target: s.targetId, relation: s.relation });
+      else if (s.kind === 'relate') relations.push({ source: s.sourceId, target: s.targetId, relation: s.relation });
       else if (s.kind === 'retype') updates.push({ id: s.ideaId, patch: { type: s.type } });
       else updates.push({ id: s.ideaId, patch: { title: s.title } });
     }
-    const count = canvasActions.applyEdits({ updates, connections });
+    const model = state.status === 'done' ? state.model : '';
+    const count = canvasActions.applyEdits(
+      { updates, connections, relations },
+      aiProvenance({ feature: 'ai.tidy', model: model.trim().slice(0, PROVENANCE_MODEL_MAX) || 'AI', acceptedAt: new Date().toISOString() }),
+    );
     aiApi.feedback({ feature: 'ai.tidy', offered: Math.min(shown.length, 100), accepted: Math.min(count, 100) });
     setState({ status: 'applied', count });
   };

@@ -96,7 +96,7 @@ async function start(setup: Setup = {}) {
       buildModel: (model, apiKey) => {
         calls.push({ model, apiKey });
         if (setup.modelFor) return setup.modelFor(model);
-        return setup.model ?? jsonModel({ ideas: [{ key: 'i1', title: 'An idea', body: '', type: 'topic', parent: null }] });
+        return setup.model ?? jsonModel({ ideas: [{ key: 'i1', title: 'An idea', body: '', type: 'topic', parent: null, relation: null }] });
       },
     }),
   );
@@ -372,10 +372,10 @@ describe('/api/ai', () => {
       const ideas = await capture.call('/capture', { body: { text: 'Naps help.', canvas: projects[PROJECT]!.canvas } });
       expect((await ideas.json()).ideas).toHaveLength(1);
       const tidy = await start({
-        model: jsonModel({ suggestions: [{ kind: 'connect', ref: 'I1', type: null, title: null, to: 'I2', reason: 'Supports it.' }] }),
+        model: jsonModel({ suggestions: [{ kind: 'connect', ref: 'I1', type: null, title: null, to: 'I2', relation: null, reason: 'Supports it.' }] }),
       });
       const res = await tidy.call('/tidy', { body: { canvas: projects[PROJECT]!.canvas } });
-      expect((await res.json()).suggestions).toEqual([{ kind: 'connect', sourceId: IDEA, targetId: CONCLUSION, reason: 'Supports it.' }]);
+      expect((await res.json()).suggestions).toEqual([{ kind: 'connect', sourceId: IDEA, targetId: CONCLUSION, relation: null, reason: 'Supports it.' }]);
     });
 
     it('records accept rates without counting them as actions', async () => {

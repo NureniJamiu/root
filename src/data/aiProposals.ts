@@ -14,6 +14,7 @@ import { create } from 'zustand';
 import type { AiFeature } from '../lib/ai/plans';
 import { PROVENANCE_MODEL_MAX } from './limits';
 import { aiProvenance } from './model';
+import type { RelationId } from './model';
 import { canvasActions } from './store';
 import { now } from './time';
 import type { NodeType, Position, UUID } from './types';
@@ -26,6 +27,11 @@ export interface GhostIdea {
   readonly type: NodeType;
   /** Another suggestion this one hangs from, or null to hang from the anchor. */
   readonly parentKey: string | null;
+  /**
+   * What the connector from its parent (or the anchor) means, shown on the
+   * ghost connector; null for a plain link.
+   */
+  readonly relation: RelationId | null;
   readonly position: Position;
 }
 
@@ -81,7 +87,9 @@ export function isGhostId(id: string): boolean {
 
 /**
  * The ideas that will be added, each re-hung from its nearest included
- * ancestor when the suggestion it hung from was switched off.
+ * ancestor when the suggestion it hung from was switched off. A re-hung idea
+ * loses its relation: it was proposed for the parent that was switched off,
+ * and the preview shows the re-hung connector as a plain link.
  */
 export function includedIdeas(proposal: AiProposal): Array<GhostIdea & { readonly parentKey: string | null }> {
   const excluded = new Set(proposal.excluded);
@@ -98,7 +106,10 @@ export function includedIdeas(proposal: AiProposal): Array<GhostIdea & { readonl
   };
   return proposal.ideas
     .filter((i) => !excluded.has(i.key))
-    .map((i) => ({ ...i, parentKey: nearestIncluded(i.parentKey) }));
+    .map((i) => {
+      const parentKey = nearestIncluded(i.parentKey);
+      return { ...i, parentKey, relation: parentKey === i.parentKey ? i.relation : null };
+    });
 }
 
 /** Told how many suggestions were shown and kept, each time a proposal is added or dropped. */
@@ -141,6 +152,7 @@ export const aiProposalActions = {
         title: i.title,
         body: i.body,
         type: i.type,
+        relation: i.relation,
       })),
       aiProvenance({
         feature: FEATURE_BY_KIND[proposal.kind],

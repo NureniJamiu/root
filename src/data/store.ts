@@ -391,6 +391,8 @@ export const canvasActions = {
       title: string;
       body?: string;
       type?: NodeType;
+      /** What the connector from its parent means; a plain link when absent. */
+      relation?: RelationId | null;
     }[],
     /** Who the ideas and their connectors come from; the researcher when absent. */
     provenance?: Provenance,
@@ -410,6 +412,7 @@ export const canvasActions = {
             body: (item.body ?? '').slice(0, NODE_BODY_MAX),
             type: item.type ?? 'finding',
             ...(provenance ? { provenance } : {}),
+            ...(item.relation ? { relationType: item.relation } : {}),
           };
           const added = parent ? mutAddChild(next, parent, idea) : mutAddNode(next, idea);
           const id = findNewNodeId(next, added);
@@ -426,14 +429,25 @@ export const canvasActions = {
   },
 
   /**
-   * Apply several edits at once (new titles or types, new connectors) as one
-   * undo step. New connectors are `related-to`. Edits naming ideas that no
-   * longer exist are skipped. Returns how many were applied.
+   * Apply several edits at once (new titles or types, new connectors, meanings
+   * for plain connectors) as one undo step. A new connector carries the
+   * relation it was shown with, or none (`related-to`). A relation is only
+   * given to a `related-to` connector between the two ideas. Edits naming
+   * ideas that no longer exist are skipped. Returns how many were applied.
    */
-  applyEdits(edits: {
-    readonly updates: ReadonlyArray<{ readonly id: UUID; readonly patch: NodePatch }>;
-    readonly connections: ReadonlyArray<{ readonly source: UUID; readonly target: UUID }>;
-  }): number {
+  applyEdits(
+    edits: {
+      readonly updates: ReadonlyArray<{ readonly id: UUID; readonly patch: NodePatch }>;
+      readonly connections: ReadonlyArray<{
+        readonly source: UUID;
+        readonly target: UUID;
+        readonly relation?: RelationId | null;
+      }>;
+      readonly relations?: ReadonlyArray<{ readonly source: UUID; readonly target: UUID; readonly relation: RelationId }>;
+    },
+    /** Who new connectors come from; the researcher when absent. */
+    provenance?: Provenance,
+  ): number {
     let applied = 0;
     commitCanvasWrite(
       'applyEdits',
@@ -444,13 +458,28 @@ export const canvasActions = {
           if (after !== next) applied += 1;
           next = after;
         }
-        for (const { source, target } of edits.connections) {
+        for (const { source, target, relation } of edits.connections) {
           const from = next.nodes.find((n) => n.id === source);
           const to = next.nodes.find((n) => n.id === target);
           if (!from || !to) continue;
-          // A suggested link was shown with no meaning, so it gets none (principle 0.3):
-          // it stays `related-to` until suggestions carry a relation (S7).
-          const after = mutConnect(next, { source, target, ...computeFacingSides(from.position, to.position) }, FALLBACK_RELATION);
+          // A suggested link gets exactly the meaning it was shown with (principle 0.3), none when it had none.
+          const after = mutConnect(
+            next,
+            { source, target, ...computeFacingSides(from.position, to.position) },
+            relation ?? FALLBACK_RELATION,
+            provenance,
+          );
+          if (after !== next) applied += 1;
+          next = after;
+        }
+        for (const { source, target, relation } of edits.relations ?? []) {
+          const edge = next.edges.find(
+            (e) =>
+              e.relationType === FALLBACK_RELATION &&
+              ((e.source === source && e.target === target) || (e.source === target && e.target === source)),
+          );
+          if (!edge) continue;
+          const after = mutSetEdgeRelation(next, edge.id, relation);
           if (after !== next) applied += 1;
           next = after;
         }

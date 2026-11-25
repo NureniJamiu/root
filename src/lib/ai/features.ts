@@ -11,6 +11,9 @@ import { generateText, Output, streamText } from 'ai';
 import type { LanguageModel } from 'ai';
 
 import { IMAGE_CAPTION_MAX, IMAGE_TEXT_MAX, NODE_BODY_MAX, NODE_TITLE_MAX } from '../../data/limits';
+import type { EnabledNodeTypeId } from '../../data/model/enabled';
+import { FALLBACK_RELATION, RELATIONS, isRelationAllowed } from '../../data/model/relations';
+import type { RelationDefinition, RelationId } from '../../data/model/relations';
 import type { GraphView, RuleId } from '../../data/model/rules';
 import { runRules } from '../../data/rules';
 import { resolveRefs } from './citations';
@@ -18,13 +21,13 @@ import { describeBranch, describeExpandContext, describeOverview } from './conte
 import {
   describeOutputSchema,
   draftOutputSchema,
-  ideaSuggestionsSchema,
+  ideaSuggestionsSchemaFor,
   researchOutputSchema,
   researchPlanSchema,
   reviewOutputSchema,
   scriptOutputSchema,
-  suggestedTypeSchema,
   tidyOutputSchema,
+  tidyTypeSchema,
 } from './contracts';
 import type {
   AskRequest,
@@ -46,6 +49,7 @@ import type {
   TidySuggestion,
 } from './contracts';
 import type { NumberedContext } from './project-content';
+import { keptRelation, relationsGuide, typesFor, typesGuide } from './vocabulary';
 import type { WebSource } from './web-search';
 
 type AskTurn = NonNullable<AskRequest['history']>[number];
@@ -73,11 +77,11 @@ export const MAP_IDEAS_MAX = 16;
 /** Most ideas one expansion may suggest. */
 export const EXPAND_IDEAS_MAX = 6;
 
-const TYPES_GUIDE = `Each idea has a type:
-- topic: a subject or theme that organises other ideas
-- finding: something learned, observed or supported by evidence
-- question: an open question worth investigating
-- conclusion: a judgement drawn from findings`;
+/** The types each suggesting feature may propose, from the registry (D9). */
+const MAP_TYPES = typesFor('ai.map');
+const EXPAND_TYPES = typesFor('ai.expand');
+const CAPTURE_TYPES = typesFor('ai.capture');
+const TIDY_TYPES = tidyTypeSchema.options;
 
 const STYLE_GUIDE = `Write titles as short, specific statements or questions (under 12 words), not single vague words.
 Notes are one to three plain sentences that say why the idea matters or what to look into.
@@ -90,18 +94,30 @@ function toUsage(usage: { inputTokens?: number | undefined; outputTokens?: numbe
 
 /**
  * Make suggestions safe to place: unique keys, text within the canvas limits,
- * and parents that point at an earlier suggestion (so there are no cycles).
+ * parents that point at an earlier suggestion (so there are no cycles), only
+ * the types the feature may propose (`types`), and only relations the
+ * validity map allows between an idea and what it hangs from (a suggested
+ * parent, or the `anchorType` idea being expanded). A relation that does not
+ * fit becomes null: a plain link, never a meaning the map rules out.
  * With `anchorAll`, every suggestion hangs directly from the idea being
  * expanded; otherwise every suggestion but the first hangs from something.
  */
 export function cleanSuggestions(
-  ideas: readonly IdeaSuggestion[],
-  opts: { readonly max: number; readonly anchorAll: boolean },
+  ideas: readonly (Omit<IdeaSuggestion, 'relation'> & { readonly relation?: RelationId | null })[],
+  opts: {
+    readonly max: number;
+    readonly anchorAll: boolean;
+    readonly types: readonly EnabledNodeTypeId[];
+    readonly anchorType?: EnabledNodeTypeId;
+  },
 ): IdeaSuggestion[] {
   const out: IdeaSuggestion[] = [];
   const keys = new Set<string>();
+  const typeOf = new Map<string, EnabledNodeTypeId>();
+  const allowed = new Set<string>(opts.types);
   for (const idea of ideas) {
     if (out.length >= opts.max) break;
+    if (!allowed.has(idea.type)) continue;
     const title = idea.title.replace(/\s+/g, ' ').trim().slice(0, NODE_TITLE_MAX);
     if (!title) continue;
     let key = idea.key.trim() || `i${out.length + 1}`;
@@ -111,7 +127,10 @@ export function cleanSuggestions(
     if (parent !== null && (!keys.has(parent) || parent === key)) parent = null;
     // A topic map is one tree: loose ideas hang from the first one.
     if (!opts.anchorAll && parent === null && out.length > 0) parent = out[0]!.key;
-    out.push({ key, title, body: idea.body.trim().slice(0, NODE_BODY_MAX), type: idea.type, parent });
+    const parentType = parent !== null ? typeOf.get(parent) : opts.anchorType;
+    const relation = keptRelation(idea.relation, parentType, idea.type);
+    typeOf.set(key, idea.type);
+    out.push({ key, title, body: idea.body.trim().slice(0, NODE_BODY_MAX), type: idea.type, parent, relation });
   }
   return out;
 }
@@ -147,20 +166,21 @@ export async function suggestMap(
 ): Promise<AiCallResult<IdeaSuggestion[]>> {
   const result = await generateText({
     model,
-    output: Output.object({ schema: ideaSuggestionsSchema }),
+    output: Output.object({ schema: ideaSuggestionsSchemaFor(MAP_TYPES) }),
     system: `You help a researcher start a visual research map: a tree of connected idea cards.
 Given a topic, return 8 to ${MAP_IDEAS_MAX} ideas forming a tree.
 The first idea is the topic itself (type "topic", parent null). Every other idea names its parent by key.
 Go two or three levels deep: themes under the topic, then findings and open questions under each theme.
 Give each idea a short unique key such as "i1", "i2".
-${TYPES_GUIDE}
+${typesGuide(MAP_TYPES)}
+${relationsGuide(MAP_TYPES)}
 ${STYLE_GUIDE}`,
     prompt: `Topic: ${req.topic}${req.guidance ? `\n\nWhat the researcher wants to focus on:\n${req.guidance}` : ''}`,
     maxRetries: 1,
     reasoning: QUICK_REASONING,
     ...(signal ? { abortSignal: signal } : {}),
   });
-  const ideas = cleanSuggestions(result.output.ideas, { max: MAP_IDEAS_MAX, anchorAll: false });
+  const ideas = cleanSuggestions(result.output.ideas, { max: MAP_IDEAS_MAX, anchorAll: false, types: MAP_TYPES });
   if (ideas.length === 0) throw new AiInputError('The model returned no usable ideas.');
   return { output: ideas, usage: toUsage(result.usage) };
 }
@@ -175,23 +195,30 @@ export async function suggestExpansion(
   signal?: AbortSignal,
 ): Promise<AiCallResult<IdeaSuggestion[]>> {
   const context = describeExpandContext(req.canvas, req.focusId);
-  if (context === null) throw new AiInputError('That idea is not on the canvas.');
+  const focus = req.canvas.nodes.find((n) => n.id === req.focusId);
+  if (context === null || !focus) throw new AiInputError('That idea is not on the canvas.');
   const result = await generateText({
     model,
-    output: Output.object({ schema: ideaSuggestionsSchema }),
+    output: Output.object({ schema: ideaSuggestionsSchemaFor(EXPAND_TYPES) }),
     system: `You help a researcher grow a visual research map of connected idea cards.
 Suggest 3 to ${EXPAND_IDEAS_MAX} new ideas that connect directly from the idea to expand.
 Good suggestions break it into parts, add the findings or evidence it needs, raise the questions it leaves open, or draw a conclusion it supports.
 Do not repeat ideas that are already connected from it or elsewhere on the canvas. Set every parent to null.
 Give each idea a short unique key such as "i1", "i2".
-${TYPES_GUIDE}
+${typesGuide(EXPAND_TYPES)}
+${relationsGuide(EXPAND_TYPES)} Here the parent is the idea to expand.
 ${STYLE_GUIDE}`,
     prompt: `${context}${req.guidance ? `\n\nThe researcher asks for:\n${req.guidance}` : ''}`,
     maxRetries: 1,
     reasoning: QUICK_REASONING,
     ...(signal ? { abortSignal: signal } : {}),
   });
-  const ideas = cleanSuggestions(result.output.ideas, { max: EXPAND_IDEAS_MAX, anchorAll: true });
+  const ideas = cleanSuggestions(result.output.ideas, {
+    max: EXPAND_IDEAS_MAX,
+    anchorAll: true,
+    types: EXPAND_TYPES,
+    anchorType: focus.type,
+  });
   if (ideas.length === 0) throw new AiInputError('The model returned no usable ideas.');
   return { output: ideas, usage: toUsage(result.usage) };
 }
@@ -439,13 +466,15 @@ export async function captureIdeas(
 ): Promise<AiCallResult<IdeaSuggestion[]>> {
   const result = await generateText({
     model,
-    output: Output.object({ schema: ideaSuggestionsSchema }),
+    output: Output.object({ schema: ideaSuggestionsSchemaFor(CAPTURE_TYPES) }),
     system: `You turn a passage from a research document into ideas for a canvas.
 Return between 2 and ${CAPTURE_IDEAS_MAX} ideas that capture the passage's distinct points: its claims as findings, its open issues as questions, its judgements as conclusions, and the subject they share as a topic when there is one.
-Connect them: give each idea a parent (another idea's key) when it follows from or supports it; the first idea's parent is null.
+When the passage frames a study (a research proposal, an introduction, a list of aims), capture that framing with the matching types: the problem it responds to, its objectives, its research questions, its hypotheses and the variables they name. Use these types only for what the passage explicitly states as such; an ordinary open question stays a question.
+Connect them: give each idea a parent (another idea's key) when it follows from, supports or addresses it; the first idea's parent is null.
 Use only what the passage says. Do not repeat ideas that are already on the canvas.
 Give each idea a short unique key such as "i1", "i2".
-${TYPES_GUIDE}
+${typesGuide(CAPTURE_TYPES)}
+${relationsGuide(CAPTURE_TYPES)}
 ${STYLE_GUIDE}`,
     prompt: `${req.documentTitle ? `Document: ${req.documentTitle}\n\n` : ''}Passage:\n${req.text}\n\nAlready on the canvas:\n${describeOverview(req.canvas)}`,
     maxRetries: 1,
@@ -453,7 +482,7 @@ ${STYLE_GUIDE}`,
     ...(signal ? { abortSignal: signal } : {}),
   });
   return {
-    output: cleanSuggestions(result.output.ideas, { max: CAPTURE_IDEAS_MAX, anchorAll: false }),
+    output: cleanSuggestions(result.output.ideas, { max: CAPTURE_IDEAS_MAX, anchorAll: false, types: CAPTURE_TYPES }),
     usage: toUsage(result.usage),
   };
 }
@@ -471,6 +500,21 @@ function orList(items: readonly string[]): string {
 }
 export const TIDY_SUGGESTIONS_MAX = 12;
 
+/** The typed relations among the types on a canvas, for tidy's connect and relate suggestions. */
+function relationsBlock(types: readonly EnabledNodeTypeId[]): string {
+  const lines = (Object.keys(RELATIONS) as RelationId[])
+    .filter((id) => id !== FALLBACK_RELATION)
+    .flatMap((id) => {
+      const pairs = (RELATIONS[id] as RelationDefinition).pairs.filter(
+        (p) => types.includes(p.subject as EnabledNodeTypeId) && types.includes(p.object as EnabledNodeTypeId) && isRelationAllowed(id, p.subject as EnabledNodeTypeId, p.object as EnabledNodeTypeId),
+      );
+      return pairs.length > 0 ? [`- ${id}: ${pairs.map((p) => `${p.subject} → ${p.object}`).join('; ')}`] : [];
+    });
+  return lines.length > 0
+    ? `Relations a connector can carry here (subject → object; the connector may be drawn either way):\n${lines.join('\n')}`
+    : 'No typed relation fits the ideas on this canvas: leave relation null and suggest no relate.';
+}
+
 export async function suggestTidy(
   model: LanguageModel,
   req: TidyRequest,
@@ -479,35 +523,44 @@ export async function suggestTidy(
   const nodes = req.canvas.nodes.slice(0, TIDY_IDEAS_MAX);
   const refOf = new Map(nodes.map((n, i) => [n.id, `I${i + 1}`]));
   const idOf = new Map(nodes.map((n, i) => [`I${i + 1}`, n]));
-  const connected = new Set<string>();
+  /** The relation of the connector between two ideas (either way round), by "a|b". */
+  const linked = new Map<string, RelationId>();
   const edgeLines: string[] = [];
   for (const e of req.canvas.edges) {
     const a = refOf.get(e.source);
     const b = refOf.get(e.target);
     if (!a || !b) continue;
-    connected.add(`${e.source}|${e.target}`).add(`${e.target}|${e.source}`);
-    edgeLines.push(`${a} → ${b}`);
+    const relation = e.relationType ?? FALLBACK_RELATION;
+    // A pair joined by any typed connector counts as typed: there is nothing to relate.
+    for (const k of [`${e.source}|${e.target}`, `${e.target}|${e.source}`]) {
+      if (linked.get(k) === undefined || linked.get(k) === FALLBACK_RELATION) linked.set(k, relation);
+    }
+    edgeLines.push(`${a} → ${b} (${relation})`);
   }
   const lines = nodes.map((n) => {
     const notes = n.body.trim().replace(/\s+/g, ' ').slice(0, 300);
     return `${refOf.get(n.id)}: [${n.type}] ${n.title.trim() || '(no title)'}${notes ? ` | notes: ${notes}` : ''}`;
   });
+  const typesOnCanvas = [...new Set(nodes.map((n) => n.type))];
   const result = await generateText({
     model,
     output: Output.object({ schema: tidyOutputSchema }),
     system: `You help keep a research canvas tidy. Suggest only clear improvements, at most ${TIDY_SUGGESTIONS_MAX}, most useful first:
-- retype: an idea whose type is clearly wrong (for example a question typed as a finding). Give the better type. Only retype ideas typed ${orList(suggestedTypeSchema.options)}; leave every other type as it is.
+- retype: an idea whose type is clearly wrong (for example a question typed as a finding). Give the better type. Only retype ideas typed ${orList(TIDY_TYPES)}, and only to one of those types; leave every other type as it is.
 - retitle: an idea with no title or a vague one, where its notes say what it is about. Give a better title (under 12 words).
-- connect: two related ideas that are not connected yet. ref is the idea it leads from, to the idea it leads to.
-For every suggestion give a one-sentence reason. Leave type, title and to null when they do not apply.
+- connect: two related ideas that are not connected yet. ref is the idea it leads from, to the idea it leads to. Give the relation when one fits exactly, otherwise null.
+- relate: a connector marked (related-to) whose two ideas clearly stand in one of the relations below. ref and to are its two ideas; give the relation.
+For every suggestion give a one-sentence reason. Leave type, title, to and relation null when they do not apply.
 Return an empty list when the canvas is already tidy. Write in the same language as the canvas.
-${TYPES_GUIDE}`,
+${typesGuide(TIDY_TYPES)}
+${relationsBlock(typesOnCanvas)}`,
     prompt: `Ideas:\n${lines.join('\n')}\n\nConnectors:\n${edgeLines.join('\n') || '(none)'}`,
     maxRetries: 1,
     reasoning: QUICK_REASONING,
     ...(signal ? { abortSignal: signal } : {}),
   });
 
+  const tidyTypes = new Set<string>(TIDY_TYPES);
   const out: TidySuggestion[] = [];
   const seen = new Set<string>();
   for (const s of result.output.suggestions) {
@@ -519,8 +572,8 @@ ${TYPES_GUIDE}`,
       s.kind === 'retype' &&
       s.type &&
       s.type !== node.type &&
-      // Until AI suggestions cover the other families (S7), never move a card off its type.
-      suggestedTypeSchema.safeParse(node.type).success &&
+      // Tidy never moves a card off a type it may not propose (D9): problem framing stays as the researcher set it.
+      tidyTypes.has(node.type) &&
       !seen.has(`type:${node.id}`)
     ) {
       seen.add(`type:${node.id}`);
@@ -532,9 +585,19 @@ ${TYPES_GUIDE}`,
       out.push({ kind: 'retitle', ideaId: node.id, title, reason });
     } else if (s.kind === 'connect' && s.to) {
       const target = idOf.get(s.to.trim());
-      if (!target || target.id === node.id || connected.has(`${node.id}|${target.id}`)) continue;
-      connected.add(`${node.id}|${target.id}`).add(`${target.id}|${node.id}`);
-      out.push({ kind: 'connect', sourceId: node.id, targetId: target.id, reason });
+      if (!target || target.id === node.id || linked.has(`${node.id}|${target.id}`)) continue;
+      const relation = keptRelation(s.relation, node.type, target.type);
+      linked.set(`${node.id}|${target.id}`, relation ?? FALLBACK_RELATION);
+      linked.set(`${target.id}|${node.id}`, relation ?? FALLBACK_RELATION);
+      out.push({ kind: 'connect', sourceId: node.id, targetId: target.id, relation, reason });
+    } else if (s.kind === 'relate' && s.to) {
+      const target = idOf.get(s.to.trim());
+      if (!target || linked.get(`${node.id}|${target.id}`) !== FALLBACK_RELATION) continue;
+      const relation = keptRelation(s.relation, node.type, target.type);
+      if (relation === null) continue;
+      linked.set(`${node.id}|${target.id}`, relation);
+      linked.set(`${target.id}|${node.id}`, relation);
+      out.push({ kind: 'relate', sourceId: node.id, targetId: target.id, relation, reason });
     }
   }
   return { output: out, usage: toUsage(result.usage) };
@@ -658,7 +721,9 @@ Do not repeat ideas already on the canvas. Write in the same language as the que
       .filter(Boolean)
       .join('\n\n')
       .slice(0, NODE_BODY_MAX);
-    ideas.push({ key: `r${ideas.length + 1}`, title, body, type: f.type, parent: null });
+    // A finding researched for a question answers it; the preview shows the label before it is added.
+    const relation = f.type === 'finding' ? keptRelation('answers', focus.type, 'finding') : null;
+    ideas.push({ key: `r${ideas.length + 1}`, title, body, type: f.type, parent: null, relation });
   }
   if (ideas.length === 0) throw new AiInputError('The sources found did not answer this question. Try rewording it.');
   return {
