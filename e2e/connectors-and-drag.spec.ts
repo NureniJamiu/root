@@ -318,6 +318,17 @@ test.describe('E2E: canvas connectors', () => {
     expect(await edges(page)).toHaveLength(0);
   });
 
+  test('13b. Selecting a connector opens a closed inspector on its panel', async ({ dashboard: page }) => {
+    await setup(page, { edge: {} });
+    const toggle = page.getByTestId('btn-toggle-inspector');
+    if ((await toggle.getAttribute('aria-expanded')) === 'true') await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await selectConnector(page, EDGE_ID);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('connector-panel')).toBeVisible();
+  });
+
   test('14. Escape clears the selection; clicking empty canvas deselects a connector', async ({ dashboard: page }) => {
     await setup(page, { edge: {} });
     const mid = await edgeMidpoint(page, EDGE_ID);

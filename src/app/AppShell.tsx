@@ -575,9 +575,10 @@ export function AppShell(): JSX.Element {
     canvasActions.addNode(position);
   }, []);
 
-  // Selecting an idea reveals the inspector. Closing it is left to the
-  // header toggle so the pane never disappears out from under the user.
-  const handleNodeSelect = useCallback(() => {
+  // Selecting an idea or a connector reveals the inspector (a connector's
+  // relation is changed there). Closing it is left to the header toggle so
+  // the pane never disappears out from under the user.
+  const revealInspector = useCallback(() => {
     setInspectorOpen(true);
   }, [setInspectorOpen]);
 
@@ -787,7 +788,8 @@ export function AppShell(): JSX.Element {
             >
               <CanvasView
                 onControlsReady={handleControlsReady}
-                onNodeSelect={handleNodeSelect}
+                onNodeSelect={revealInspector}
+                onEdgeSelect={revealInspector}
                 onPaneClick={handleCanvasPaneClick}
                 onDragChange={setDragInfo}
                 isPanActive={isPanActive}

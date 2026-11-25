@@ -606,10 +606,11 @@ function rejectEnds(c: Canvas, ends: ConnectorEnds, ignoreId?: UUID): string | n
  * Add a connector. Rejected (returns `c`) for a connector from a node to
  * itself, an unknown node, or a connector that repeats an existing one. Two
  * cards may share any number of connectors as long as they attach to
- * different sides. The connector starts with the validity map's default
- * relation for the two card types (`related-to` when the pair has none).
+ * different sides. The connector starts with `relationType` when given,
+ * otherwise with the validity map's default relation for the two card types
+ * (`related-to` when the pair has none).
  */
-export function connect(c: Canvas, ends: ConnectorEnds): Canvas {
+export function connect(c: Canvas, ends: ConnectorEnds, relationType?: RelationId): Canvas {
   const from = c.nodes.find((n) => n.id === ends.source);
   const to = c.nodes.find((n) => n.id === ends.target);
   if (from === undefined || to === undefined || rejectEnds(c, ends) !== null) return c;
@@ -621,7 +622,7 @@ export function connect(c: Canvas, ends: ConnectorEnds): Canvas {
     targetSide: ends.targetSide,
     sourcePinned: ends.sourcePinned ?? false,
     targetPinned: ends.targetPinned ?? false,
-    relationType: defaultRelation(from.type, to.type),
+    relationType: relationType ?? defaultRelation(from.type, to.type),
     provenance: researcherProvenance(),
   };
   return { ...c, edges: [...c.edges, edge], updatedAt: now() };

@@ -7,7 +7,7 @@
  *   target ("supported by"). It lets clicks through to the curve. A
  *   `related-to` connector shows it only while hovered or selected, so an
  *   old canvas looks as it did. A relation that does not fit its two cards is
- *   dashed in the warning colour and its label carries a warning mark.
+ *   dotted in the warning colour and its label carries a warning mark.
  * - Hovering or selecting a connector highlights it and shows a remove button
  *   just above its midpoint (not on it, so clicks on the curve never hit it). The same connector can be removed with Delete/Backspace
  *   while it is selected.
@@ -27,6 +27,7 @@ import type { RelationType } from '../data';
 import {
   EDGE_DASH,
   EDGE_DOT_RADIUS,
+  EDGE_INVALID_DASH,
   EDGE_INTERACTION_WIDTH,
   EDGE_STROKE_COLOR,
   EDGE_STROKE_WIDTH,
@@ -116,7 +117,7 @@ function ConnectorEdgeImpl(props: EdgeProps<ConnectorEdgeData>): JSX.Element {
           stroke: color,
           strokeWidth: active ? EDGE_STROKE_WIDTH_ACTIVE : EDGE_STROKE_WIDTH,
           strokeLinecap: 'round',
-          ...(data?.dashed ? { strokeDasharray: EDGE_DASH } : {}),
+          ...(data?.dashed ? { strokeDasharray: data.invalid ? EDGE_INVALID_DASH : EDGE_DASH } : {}),
         }}
       />
       <circle cx={sourceX} cy={sourceY} r={dotRadius} fill={color} stroke="rgb(var(--panel))" strokeWidth={1.5} pointerEvents="none" />

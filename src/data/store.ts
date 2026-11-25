@@ -62,7 +62,7 @@ import {
   updateNode as mutUpdateNode,
 } from './mutators';
 import type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators';
-import { fieldsForType, sameFields } from './model';
+import { FALLBACK_RELATION, fieldsForType, sameFields } from './model';
 import type { Provenance, RelationId } from './model';
 import { emitSaveError } from './storeEvents';
 import { computeFacingSides, subtreeIds } from './graph';
@@ -427,8 +427,8 @@ export const canvasActions = {
 
   /**
    * Apply several edits at once (new titles or types, new connectors) as one
-   * undo step. Edits naming ideas that no longer exist are skipped. Returns
-   * how many were applied.
+   * undo step. New connectors are `related-to`. Edits naming ideas that no
+   * longer exist are skipped. Returns how many were applied.
    */
   applyEdits(edits: {
     readonly updates: ReadonlyArray<{ readonly id: UUID; readonly patch: NodePatch }>;
@@ -448,7 +448,9 @@ export const canvasActions = {
           const from = next.nodes.find((n) => n.id === source);
           const to = next.nodes.find((n) => n.id === target);
           if (!from || !to) continue;
-          const after = mutConnect(next, { source, target, ...computeFacingSides(from.position, to.position) });
+          // A suggested link was shown with no meaning, so it gets none (principle 0.3):
+          // it stays `related-to` until suggestions carry a relation (S7).
+          const after = mutConnect(next, { source, target, ...computeFacingSides(from.position, to.position) }, FALLBACK_RELATION);
           if (after !== next) applied += 1;
           next = after;
         }

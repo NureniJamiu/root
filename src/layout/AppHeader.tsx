@@ -296,7 +296,7 @@ export function AppHeader({
                 Hover an idea to add a connected idea, edit or collapse it. Drag from a dot on any side of a card to any side of another card (or drop on the card itself) to connect them. A card can have as many connectors as you like.
               </p>
               <p className="font-serif text-[13px] leading-[19px] text-ink-read m-0 mb-3">
-                Click a connector to select it, then press Delete or use its ✕ button to remove it. With a connector selected, drag either end to re-attach it (dropped on empty canvas, it goes back). A side you pick stays put; double-click a connector to let it follow the facing sides again. A dashed connector leads to a Question. A new connector says what it means when the two cards have a usual relation (a Finding supports a Conclusion); change it in the inspector. A red dashed connector has a relation that does not fit its cards.
+                Click a connector to select it, then press Delete or use its ✕ button to remove it. With a connector selected, drag either end to re-attach it (dropped on empty canvas, it goes back). A side you pick stays put; double-click a connector to let it follow the facing sides again. A connector’s label says what it means, read from the card it leaves (a Finding supports a Conclusion). A new connector gets the usual relation for its two cards; select it to change that in the inspector. A connector with no set meaning shows “related to” only while hovered or selected, and is dashed when it leads to a Question. A relation that does not fit its cards is drawn dotted, with a warning mark on its label.
               </p>
               <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
                 {GUIDE_ITEMS.map((item) => (
