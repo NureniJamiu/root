@@ -91,7 +91,7 @@ describe('addChild postcondition', () => {
   });
 
   test('an unknown parent leaves the canvas unchanged', () => {
-    const c: Canvas = { id: crypto.randomUUID(), title: '', nodes: [], edges: [], updatedAt: new Date().toISOString() };
+    const c: Canvas = { id: crypto.randomUUID(), schemaVersion: 2, title: '', nodes: [], edges: [], updatedAt: new Date().toISOString() };
     expect(addChild(c, crypto.randomUUID(), { position: { x: 0, y: 0 } })).toBe(c);
   });
 });

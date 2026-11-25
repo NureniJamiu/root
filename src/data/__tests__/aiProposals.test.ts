@@ -39,6 +39,34 @@ describe('AI proposals', () => {
     ]);
   });
 
+  it('records accepted ideas and their connectors as AI-made, with the feature and model', () => {
+    aiProposalActions.propose(proposal());
+    aiProposalActions.accept();
+    const { nodes, edges } = canvas();
+    expect(nodes).toHaveLength(3);
+    expect(edges).toHaveLength(2);
+    for (const item of [...nodes, ...edges]) {
+      expect(item.provenance).toMatchObject({
+        origin: 'ai',
+        ai: { feature: 'ai.map', model: 'Test model', acceptedAt: expect.any(String) },
+        edited: false,
+      });
+    }
+    expect(edges.every((e) => e.relationType === 'related-to')).toBe(true);
+  });
+
+  it('records the feature each kind of proposal comes from', () => {
+    canvasActions.addNode({ x: 0, y: 0 });
+    const anchor = canvas().nodes[0]!.id;
+    canvasActions.closeEditor();
+    aiProposalActions.propose(proposal({ kind: 'expand', anchorId: anchor, ideas: [ghost('a', null)], modelLabel: '' }));
+    aiProposalActions.accept();
+    const added = canvas().nodes[1]!;
+    expect(canvas().nodes[0]!.provenance.origin).toBe('researcher');
+    expect(added.provenance).toMatchObject({ origin: 'ai', ai: { feature: 'ai.expand', model: 'Unknown model' } });
+    expect(canvas().edges[0]!.provenance).toStrictEqual(added.provenance);
+  });
+
   it('adds a map as one connected tree in one undo step', () => {
     aiProposalActions.propose(proposal());
     const ids = aiProposalActions.accept();

@@ -12,7 +12,7 @@
  *                                              Position, ImageEntry, UUID
  *   - Zod schemas         (from `./schema`)  — canvasSchema, nodeSchema,
  *                                              nodeTypeSchema, positionSchema,
- *                                              imageEntrySchema
+ *                                              imageEntrySchema, migrateCanvas
  *   - Pure mutators       (from `./mutators`) — emptyCanvas, addNode,
  *                                              addChild, connect, updateEdge,
  *                                              removeEdge, updateNode, ...
@@ -38,15 +38,31 @@
  *                                                    SaveErrorDetail
  */
 
-export type { Canvas, Edge, ImageEntry, Node, NodeType, Position, Side, Source, SourceKind, UUID } from './types';
+export type {
+  Canvas,
+  Edge,
+  ImageEntry,
+  Node,
+  NodeType,
+  Position,
+  RelationType,
+  Side,
+  Source,
+  SourceKind,
+  UUID,
+} from './types';
 
 export {
+  CANVAS_SCHEMA_VERSION,
   canvasSchema,
+  canvasSchemaVersion,
   edgeSchema,
   imageEntrySchema,
+  migrateCanvas,
   migrateLegacyCanvas,
   nodeSchema,
   nodeTypeSchema,
+  relationTypeSchema,
   positionSchema,
   sideSchema,
   sourceKindSchema,

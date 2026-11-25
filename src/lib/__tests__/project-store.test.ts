@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { addChild, addImage, addNode, emptyCanvas, updateNode } from '../../data/mutators';
 import type { Canvas } from '../../data/types';
+import { toV1 } from '../../data/__tests__/arbitraries';
 import { memoryBlobStore } from '../blob-store';
 import { IMAGE_REF_DATA_URL } from '../image-ref';
 import { createProjectStore, ProjectError } from '../project-store';
@@ -77,6 +78,60 @@ describe('project store', () => {
     expect(loaded.canvas.edges).toHaveLength(1);
     expect(loaded.canvas.edges[0]).toMatchObject({ source: a, target: b, sourceSide: 'right', targetSide: 'left' });
     expect(loaded.canvas.nodes.every((n) => !('parentId' in n))).toBe(true);
+  });
+
+  it('reads a stored v1 canvas back as v2, with nothing inferred', async () => {
+    let canvas = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
+    canvas = addChild(canvas, canvas.nodes[0]!.id, { position: { x: 400, y: 0 } });
+    const project = await store.create(USER, { canvas });
+    db.prepare('UPDATE project SET canvas = ? WHERE id = ?').run(JSON.stringify(toV1(canvas)), project.id);
+    const loaded = (await store.get(USER, project.id))!.canvas;
+    expect(loaded.schemaVersion).toBe(2);
+    expect(loaded.nodes.map((n) => n.provenance.origin)).toEqual(['unrecorded', 'unrecorded']);
+    expect(loaded.edges[0]).toMatchObject({ relationType: 'related-to', provenance: { origin: 'unrecorded' } });
+  });
+
+  describe('downgrade guard', () => {
+    const v2Canvas = () => {
+      let canvas = addNode({ ...emptyCanvas(), title: 'Typed' }, { position: { x: 0, y: 0 } });
+      canvas = addChild(canvas, canvas.nodes[0]!.id, { position: { x: 400, y: 0 } });
+      return canvas;
+    };
+
+    it('refuses (409 stale-schema) a canvas without schemaVersion 2 once the stored one is v2', async () => {
+      const canvas = v2Canvas();
+      const project = await store.create(USER, { canvas });
+      const stale = { ...toV1(canvas), title: 'Saved by an old tab' };
+      await expect(store.update(USER, project.id, { canvas: stale })).rejects.toMatchObject({
+        status: 409,
+        code: 'stale-schema',
+      });
+      const kept = (await store.get(USER, project.id))!.canvas;
+      expect(kept.title).toBe('Typed');
+      expect(kept.edges[0]!.provenance.origin).toBe('researcher');
+    });
+
+    it('still accepts a v2 save, and a title-only save, over a v2 canvas', async () => {
+      const canvas = v2Canvas();
+      const project = await store.create(USER, { canvas });
+      expect(await store.update(USER, project.id, { canvas: { ...canvas, title: 'Renamed' } })).not.toBeNull();
+      expect(await store.update(USER, project.id, { title: 'Renamed again' })).not.toBeNull();
+    });
+
+    it('accepts a v1 save over a stored v1 canvas and stores it as v2', async () => {
+      const canvas = v2Canvas();
+      const project = await store.create(USER, { canvas });
+      db.prepare('UPDATE project SET canvas = ? WHERE id = ?').run(JSON.stringify(toV1(canvas)), project.id);
+      expect(await store.update(USER, project.id, { canvas: toV1(canvas) })).not.toBeNull();
+      const raw = db.prepare('SELECT canvas FROM project WHERE id = ?').get(project.id) as { canvas: string };
+      expect(JSON.parse(raw.canvas)).toMatchObject({ schemaVersion: 2 });
+    });
+
+    it('creates new projects as v2', async () => {
+      const project = await store.create(USER, { title: 'Blank' });
+      const raw = db.prepare('SELECT canvas FROM project WHERE id = ?').get(project.id) as { canvas: string };
+      expect(JSON.parse(raw.canvas)).toMatchObject({ schemaVersion: 2 });
+    });
   });
 
   it('computes nodeCount itself and ignores a client-supplied value', async () => {

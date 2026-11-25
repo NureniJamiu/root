@@ -14,6 +14,9 @@
 
 import { newId } from './ids';
 import { IMAGE_CAPTION_MAX, IMAGE_DATA_URL_MAX_BYTES, IMAGE_TEXT_MAX } from './limits';
+import { FALLBACK_RELATION, markEdited, researcherProvenance } from './model';
+import type { Provenance } from './model';
+import { CANVAS_SCHEMA_VERSION } from './schema';
 import { cleanSource } from './source';
 import { now } from './time';
 import {
@@ -97,6 +100,7 @@ function refreshAutoSides(nodes: readonly Node[], edges: readonly Edge[], moved:
 export function emptyCanvas(): Canvas {
   return {
     id: newId(),
+    schemaVersion: CANVAS_SCHEMA_VERSION,
     title: '',
     nodes: [],
     edges: [],
@@ -108,14 +112,29 @@ export function emptyCanvas(): Canvas {
 /* addNode / addChild                                                         */
 /* -------------------------------------------------------------------------- */
 
-function blankNode(position: Position, ts: string): Node {
+/**
+ * What a new node starts with. Content left out starts blank (a `topic` with
+ * no title or body). `provenance` defaults to the researcher; anything else
+ * is built with the constructors in `model/provenance.ts`.
+ */
+export interface NewNodeOptions {
+  position: Position;
+  title?: string;
+  body?: string;
+  type?: NodeType;
+  provenance?: Provenance;
+}
+
+function newNode(opts: NewNodeOptions, ts: string): Node {
   return {
     id: newId(),
-    title: '',
-    body: '',
+    title: opts.title ?? '',
+    body: opts.body ?? '',
     images: [],
-    type: 'topic',
-    position,
+    type: opts.type ?? 'topic',
+    fields: {},
+    provenance: opts.provenance ?? researcherProvenance(),
+    position: opts.position,
     collapsed: false,
     createdAt: ts,
     updatedAt: ts,
@@ -126,27 +145,27 @@ function blankNode(position: Position, ts: string): Node {
  * Append a new, unconnected node at `position`. Works on any canvas, empty or
  * not: ideas do not have to hang from anything.
  */
-export function addNode(c: Canvas, opts: { position: Position }): Canvas {
+export function addNode(c: Canvas, opts: NewNodeOptions): Canvas {
   const ts = now();
-  return { ...c, nodes: [...c.nodes, blankNode(opts.position, ts)], updatedAt: ts };
+  return { ...c, nodes: [...c.nodes, newNode(opts, ts)], updatedAt: ts };
 }
 
 /**
  * Append a new node at `position` and connect `parentId` to it. The connector
  * follows the facing sides of the two cards unless `sourceSide` / `targetSide`
  * are given, which pins that end. A collapsed parent is expanded so the new node is visible.
- * Unknown `parentId` returns `c` unchanged.
+ * The connector has the new node's provenance. Unknown `parentId` returns `c` unchanged.
  */
 export function addChild(
   c: Canvas,
   parentId: UUID,
-  opts: { position: Position; sourceSide?: Side; targetSide?: Side },
+  opts: NewNodeOptions & { sourceSide?: Side; targetSide?: Side },
 ): Canvas {
   const parent = c.nodes.find((n) => n.id === parentId);
   if (parent === undefined) return c;
 
   const ts = now();
-  const child = blankNode(opts.position, ts);
+  const child = newNode(opts, ts);
   const facing = computeFacingSides(parent.position, opts.position);
   const edge: Edge = {
     id: newId(),
@@ -157,6 +176,8 @@ export function addChild(
     // A side that was asked for is the user's choice, so it stays put.
     sourcePinned: opts.sourceSide !== undefined,
     targetPinned: opts.targetSide !== undefined,
+    relationType: FALLBACK_RELATION,
+    provenance: child.provenance,
   };
   const nodes = c.nodes.map((n) =>
     n.id === parentId && n.collapsed ? { ...n, collapsed: false, updatedAt: ts } : n,
@@ -192,12 +213,16 @@ export interface NodePatch {
  */
 export function updateNode(c: Canvas, id: UUID, patch: NodePatch): Canvas {
   const ts = now();
+  const edits =
+    patch.title !== undefined || patch.body !== undefined || patch.type !== undefined || patch.source !== undefined;
   const nextNodes = replaceNode(c.nodes, id, (n) => {
     const next: Node = {
       ...n,
       ...(patch.title !== undefined ? { title: patch.title } : null),
       ...(patch.body !== undefined ? { body: patch.body } : null),
       ...(patch.type !== undefined ? { type: patch.type } : null),
+      // Editing an idea that came from AI makes it the researcher's (`edited`).
+      provenance: edits ? markEdited(n.provenance) : n.provenance,
       updatedAt: ts,
     };
     if (patch.source === undefined) return next;
@@ -266,6 +291,7 @@ export function addImage(c: Canvas, id: UUID, image: ImageEntry): Canvas {
   const nextNodes = replaceNode(c.nodes, id, (n) => ({
     ...n,
     images: [...n.images, image],
+    provenance: markEdited(n.provenance),
     updatedAt: ts,
   }));
   if (nextNodes === null) return c;
@@ -294,7 +320,7 @@ export function removeImage(c: Canvas, id: UUID, imageId: UUID): Canvas {
   const nextImages = node.images.slice();
   nextImages.splice(imgIdx, 1);
   const nextNodes = c.nodes.slice();
-  nextNodes[nodeIdx] = { ...node, images: nextImages, updatedAt: ts };
+  nextNodes[nodeIdx] = { ...node, images: nextImages, provenance: markEdited(node.provenance), updatedAt: ts };
   return { ...c, nodes: nextNodes, updatedAt: ts };
 }
 
@@ -580,6 +606,8 @@ export function connect(c: Canvas, ends: ConnectorEnds): Canvas {
     targetSide: ends.targetSide,
     sourcePinned: ends.sourcePinned ?? false,
     targetPinned: ends.targetPinned ?? false,
+    relationType: FALLBACK_RELATION,
+    provenance: researcherProvenance(),
   };
   return { ...c, edges: [...c.edges, edge], updatedAt: now() };
 }
@@ -600,6 +628,12 @@ export function updateEdge(c: Canvas, edgeId: UUID, ends: ConnectorEnds): Canvas
     targetSide: ends.targetSide,
     sourcePinned: ends.sourcePinned ?? current.sourcePinned,
     targetPinned: ends.targetPinned ?? current.targetPinned,
+    relationType: current.relationType,
+    // Attaching it to another card is an edit; moving an end to another side is not.
+    provenance:
+      ends.source !== current.source || ends.target !== current.target
+        ? markEdited(current.provenance)
+        : current.provenance,
   };
   if (
     next.source === current.source &&

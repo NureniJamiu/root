@@ -51,16 +51,16 @@ describe('deriveReactFlowGraph', () => {
     const ts = '2024-01-01T00:00:00.000Z';
     const node = (id: string, x: number) => ({
       id, title: '', body: '', images: [], type: 'topic' as const, position: { x, y: 0 },
-      collapsed: false, createdAt: ts, updatedAt: ts,
+      collapsed: false, createdAt: ts, updatedAt: ts, fields: {}, provenance: { origin: 'researcher' as const, edited: false },
     });
     const [a, b, c] = ['00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-00000000000c'];
     const canvas = {
-      id: '00000000-0000-4000-8000-000000000010', title: '', updatedAt: ts,
+      id: '00000000-0000-4000-8000-000000000010', schemaVersion: 2 as const, title: '', updatedAt: ts,
       nodes: [node(a, 0), node(b, 500), node(c, 1000)],
       edges: [
-        { id: '30000000-0000-4000-8000-000000000001', source: a, target: b, sourceSide: 'right' as const, targetSide: 'left' as const, sourcePinned: false, targetPinned: false },
-        { id: '30000000-0000-4000-8000-000000000002', source: a, target: b, sourceSide: 'top' as const, targetSide: 'top' as const, sourcePinned: true, targetPinned: true },
-        { id: '30000000-0000-4000-8000-000000000003', source: b, target: c, sourceSide: 'right' as const, targetSide: 'left' as const, sourcePinned: false, targetPinned: false },
+        { id: '30000000-0000-4000-8000-000000000001', source: a, target: b, sourceSide: 'right' as const, targetSide: 'left' as const, sourcePinned: false, targetPinned: false, relationType: 'related-to' as const, provenance: { origin: 'researcher' as const, edited: false } },
+        { id: '30000000-0000-4000-8000-000000000002', source: a, target: b, sourceSide: 'top' as const, targetSide: 'top' as const, sourcePinned: true, targetPinned: true, relationType: 'related-to' as const, provenance: { origin: 'researcher' as const, edited: false } },
+        { id: '30000000-0000-4000-8000-000000000003', source: b, target: c, sourceSide: 'right' as const, targetSide: 'left' as const, sourcePinned: false, targetPinned: false, relationType: 'related-to' as const, provenance: { origin: 'researcher' as const, edited: false } },
       ],
     };
     const { edges } = deriveReactFlowGraph(canvas);

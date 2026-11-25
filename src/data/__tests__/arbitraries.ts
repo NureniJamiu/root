@@ -35,12 +35,17 @@ import {
   updateNode,
   type NodePatch,
 } from '../mutators';
+import type { AiFeature } from '../../lib/ai/plans';
+import { INTAKE_ANSWERS, STAGE_IDS } from '../model';
+import type { Provenance, Workspace } from '../model';
 import type {
   Canvas,
   ImageEntry,
   NodeType,
   Position,
   Side,
+  Source,
+  SourceKind,
   UUID,
 } from '../types';
 
@@ -365,6 +370,111 @@ export const arbCanvas: fc.Arbitrary<Canvas> = fc
   // starves downstream property tests that need to draw an in-canvas node.
   .array(arbOp, { minLength: 0, maxLength: 30, size: 'xlarge' })
   .map((ops) => ops.reduce<Canvas>(applyOp, emptyCanvas()));
+
+/* -------------------------------------------------------------------------- */
+/* Fields the mutators never set                                              */
+/* -------------------------------------------------------------------------- */
+
+const TS = '2024-01-01T00:00:00.000Z';
+
+const arbSource: fc.Arbitrary<Source> = fc.record(
+  {
+    kind: fc.constantFrom<SourceKind>('web', 'article', 'book', 'report', 'other'),
+    title: fc.string({ maxLength: 40 }),
+    authors: fc.array(fc.string({ maxLength: 20 }), { maxLength: 3 }),
+    published: fc.constantFrom('2024', '2024-03', '2024-03-18'),
+    container: fc.string({ maxLength: 40 }),
+    url: fc.constantFrom('https://example.com/a', 'http://example.org/b?c=d'),
+    doi: fc.string({ maxLength: 20 }),
+    accessed: fc.constant('2024-03-18'),
+    quote: fc.string({ maxLength: 80 }),
+  },
+  { requiredKeys: ['kind'] },
+);
+
+/** Every provenance origin, AI ones with each feature that proposes ideas. */
+export const arbProvenance: fc.Arbitrary<Provenance> = fc.oneof(
+  fc.boolean().map((edited): Provenance => ({ origin: 'researcher', edited })),
+  fc.boolean().map((edited): Provenance => ({ origin: 'import', edited })),
+  fc.boolean().map((edited): Provenance => ({ origin: 'unrecorded', edited })),
+  fc
+    .record({
+      feature: fc.constantFrom<AiFeature>('ai.map', 'ai.expand', 'ai.capture', 'ai.research', 'ai.tidy'),
+      model: fc.string({ minLength: 1, maxLength: 30 }),
+      edited: fc.boolean(),
+    })
+    .map(({ feature, model, edited }): Provenance => ({
+      origin: 'ai',
+      ai: { feature, model, acceptedAt: TS },
+      edited,
+    })),
+);
+
+const arbWorkspace: fc.Arbitrary<Workspace> = fc.record(
+  {
+    intake: fc.record({ answer: fc.constantFrom(...INTAKE_ANSWERS), answeredAt: fc.constant(TS) }),
+    focusStage: fc.constantFrom(...STAGE_IDS),
+  },
+  { requiredKeys: [] },
+);
+
+const arbNodeExtras = fc.record({
+  source: fc.option(arbSource, { nil: undefined }),
+  provenance: arbProvenance,
+  caption: fc.option(fc.string({ maxLength: 60 }), { nil: undefined }),
+  text: fc.option(fc.string({ maxLength: 60 }), { nil: undefined }),
+});
+
+const arbEdgeExtras = fc.record({ hidden: fc.boolean(), provenance: arbProvenance });
+
+/**
+ * A canvas from `arbCanvas` that also uses every field the mutators never
+ * set: sources, image captions and text, hidden connectors, every provenance
+ * origin and the workspace. Round-trip tests use it so a dropped field shows.
+ */
+export const arbRichCanvas: fc.Arbitrary<Canvas> = arbCanvas.chain((c) =>
+  fc
+    .record({
+      nodes: fc.array(arbNodeExtras, { minLength: c.nodes.length, maxLength: c.nodes.length }),
+      edges: fc.array(arbEdgeExtras, { minLength: c.edges.length, maxLength: c.edges.length }),
+      workspace: fc.option(arbWorkspace, { nil: undefined }),
+    })
+    .map(({ nodes, edges, workspace }): Canvas => ({
+      ...c,
+      ...(workspace ? { workspace } : {}),
+      nodes: c.nodes.map((n, i) => {
+        const extra = nodes[i]!;
+        return {
+          ...n,
+          provenance: extra.provenance,
+          ...(extra.source ? { source: extra.source } : {}),
+          images: n.images.map((img) => ({
+            ...img,
+            ...(extra.caption !== undefined ? { caption: extra.caption } : {}),
+            ...(extra.text !== undefined ? { text: extra.text } : {}),
+          })),
+        };
+      }),
+      edges: c.edges.map((e, i) => {
+        const extra = edges[i]!;
+        return { ...e, provenance: extra.provenance, ...(extra.hidden ? { hidden: true } : {}) };
+      }),
+    })),
+);
+
+/**
+ * The same canvas as it would have been stored before schema version 2:
+ * no `schemaVersion` or workspace, no node `fields` or `provenance`, no edge
+ * `relationType` or `provenance`.
+ */
+export function toV1(c: Canvas): Record<string, unknown> {
+  const { schemaVersion: _v, workspace: _w, ...canvas } = c;
+  return {
+    ...canvas,
+    nodes: c.nodes.map(({ fields: _f, provenance: _p, ...node }) => node),
+    edges: c.edges.map(({ relationType: _r, provenance: _p, ...edge }) => edge),
+  };
+}
 
 /* -------------------------------------------------------------------------- */
 /* Canvas-scoped arbitraries                                                  */

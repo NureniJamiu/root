@@ -11,7 +11,10 @@ const C1 = '00000000-0000-4000-8000-000000000002';
 const GONE = '00000000-0000-4000-8000-000000000009';
 
 function idea(id: string, type: Node['type'], title: string, body = ''): Node {
-  return { id, type, title, body, images: [], position: { x: 0, y: 0 }, collapsed: false, createdAt: TS, updatedAt: TS };
+  return {
+    id, type, title, body, images: [], position: { x: 0, y: 0 }, collapsed: false, createdAt: TS, updatedAt: TS,
+    fields: {}, provenance: { origin: 'researcher' as const, edited: false },
+  };
 }
 
 const ideas = new Map<string, Node>([

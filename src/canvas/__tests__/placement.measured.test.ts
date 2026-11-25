@@ -137,7 +137,7 @@ describe('computeTreeLayout on a graph', () => {
     const [a, b] = c.nodes.map((n) => n.id) as [string, string];
     c = addChild(c, a, { position: { x: 0, y: 0 } });
     const shared = c.nodes[2]!.id;
-    c = { ...c, edges: [...c.edges, { id: crypto.randomUUID(), source: b, target: shared, sourceSide: 'right', targetSide: 'left', sourcePinned: false, targetPinned: false }] };
+    c = { ...c, edges: [...c.edges, { id: crypto.randomUUID(), source: b, target: shared, sourceSide: 'right', targetSide: 'left', sourcePinned: false, targetPinned: false, relationType: 'related-to' as const, provenance: { origin: 'researcher' as const, edited: false } }] };
 
     const laid = computeTreeLayout(c);
 
@@ -153,7 +153,7 @@ describe('computeTreeLayout on a graph', () => {
   it('terminates on a cycle and lays every card out', () => {
     let c = addNode(emptyCanvas(), { position: { x: 0, y: 0 } });
     c = addChild(c, c.nodes[0]!.id, { position: { x: 0, y: 0 } });
-    c = { ...c, edges: [...c.edges, { id: crypto.randomUUID(), source: c.nodes[1]!.id, target: c.nodes[0]!.id, sourceSide: 'left', targetSide: 'right', sourcePinned: false, targetPinned: false }] };
+    c = { ...c, edges: [...c.edges, { id: crypto.randomUUID(), source: c.nodes[1]!.id, target: c.nodes[0]!.id, sourceSide: 'left', targetSide: 'right', sourcePinned: false, targetPinned: false, relationType: 'related-to' as const, provenance: { origin: 'researcher' as const, edited: false } }] };
     const laid = computeTreeLayout(c);
     expect(laid.nodes).toHaveLength(2);
     expect(laid.nodes[0]!.position).not.toEqual(laid.nodes[1]!.position);

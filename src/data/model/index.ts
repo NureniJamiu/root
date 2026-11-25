@@ -36,3 +36,7 @@ export { STAGE_IDS, STAGES, stageIdSchema } from './stages';
 export type { StageId } from './stages';
 export { RULE_IDS } from './rules';
 export type { GraphView, Issue, Rule, RuleId } from './rules';
+export { ENABLED_NODE_TYPE_IDS, ENABLED_RELATION_IDS } from './enabled';
+export type { EnabledNodeTypeId, EnabledRelationId } from './enabled';
+export { INTAKE_ANSWERS, intakeAnswerSchema, workspaceSchema } from './workspace';
+export type { IntakeAnswer, Workspace } from './workspace';

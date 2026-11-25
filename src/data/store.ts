@@ -61,6 +61,7 @@ import {
   updateNode as mutUpdateNode,
 } from './mutators';
 import type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators';
+import type { Provenance } from './model';
 import { emitSaveError } from './storeEvents';
 import { computeFacingSides, subtreeIds } from './graph';
 import { NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
@@ -387,6 +388,8 @@ export const canvasActions = {
       body?: string;
       type?: NodeType;
     }[],
+    /** Who the ideas and their connectors come from; the researcher when absent. */
+    provenance?: Provenance,
   ): Record<string, UUID> {
     const ids: Record<string, UUID> = {};
     commitCanvasWrite(
@@ -397,17 +400,18 @@ export const canvasActions = {
           const parent =
             (item.parentKey != null ? ids[item.parentKey] : undefined) ??
             (item.parentId != null && next.nodes.some((n) => n.id === item.parentId) ? item.parentId : undefined);
-          const added = parent
-            ? mutAddChild(next, parent, { position: item.position })
-            : mutAddNode(next, { position: item.position });
-          const id = findNewNodeId(next, added);
-          if (id === null) continue;
-          ids[item.key] = id;
-          next = mutUpdateNode(added, id, {
+          const idea = {
+            position: item.position,
             title: item.title.slice(0, NODE_TITLE_MAX),
             body: (item.body ?? '').slice(0, NODE_BODY_MAX),
             type: item.type ?? 'finding',
-          });
+            ...(provenance ? { provenance } : {}),
+          };
+          const added = parent ? mutAddChild(next, parent, idea) : mutAddNode(next, idea);
+          const id = findNewNodeId(next, added);
+          if (id === null) continue;
+          ids[item.key] = id;
+          next = added;
         }
         return next;
       },

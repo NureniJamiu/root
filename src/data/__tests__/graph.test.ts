@@ -30,13 +30,14 @@ function build(letters: string, edges: string[], collapsed: string[] = []): { c:
   const id = (l: string): string => ids.get(l)!;
   const nodes: Node[] = letters.split('').map((l) => ({
     id: id(l), title: l, body: '', images: [], type: 'topic', position: { x: 0, y: 0 },
-    collapsed: collapsed.includes(l), createdAt: TS, updatedAt: TS,
+    collapsed: collapsed.includes(l), createdAt: TS, updatedAt: TS, fields: {}, provenance: { origin: 'researcher' as const, edited: false },
   }));
   const es: Edge[] = edges.map((e, i) => ({
     id: `10000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
     source: id(e[0]!), target: id(e[1]!), sourceSide: 'right', targetSide: 'left', sourcePinned: false, targetPinned: false,
+    relationType: 'related-to' as const, provenance: { origin: 'researcher' as const, edited: false },
   }));
-  return { c: { id: '20000000-0000-4000-8000-000000000000', title: '', nodes, edges: es, updatedAt: TS }, id };
+  return { c: { id: '20000000-0000-4000-8000-000000000000', schemaVersion: 2, title: '', nodes, edges: es, updatedAt: TS }, id };
 }
 
 const names = (c: Canvas, set: Set<string>): string => c.nodes.filter((n) => set.has(n.id)).map((n) => n.title).sort().join('');

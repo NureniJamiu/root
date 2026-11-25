@@ -57,6 +57,7 @@ describe('on D1 and R2', () => {
           id: crypto.randomUUID(), title: 'Idea', body: '', type: 'topic' as const,
           images: [{ id: imageId, dataUrl: big, addedAt: now }],
           position: { x: 0, y: 0 }, collapsed: false, createdAt: now, updatedAt: now,
+          fields: {}, provenance: { origin: 'researcher' as const, edited: false },
         },
       ],
     };

@@ -67,3 +67,15 @@ Rules run over a `GraphView` and return `Issue`s carrying `ruleId` and `ruleVers
 ## Stages (`stages.ts`)
 
 `topic`, `problem`, `literature`, `framework`, `methodology`, `data`, `interpretation`, `documentation`: the eight stages of the research journey, in order. Stage state is derived from the types on the canvas, never stored.
+
+## What the app exposes today (`enabled.ts`)
+
+The canvas schema accepts only the node types and relations listed in `enabled.ts`, so nothing can be saved that the interface cannot show. Today that is the four general types and `related-to`. The problem-framing types are enabled with the type picker (slice S4) and the other relations with the relation picker (S5).
+
+## Workspace (`workspace.ts`)
+
+`canvas.workspace` is optional: `{ intake?: { answer, answeredAt }, focusStage? }`. The intake answers are `no-topic`, `has-topic`, `objectives-drafted`, `collected-data` and `writing-up`, one per row of the D10 intake table.
+
+## Canvas schema v2
+
+`canvasSchema` (in `../schema.ts`) is version 2: `schemaVersion: 2`, node `fields` and `provenance`, edge `relationType` and `provenance`, and the optional `workspace`. `migrateCanvas` brings older canvases up on parse: legacy `parentId` → v1 → v2, where every v1 node gets `fields: {}` and `unrecorded` provenance and every v1 edge gets `related-to` and `unrecorded`. The server refuses (409 `stale-schema`) a save whose canvas is older than the one stored.

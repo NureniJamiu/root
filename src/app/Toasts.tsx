@@ -6,6 +6,8 @@ import { onLoadError, onSaveError as onPersistenceSaveError } from '../persisten
 interface Toast {
   id: number;
   message: string;
+  /** Offer a Reload button; the toast stays until dismissed or reloaded. */
+  reload?: boolean;
 }
 
 let toastCounter = 0;
@@ -27,9 +29,10 @@ const TOAST_LIFETIME_MS = 4_000;
 export function ToastSurface(): JSX.Element {
   const [toasts, setToasts] = useState<readonly Toast[]>([]);
 
-  const addToast = useCallback((message: string) => {
+  const addToast = useCallback((message: string, options: { reload?: boolean } = {}) => {
     const id = ++toastCounter;
-    setToasts((prev) => [...prev, { id, message }]);
+    setToasts((prev) => [...prev, { id, message, ...(options.reload ? { reload: true } : {}) }]);
+    if (options.reload) return;
     setTimeout(() => {
       setToasts((current) => current.filter((t) => t.id !== id));
     }, TOAST_LIFETIME_MS);
@@ -46,7 +49,7 @@ export function ToastSurface(): JSX.Element {
     });
     // Failures saving a project to the server.
     const unsubPersistSave = onPersistenceSaveError((detail) => {
-      addToast(`Not saved: ${detail.message}`);
+      addToast(`Not saved: ${detail.message}`, { reload: detail.reload === true });
     });
     // Failures loading a project from the server.
     const unsubLoad = onLoadError((detail) => {
@@ -107,6 +110,27 @@ export function ToastSurface(): JSX.Element {
             }}
           />
           <span style={{ letterSpacing: '-0.01em' }}>{toast.message}</span>
+          {toast.reload && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="transition-colors hover:text-question"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgb(var(--on-inverse))',
+                cursor: 'pointer',
+                padding: 0,
+                fontFamily: 'inherit',
+                fontSize: 13,
+                fontWeight: 600,
+                textDecoration: 'underline',
+              }}
+              data-testid="toast-reload"
+            >
+              Reload
+            </button>
+          )}
           <button
             type="button"
             onClick={() => dismissToast(toast.id)}

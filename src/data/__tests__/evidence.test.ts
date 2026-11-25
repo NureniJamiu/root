@@ -20,16 +20,17 @@ function build(cards: string[], edges: string[]): { c: Canvas; id: (name: string
   const id = (name: string): string => ids.get(name)!;
   const nodes: Node[] = cards.map((name) => ({
     id: id(name), title: name, body: '', images: [], type: TYPES[name[0]!]!, position: { x: 0, y: 0 },
-    collapsed: false, createdAt: TS, updatedAt: TS,
+    collapsed: false, createdAt: TS, updatedAt: TS, fields: {}, provenance: { origin: 'researcher' as const, edited: false },
   }));
   const es: Edge[] = edges.map((e, i) => {
     const [s, t] = e.split('-') as [string, string];
     return {
       id: `10000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
       source: id(s), target: id(t), sourceSide: 'right', targetSide: 'left', sourcePinned: false, targetPinned: false,
+      relationType: 'related-to' as const, provenance: { origin: 'researcher' as const, edited: false },
     };
   });
-  return { c: { id: '20000000-0000-4000-8000-000000000000', title: '', nodes, edges: es, updatedAt: TS }, id };
+  return { c: { id: '20000000-0000-4000-8000-000000000000', schemaVersion: 2, title: '', nodes, edges: es, updatedAt: TS }, id };
 }
 
 const kinds = (c: Canvas, id: string): string[] => evidenceIssuesFor(c, id).map((i) => i.kind);

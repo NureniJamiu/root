@@ -14,6 +14,7 @@ const ideas = new Map<string, Node>([
   [F1, {
     id: F1, type: 'finding', title: 'Annual wins 3 to 1', body: 'Survey of 400 buyers. https://example.com/report',
     images: [], position: { x: 0, y: 0 }, collapsed: false, createdAt: TS, updatedAt: TS,
+    fields: {}, provenance: { origin: 'researcher' as const, edited: false },
   }],
 ]);
 

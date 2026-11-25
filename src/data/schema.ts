@@ -14,13 +14,22 @@
  * there when cards move) or automatic (it follows the sides that face each
  * other and is refreshed whenever a card moves).
  *
- * Canvases saved before connectors were first-class (each node carried a
- * `parentId` and optional side hints) are migrated on parse, see
- * `migrateLegacyCanvas`.
+ * Schema version 2 (M0) adds the typed graph: each node carries its type's
+ * `fields`, each edge a `relationType`, and both a required `provenance`.
+ * Older canvases are migrated on parse, see `migrateCanvas`.
  */
 
 import { z } from 'zod';
 
+import {
+  ENABLED_NODE_TYPE_IDS,
+  ENABLED_RELATION_IDS,
+  FALLBACK_RELATION,
+  fieldsSchemaFor,
+  provenanceSchema,
+  unrecordedProvenance,
+  workspaceSchema,
+} from './model';
 import {
   CANVAS_TITLE_MAX,
   IMAGE_CAPTION_MAX,
@@ -37,12 +46,14 @@ import {
 /* Primitive schemas                                                          */
 /* -------------------------------------------------------------------------- */
 
-export const nodeTypeSchema = z.enum([
-  'topic',
-  'finding',
-  'question',
-  'conclusion',
-]);
+/** The current canvas schema version. Saved canvases without one are version 1. */
+export const CANVAS_SCHEMA_VERSION = 2;
+
+/** The node types a canvas may hold today (see `model/enabled.ts`). */
+export const nodeTypeSchema = z.enum(ENABLED_NODE_TYPE_IDS);
+
+/** The relations an edge may carry today (see `model/enabled.ts`). */
+export const relationTypeSchema = z.enum(ENABLED_RELATION_IDS);
 
 export const positionSchema = z.object({
   x: z.number().finite(),
@@ -90,18 +101,37 @@ export const sourceSchema = z.object({
 /* Node + edge schemas                                                        */
 /* -------------------------------------------------------------------------- */
 
-export const nodeSchema = z.object({
+const nodeObjectSchema = z.object({
   id: z.string().uuid(),
   title: z.string().max(NODE_TITLE_MAX),
   body: z.string().max(NODE_BODY_MAX),
   images: z.array(imageEntrySchema),
   type: nodeTypeSchema,
+  /** The type's own fields (see the registry); checked against `type` below. */
+  fields: z.record(z.string(), z.unknown()),
   /** Where the idea came from; absent when no source is recorded. */
   source: sourceSchema.optional(),
+  /** Who made the idea: the researcher, an accepted AI suggestion, ... */
+  provenance: provenanceSchema,
   position: positionSchema,
   collapsed: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+});
+
+/**
+ * A node. `fields` is validated by the registry schema of the node's type,
+ * which also drops keys that type does not define.
+ */
+export const nodeSchema = nodeObjectSchema.transform((node, ctx): z.infer<typeof nodeObjectSchema> => {
+  const fields = fieldsSchemaFor(node.type).safeParse(node.fields);
+  if (!fields.success) {
+    for (const issue of fields.error.issues) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: issue.message, path: ['fields', ...issue.path] });
+    }
+    return z.NEVER;
+  }
+  return { ...node, fields: fields.data };
 });
 
 /**
@@ -122,6 +152,13 @@ export const edgeSchema = z.object({
    * one at a time (see `revealChild`). Absent when not hidden.
    */
   hidden: z.boolean().optional(),
+  /**
+   * What the connector means. Parsing checks only that the relation is
+   * known; whether it fits the two card types is a rule, not a parse error.
+   */
+  relationType: relationTypeSchema,
+  /** Who drew the connector. */
+  provenance: provenanceSchema,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -195,6 +232,45 @@ export function migrateLegacyCanvas(input: unknown): unknown {
   return { ...input, nodes, edges };
 }
 
+/**
+ * The schema version a stored or sent canvas claims. Canvases saved before
+ * versions were recorded are version 1.
+ */
+export function canvasSchemaVersion(input: unknown): number {
+  return isRecord(input) && typeof input.schemaVersion === 'number' ? input.schemaVersion : 1;
+}
+
+/**
+ * Turn a version 1 canvas into version 2. Node types keep their ids, nodes
+ * get empty `fields`, every edge becomes `related-to`, and nodes and edges are
+ * marked `unrecorded`, because who made them was never recorded. No meaning
+ * is inferred for old connectors. Anything that is not a version 1 canvas is
+ * returned untouched.
+ */
+function migrateV1ToV2(input: unknown): unknown {
+  if (!isRecord(input) || 'schemaVersion' in input) return input;
+  if (!Array.isArray(input.nodes) || !Array.isArray(input.edges)) return input;
+  return {
+    ...input,
+    schemaVersion: CANVAS_SCHEMA_VERSION,
+    nodes: input.nodes.map((n: unknown) =>
+      isRecord(n) ? { ...n, fields: {}, provenance: unrecordedProvenance() } : n,
+    ),
+    edges: input.edges.map((e: unknown) =>
+      isRecord(e) ? { ...e, relationType: FALLBACK_RELATION, provenance: unrecordedProvenance() } : e,
+    ),
+  };
+}
+
+/**
+ * Bring a stored canvas of any version up to the current one:
+ * legacy `parentId` canvas → version 1 → version 2. Idempotent, and it leaves
+ * anything it does not recognise for the schema to reject.
+ */
+export function migrateCanvas(input: unknown): unknown {
+  return migrateV1ToV2(migrateLegacyCanvas(input));
+}
+
 /* -------------------------------------------------------------------------- */
 /* Canvas schema + structural invariants                                      */
 /* -------------------------------------------------------------------------- */
@@ -202,9 +278,12 @@ export function migrateLegacyCanvas(input: unknown): unknown {
 const canvasObjectSchema = z
   .object({
     id: z.string().uuid(),
+    schemaVersion: z.literal(CANVAS_SCHEMA_VERSION),
     title: z.string().max(CANVAS_TITLE_MAX),
     nodes: z.array(nodeSchema),
     edges: z.array(edgeSchema),
+    /** The intake answer and the stage the workspace opens on; absent until set. */
+    workspace: workspaceSchema.optional(),
     updatedAt: z.string().datetime(),
   })
   .superRefine((canvas, ctx) => {
@@ -237,4 +316,4 @@ const canvasObjectSchema = z
     }
   });
 
-export const canvasSchema = z.preprocess(migrateLegacyCanvas, canvasObjectSchema);
+export const canvasSchema = z.preprocess(migrateCanvas, canvasObjectSchema);
