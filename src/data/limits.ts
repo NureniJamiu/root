@@ -32,3 +32,6 @@ export const SOURCE_AUTHORS_MAX = 30;
 
 /** Maximum length of the passage quoted from a source. */
 export const SOURCE_QUOTE_MAX = 4_000;
+
+/** Maximum length of the model label recorded on AI provenance. */
+export const PROVENANCE_MODEL_MAX = 200;

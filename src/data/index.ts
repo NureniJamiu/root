@@ -21,6 +21,8 @@
  *                                              computeFacingSides, ...
  *   - Serialization       (from `./serialize`) — serializeCanvas, parseCanvas,
  *                                              ParseCanvasResult
+ *   - Typed-graph contract (from `./model`)  — NODE_TYPES, RELATIONS,
+ *                                              orient, provenanceSchema, ...
  *
  * What is intentionally NOT exported:
  *   - `./ids` (`newId`) and `./time` (`now`) — internal helpers used by the
@@ -137,5 +139,6 @@ export type { CanvasState, NodeEdits } from './store';
 export { docLinksActions, useDocLinksStore } from './docLinks';
 export type { DocLinksState } from './docLinks';
 
+export * from './model';
 export { emitSaveError, onSaveError } from './storeEvents';
 export type { SaveErrorDetail } from './storeEvents';
