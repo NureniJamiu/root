@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { nodeTypeSchema } from '../../data/schema';
 import { NODE_TITLE_MAX } from '../../data/limits';
+import type { RuleId } from '../../data/model/rules';
 import type { AiModel, AiProvider, KeyedProvider } from './models';
 import type { AiFeature, Feature, Plan } from './plans';
 
@@ -347,8 +348,9 @@ export interface ReviewIssue {
   readonly message: string;
   readonly suggestion: string;
   readonly sources: AiSource[];
-  /** Found by Root's own rules rather than by the model. */
-  readonly rule: boolean;
+  /** Set when Root's own rules found the issue rather than the model: which rule, and its version. */
+  readonly ruleId?: RuleId;
+  readonly ruleVersion?: number;
 }
 
 export interface ReviewResponse extends AiResultMeta {

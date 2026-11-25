@@ -325,10 +325,13 @@ describe('/api/ai', () => {
       const res = await call('/review', { body: { projectId: PROJECT } });
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.issues.map((i: { kind: string; rule: boolean }) => [i.kind, i.rule])).toEqual([
-        ['unsupported', true],
-        ['gap', false],
+      // The same rules as the cards: the conclusion has no evidence and the finding is not used.
+      expect(body.issues.map((i: { kind: string; ruleId?: string }) => [i.kind, i.ruleId ?? null])).toEqual([
+        ['unsupported', 'conclusion-unbacked'],
+        ['gap', 'finding-dangling'],
+        ['gap', null],
       ]);
+      expect(body.issues[0].ruleVersion).toBe(1);
       const free = await start({ projects, model, plan: 'free' });
       expect((await free.call('/review', { body: { projectId: PROJECT } })).status).toBe(403);
     });

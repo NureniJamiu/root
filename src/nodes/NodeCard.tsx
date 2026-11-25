@@ -27,12 +27,10 @@ import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
 import {
-  evidenceIssueHint,
-  evidenceIssueLabel,
-  evidenceIssuesFor,
   formatNodeLabel,
   hasHiddenChildren,
   hiddenDescendantCount,
+  issuesFor,
   nodeOrdinal,
   nodeTypeLabel,
   useCanvasStore,
@@ -314,8 +312,8 @@ function TypeBadge({ type }: { readonly type: Node['type'] }): JSX.Element {
  * Selects strings, so the card re-renders only when its own issues change.
  */
 function EvidenceBadge({ nodeId }: { readonly nodeId: UUID }): JSX.Element | null {
-  const label = useCanvasStore((s) => evidenceIssuesFor(s.canvas, nodeId).map(evidenceIssueLabel).join(' · '));
-  const hint = useCanvasStore((s) => evidenceIssuesFor(s.canvas, nodeId).map(evidenceIssueHint).join('\n'));
+  const label = useCanvasStore((s) => issuesFor(s.canvas, nodeId).map((i) => i.label).join(' · '));
+  const hint = useCanvasStore((s) => issuesFor(s.canvas, nodeId).map((i) => i.hint).join('\n'));
   if (label === '') return null;
   return (
     <span

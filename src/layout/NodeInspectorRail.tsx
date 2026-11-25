@@ -1,16 +1,14 @@
 import { useMemo } from 'react';
 import {
   canvasActions,
-  evidenceIssueHint,
-  evidenceIssueLabel,
-  evidenceIssues,
+  issuesByNode,
   nodeLabel,
   nodeOrdinals,
   nodeTypeLabel,
   useCanvasStore,
   useDocLinksStore,
 } from '../data';
-import type { Edge, EvidenceIssue, Node, Side, Source, UUID } from '../data';
+import type { Edge, Issue, Node, RuleId, Side, Source, UUID } from '../data';
 import type { DragState } from '../canvas';
 import type { SaveStatus } from '../lib/save-queue';
 import { formatReference } from '../lib/citation';
@@ -236,7 +234,7 @@ function EvidenceSection({
   byId,
   labelOf,
 }: {
-  readonly issues: readonly EvidenceIssue[];
+  readonly issues: readonly Issue[];
   readonly byId: ReadonlyMap<UUID, Node>;
   readonly labelOf: (node: Node) => string;
 }): JSX.Element {
@@ -246,19 +244,19 @@ function EvidenceSection({
       <ul className="m-0 p-0 list-none flex flex-col gap-2">
         {issues.map((issue) => (
           <li
-            key={issue.kind}
+            key={issue.ruleId}
             className="border border-dashed border-danger/40 bg-danger-soft rounded-[2px] p-2.5 flex flex-col gap-1.5"
-            data-testid={`evidence-issue-${issue.kind}`}
+            data-testid={`evidence-issue-${issueSlug(issue.ruleId)}`}
           >
             <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.06em] text-danger">
-              {evidenceIssueLabel(issue)}
+              {issue.label}
             </span>
-            <p className="m-0 font-serif text-[13px] leading-[19px] text-ink">{evidenceIssueHint(issue)}</p>
-            {issue.kind === 'open-question' &&
-              issue.questionIds.map((qid) => {
-                const q = byId.get(qid);
-                return q ? <IdeaLink key={qid} node={q} label={labelOf(q)} /> : null;
-              })}
+            <p className="m-0 font-serif text-[13px] leading-[19px] text-ink">{issue.hint}</p>
+            {/* The cards the issue points at, after the one it is about. */}
+            {issue.nodeIds.slice(1).map((nid) => {
+              const n = byId.get(nid);
+              return n ? <IdeaLink key={nid} node={n} label={labelOf(n)} /> : null;
+            })}
           </li>
         ))}
       </ul>
@@ -266,12 +264,14 @@ function EvidenceSection({
   );
 }
 
-const ISSUE_ORDER: readonly EvidenceIssue['kind'][] = ['unbacked', 'open-question', 'dangling'];
-const ISSUE_GROUP_TITLES: Record<EvidenceIssue['kind'], string> = {
-  unbacked: 'Conclusions with no evidence',
-  'open-question': 'Conclusions resting on open questions',
-  dangling: 'Findings nothing uses',
-};
+/** The overview's groups, in order. `slug` names the group in test ids. */
+const ISSUE_GROUPS: readonly { readonly ruleId: RuleId; readonly slug: string; readonly title: string }[] = [
+  { ruleId: 'conclusion-unbacked', slug: 'unbacked', title: 'Conclusions with no evidence' },
+  { ruleId: 'conclusion-open-question', slug: 'open-question', title: 'Conclusions resting on open questions' },
+  { ruleId: 'finding-dangling', slug: 'dangling', title: 'Findings nothing uses' },
+];
+
+const issueSlug = (ruleId: RuleId): string => ISSUE_GROUPS.find((g) => g.ruleId === ruleId)?.slug ?? ruleId;
 
 /** Every evidence check on the canvas, grouped, for when no idea is selected. */
 function EvidenceOverview({
@@ -279,14 +279,15 @@ function EvidenceOverview({
   byId,
   labelOf,
 }: {
-  readonly issues: ReadonlyMap<UUID, readonly EvidenceIssue[]>;
+  readonly issues: ReadonlyMap<UUID, readonly Issue[]>;
   readonly byId: ReadonlyMap<UUID, Node>;
   readonly labelOf: (node: Node) => string;
 }): JSX.Element {
-  const groups = ISSUE_ORDER.map((kind) => ({
-    kind,
+  const groups = ISSUE_GROUPS.map(({ ruleId, slug, title }) => ({
+    slug,
+    title,
     nodes: [...issues]
-      .filter(([, list]) => list.some((i) => i.kind === kind))
+      .filter(([, list]) => list.some((i) => i.ruleId === ruleId))
       .map(([id]) => byId.get(id))
       .filter((n): n is Node => n !== undefined),
   })).filter((g) => g.nodes.length > 0);
@@ -300,9 +301,9 @@ function EvidenceOverview({
         </p>
       ) : (
         groups.map((g) => (
-          <div key={g.kind} className="flex flex-col gap-1.5" data-testid={`evidence-group-${g.kind}`}>
+          <div key={g.slug} className="flex flex-col gap-1.5" data-testid={`evidence-group-${g.slug}`}>
             <span className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-danger">
-              {ISSUE_GROUP_TITLES[g.kind]} · {g.nodes.length}
+              {g.title} · {g.nodes.length}
             </span>
             {g.nodes.map((n) => (
               <IdeaLink key={n.id} node={n} label={labelOf(n)} />
@@ -345,7 +346,7 @@ export function NodeInspectorRail({
     () => ({
       byId: new Map(canvas.nodes.map((n) => [n.id, n])),
       ordinals: nodeOrdinals(canvas),
-      issues: evidenceIssues(canvas),
+      issues: issuesByNode(canvas),
     }),
     [canvas],
   );

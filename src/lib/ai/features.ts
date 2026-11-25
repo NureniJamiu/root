@@ -11,6 +11,9 @@ import { generateText, Output, streamText } from 'ai';
 import type { LanguageModel } from 'ai';
 
 import { IMAGE_CAPTION_MAX, IMAGE_TEXT_MAX, NODE_BODY_MAX, NODE_TITLE_MAX } from '../../data/limits';
+import { FALLBACK_RELATION } from '../../data/model/relations';
+import type { GraphView, RuleId } from '../../data/model/rules';
+import { runRules } from '../../data/rules';
 import { resolveRefs } from './citations';
 import { describeBranch, describeExpandContext, describeOverview } from './context';
 import {
@@ -39,11 +42,11 @@ import type {
   MapRequest,
   PromptCanvas,
   ReviewIssue,
+  ReviewKind,
   RewriteRequest,
   TidyRequest,
   TidySuggestion,
 } from './contracts';
-import { neighbours } from './project-content';
 import type { NumberedContext } from './project-content';
 import type { WebSource } from './web-search';
 
@@ -330,23 +333,39 @@ Be concise: short paragraphs or a short "-" list. No headings. Write in the same
 /** Most issues a gap check reports from the model. */
 export const REVIEW_ISSUES_MAX = 12;
 
+/** Most issues a gap check reports from Root's own rules. */
+const RULE_ISSUES_MAX = 8;
+
+/** The gap-check kind each rule's issues are listed under; rules not named here are gaps. */
+const RULE_REVIEW_KINDS: Partial<Record<RuleId, ReviewKind>> = { 'conclusion-unbacked': 'unsupported' };
+
 /**
- * Root's own checks, which need no model: conclusions with no finding
- * connected to them.
+ * A prompt canvas as the rule engine reads it. Prompt canvases send no
+ * relations yet, so every connector reads as `related-to`, which is how the
+ * cards read a canvas whose connectors have no meaning set.
+ */
+export function promptGraph(canvas: PromptCanvas): GraphView {
+  return {
+    nodes: canvas.nodes,
+    edges: canvas.edges.map((e) => ({ source: e.source, target: e.target, relationType: FALLBACK_RELATION })),
+  };
+}
+
+/**
+ * Root's own checks, which need no model: the same rule engine the cards
+ * use, so the gap check reports what the badges show.
  */
 export function ruleIssues(canvas: PromptCanvas): ReviewIssue[] {
-  const links = neighbours(canvas);
   const byId = new Map(canvas.nodes.map((n) => [n.id, n]));
-  return canvas.nodes
-    .filter((n) => n.type === 'conclusion')
-    .filter((n) => !(links.get(n.id) ?? []).some((id) => byId.get(id)?.type === 'finding'))
-    .slice(0, 8)
-    .map((n) => ({
-      kind: 'unsupported' as const,
-      message: `“${n.title.trim() || 'Untitled idea'}” is a conclusion with no finding connected to it.`,
-      suggestion: 'Connect the findings that support it, or add a question for the evidence still needed.',
-      sources: [{ kind: 'idea' as const, ideaId: n.id }],
-      rule: true,
+  return runRules(promptGraph(canvas))
+    .slice(0, RULE_ISSUES_MAX)
+    .map((issue) => ({
+      kind: RULE_REVIEW_KINDS[issue.ruleId] ?? 'gap',
+      message: `${issue.label}: “${byId.get(issue.nodeIds[0] ?? '')?.title.trim() || 'Untitled idea'}”.`,
+      suggestion: issue.hint,
+      sources: issue.nodeIds.map((ideaId) => ({ kind: 'idea' as const, ideaId })),
+      ruleId: issue.ruleId,
+      ruleVersion: issue.ruleVersion,
     }));
 }
 
@@ -381,7 +400,7 @@ Return an empty list if the project has no real problems. Never invent facts. Wr
     const sources = issue.refs.flatMap((r) => resolveRefs(r, context.refs));
     // Everything but a gap must point at something real.
     if (sources.length === 0 && issue.kind !== 'gap') continue;
-    issues.push({ kind: issue.kind, message, suggestion: issue.suggestion.trim(), sources, rule: false });
+    issues.push({ kind: issue.kind, message, suggestion: issue.suggestion.trim(), sources });
   }
   return { output: issues, usage: toUsage(result.usage) };
 }

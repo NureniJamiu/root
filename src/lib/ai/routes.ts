@@ -766,11 +766,13 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
       const { p, result } = await runFeature(req, res, 'ai.review', 'smart', timeouts.review, (model, signal) =>
         reviewProject(model, context, signal),
       );
-      // Root's rules already flag conclusions with no findings; skip the model saying the same.
-      const flagged = new Set(rules.flatMap((r) => r.sources.map((s) => (s.kind === 'idea' ? s.ideaId : ''))));
+      // Skip the model saying what a rule already says: the same kind of issue about the same one idea.
+      const key = (kind: string, ideaId: string) => `${kind}:${ideaId}`;
+      const flagged = new Set(
+        rules.flatMap((r) => (r.ruleId && r.sources[0]?.kind === 'idea' ? [key(r.kind, r.sources[0].ideaId)] : [])),
+      );
       const fromModel = result.output.filter(
-        (i) =>
-          !(i.kind === 'unsupported' && i.sources.length === 1 && i.sources[0]!.kind === 'idea' && flagged.has(i.sources[0]!.ideaId)),
+        (i) => !(i.sources.length === 1 && i.sources[0]!.kind === 'idea' && flagged.has(key(i.kind, i.sources[0]!.ideaId))),
       );
       const issues: ReviewIssue[] = [...rules, ...fromModel];
       res.json({ issues, ...(await meta(p)) });

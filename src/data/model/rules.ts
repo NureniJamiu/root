@@ -42,6 +42,7 @@ export type RuleId = (typeof RULE_IDS)[number];
 export interface Issue {
   readonly ruleId: RuleId;
   readonly ruleVersion: number;
+  /** The card the issue is about first, then any cards it points at. */
   readonly nodeIds: readonly UUID[];
   readonly edgeIds: readonly UUID[];
   readonly label: string;

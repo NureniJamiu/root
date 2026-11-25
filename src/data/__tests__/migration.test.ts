@@ -9,7 +9,7 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import { evidenceIssues } from '../evidence';
+import { issuesByNode } from '../rules';
 import { CANVAS_SCHEMA_VERSION, canvasSchema, migrateCanvas, migrateLegacyCanvas } from '../schema';
 import type { Canvas, Edge, Node } from '../types';
 import { arbCanvas, toV1 } from './arbitraries';
@@ -30,7 +30,7 @@ function parse(input: unknown): Canvas {
 
 /** Evidence issues as plain sorted entries, for comparison. */
 function issuesOf(c: Canvas): Array<[string, unknown]> {
-  return [...evidenceIssues(c).entries()].sort(([a], [b]) => a.localeCompare(b));
+  return [...issuesByNode(c).entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
 const withoutV2Node = ({ fields: _f, provenance: _p, ...rest }: Node) => rest;
@@ -122,9 +122,9 @@ describe('evidence issues on migrated canvases equal today’s', () => {
   test('the evidence seed still raises the badges the e2e spec expects', () => {
     const canvas = parse(evidenceSeed);
     const [conclusion, question, finding] = canvas.nodes.map((n) => n.id) as [string, string, string];
-    const kinds = (id: string) => (evidenceIssues(canvas).get(id) ?? []).map((i) => i.kind);
-    expect(kinds(conclusion)).toEqual(['unbacked', 'open-question']);
-    expect(kinds(finding)).toEqual(['dangling']);
+    const kinds = (id: string) => (issuesByNode(canvas).get(id) ?? []).map((i) => i.ruleId);
+    expect(kinds(conclusion)).toEqual(['conclusion-unbacked', 'conclusion-open-question']);
+    expect(kinds(finding)).toEqual(['finding-dangling']);
     expect(kinds(question)).toEqual([]);
   });
 
