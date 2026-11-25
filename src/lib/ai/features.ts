@@ -11,7 +11,6 @@ import { generateText, Output, streamText } from 'ai';
 import type { LanguageModel } from 'ai';
 
 import { IMAGE_CAPTION_MAX, IMAGE_TEXT_MAX, NODE_BODY_MAX, NODE_TITLE_MAX } from '../../data/limits';
-import { FALLBACK_RELATION } from '../../data/model/relations';
 import type { GraphView, RuleId } from '../../data/model/rules';
 import { runRules } from '../../data/rules';
 import { resolveRefs } from './citations';
@@ -40,7 +39,6 @@ import type {
   ExpandRequest,
   IdeaSuggestion,
   MapRequest,
-  PromptCanvas,
   ReviewIssue,
   ReviewKind,
   RewriteRequest,
@@ -333,32 +331,34 @@ Be concise: short paragraphs or a short "-" list. No headings. Write in the same
 /** Most issues a gap check reports from the model. */
 export const REVIEW_ISSUES_MAX = 12;
 
-/** Most issues a gap check reports from Root's own rules. */
-const RULE_ISSUES_MAX = 8;
+/** Most issues a gap check reports from each of Root's own rules, so every rule gets a say. */
+const RULE_ISSUES_PER_RULE_MAX = 8;
 
 /** The gap-check kind each rule's issues are listed under; rules not named here are gaps. */
 const RULE_REVIEW_KINDS: Partial<Record<RuleId, ReviewKind>> = { 'conclusion-unbacked': 'unsupported' };
 
 /**
- * A prompt canvas as the rule engine reads it. Prompt canvases send no
- * relations yet, so every connector reads as `related-to`, which is how the
- * cards read a canvas whose connectors have no meaning set.
+ * The model's issue kinds that say the same thing as a rule, about the same
+ * idea. Rules not named here duplicate none: a model `gap` is broad ("an open
+ * question or missing piece of evidence") and may name something the rule
+ * does not, so it is kept.
  */
-export function promptGraph(canvas: PromptCanvas): GraphView {
-  return {
-    nodes: canvas.nodes,
-    edges: canvas.edges.map((e) => ({ source: e.source, target: e.target, relationType: FALLBACK_RELATION })),
-  };
-}
+const RULE_DUPLICATES: Partial<Record<RuleId, readonly ReviewKind[]>> = { 'conclusion-unbacked': ['unsupported'] };
 
 /**
  * Root's own checks, which need no model: the same rule engine the cards
- * use, so the gap check reports what the badges show.
+ * use. Give it the whole saved canvas, not the prompt copy (cut at
+ * `PROMPT_NODES_MAX`), so the gap check reports what the badges show.
  */
-export function ruleIssues(canvas: PromptCanvas): ReviewIssue[] {
-  const byId = new Map(canvas.nodes.map((n) => [n.id, n]));
-  return runRules(promptGraph(canvas))
-    .slice(0, RULE_ISSUES_MAX)
+export function ruleIssues(graph: GraphView): ReviewIssue[] {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const perRule = new Map<RuleId, number>();
+  return runRules(graph)
+    .filter((issue) => {
+      const count = (perRule.get(issue.ruleId) ?? 0) + 1;
+      perRule.set(issue.ruleId, count);
+      return count <= RULE_ISSUES_PER_RULE_MAX;
+    })
     .map((issue) => ({
       kind: RULE_REVIEW_KINDS[issue.ruleId] ?? 'gap',
       message: `${issue.label}: “${byId.get(issue.nodeIds[0] ?? '')?.title.trim() || 'Untitled idea'}”.`,
@@ -367,6 +367,26 @@ export function ruleIssues(canvas: PromptCanvas): ReviewIssue[] {
       ruleId: issue.ruleId,
       ruleVersion: issue.ruleVersion,
     }));
+}
+
+/**
+ * The model's issues without those that repeat a rule issue: a kind the rule
+ * duplicates (`RULE_DUPLICATES`), about the one idea the rule flagged. Other
+ * kinds about the same idea are kept.
+ */
+export function withoutRuleDuplicates(fromModel: readonly ReviewIssue[], rules: readonly ReviewIssue[]): ReviewIssue[] {
+  const key = (kind: ReviewKind, ideaId: string) => `${kind}:${ideaId}`;
+  const flagged = new Set(
+    rules.flatMap((r) => {
+      const subject = r.sources[0];
+      if (!r.ruleId || subject?.kind !== 'idea') return [];
+      return (RULE_DUPLICATES[r.ruleId] ?? []).map((kind) => key(kind, subject.ideaId));
+    }),
+  );
+  return fromModel.filter((i) => {
+    const only = i.sources.length === 1 ? i.sources[0] : undefined;
+    return !(only?.kind === 'idea' && flagged.has(key(i.kind, only.ideaId)));
+  });
 }
 
 /** Ask the model for weak spots in the project; issues cite what they are about. */
@@ -444,6 +464,11 @@ ${STYLE_GUIDE}`,
 
 /** Most ideas shown to the model, and most suggestions kept. */
 const TIDY_IDEAS_MAX = 150;
+
+/** "a, b, c or d", for listing ids in a prompt. */
+function orList(items: readonly string[]): string {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`;
+}
 export const TIDY_SUGGESTIONS_MAX = 12;
 
 export async function suggestTidy(
@@ -471,7 +496,7 @@ export async function suggestTidy(
     model,
     output: Output.object({ schema: tidyOutputSchema }),
     system: `You help keep a research canvas tidy. Suggest only clear improvements, at most ${TIDY_SUGGESTIONS_MAX}, most useful first:
-- retype: an idea whose type is clearly wrong (for example a question typed as a finding). Give the better type. Only retype ideas typed topic, finding, question or conclusion; leave every other type as it is.
+- retype: an idea whose type is clearly wrong (for example a question typed as a finding). Give the better type. Only retype ideas typed ${orList(suggestedTypeSchema.options)}; leave every other type as it is.
 - retitle: an idea with no title or a vague one, where its notes say what it is about. Give a better title (under 12 words).
 - connect: two related ideas that are not connected yet. ref is the idea it leads from, to the idea it leads to.
 For every suggestion give a one-sentence reason. Leave type, title and to null when they do not apply.

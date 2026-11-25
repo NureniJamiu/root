@@ -1,6 +1,6 @@
 /**
  * The gap check on the server and the card badges in the browser run the
- * same rule engine, so they report the same issues for the same canvas.
+ * same rule engine on the same saved canvas, so they report the same issues.
  */
 
 import fc from 'fast-check';
@@ -10,11 +10,14 @@ import { addNode, connect, emptyCanvas } from '../../../data/mutators';
 import { runRules } from '../../../data/rules';
 import type { Canvas, NodeType } from '../../../data/types';
 import { arbRichCanvas } from '../../../data/__tests__/arbitraries';
-import { promptGraph, ruleIssues } from '../features';
-import { toPromptCanvas } from '../project-content';
+import type { Issue } from '../../../data/model/rules';
+import { ruleIssues } from '../features';
 
-/** What the server finds for the canvas the browser sends it. */
-const serverIssues = (c: Canvas) => runRules(promptGraph(toPromptCanvas(c)));
+/** The gap check's rule issues, as the rule, its version and the cards it points at. */
+const serverIssues = (c: Canvas) => ruleIssues(c).map((i) => [i.ruleId, i.ruleVersion, i.sources]);
+/** The same for the issues the cards show. */
+const asServer = (issues: readonly Issue[]) =>
+  issues.map((i) => [i.ruleId, i.ruleVersion, i.nodeIds.map((ideaId) => ({ kind: 'idea', ideaId }))]);
 
 function withCards(types: NodeType[], links: [number, number][]): Canvas {
   let c = emptyCanvas();
@@ -48,17 +51,16 @@ describe('server and client rule issues', () => {
       ['conclusion-open-question', [c4, q1]],
       ['finding-dangling', [f5]],
     ]);
-    expect(serverIssues(c)).toStrictEqual(client);
-    const review = ruleIssues(toPromptCanvas(c));
-    expect(review.map((i) => [i.ruleId, i.ruleVersion, i.sources])).toEqual(
-      client.map((i) => [i.ruleId, i.ruleVersion, i.nodeIds.map((ideaId) => ({ kind: 'idea', ideaId }))]),
-    );
+    expect(serverIssues(c)).toEqual(asServer(client));
   });
 
   it('match for any canvas', () => {
     fc.assert(
       fc.property(arbRichCanvas, (c) => {
-        expect(serverIssues(c)).toStrictEqual(runRules(c));
+        // The gap check keeps at most eight issues per rule.
+        const seen = new Map<string, number>();
+        const capped = runRules(c).filter((i) => seen.set(i.ruleId, (seen.get(i.ruleId) ?? 0) + 1).get(i.ruleId)! <= 8);
+        expect(serverIssues(c)).toEqual(asServer(capped));
       }),
       { numRuns: 200 },
     );
