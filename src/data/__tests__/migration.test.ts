@@ -9,7 +9,8 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import { evidenceIssues } from '../evidence';
+import { RELATION_IDS } from '../model';
+import { issuesByNode } from '../rules';
 import { CANVAS_SCHEMA_VERSION, canvasSchema, migrateCanvas, migrateLegacyCanvas } from '../schema';
 import type { Canvas, Edge, Node } from '../types';
 import { arbCanvas, toV1 } from './arbitraries';
@@ -30,7 +31,7 @@ function parse(input: unknown): Canvas {
 
 /** Evidence issues as plain sorted entries, for comparison. */
 function issuesOf(c: Canvas): Array<[string, unknown]> {
-  return [...evidenceIssues(c).entries()].sort(([a], [b]) => a.localeCompare(b));
+  return [...issuesByNode(c).entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
 const withoutV2Node = ({ fields: _f, provenance: _p, ...rest }: Node) => rest;
@@ -122,9 +123,9 @@ describe('evidence issues on migrated canvases equal today’s', () => {
   test('the evidence seed still raises the badges the e2e spec expects', () => {
     const canvas = parse(evidenceSeed);
     const [conclusion, question, finding] = canvas.nodes.map((n) => n.id) as [string, string, string];
-    const kinds = (id: string) => (evidenceIssues(canvas).get(id) ?? []).map((i) => i.kind);
-    expect(kinds(conclusion)).toEqual(['unbacked', 'open-question']);
-    expect(kinds(finding)).toEqual(['dangling']);
+    const kinds = (id: string) => (issuesByNode(canvas).get(id) ?? []).map((i) => i.ruleId);
+    expect(kinds(conclusion)).toEqual(['conclusion-unbacked', 'conclusion-open-question']);
+    expect(kinds(finding)).toEqual(['finding-dangling']);
     expect(kinds(question)).toEqual([]);
   });
 
@@ -155,10 +156,14 @@ describe('schema v2', () => {
   });
 
   test('accepts only the types and relations the app exposes today', () => {
-    const retyped = { ...valid, nodes: valid.nodes.map((n, i) => (i === 0 ? { ...n, type: 'objective' } : n)) };
+    const framing = { ...valid, nodes: valid.nodes.map((n, i) => (i === 0 ? { ...n, type: 'objective' } : n)) };
+    expect(canvasSchema.safeParse(framing).success).toBe(true);
+    const retyped = { ...valid, nodes: valid.nodes.map((n, i) => (i === 0 ? { ...n, type: 'methodology' } : n)) };
     expect(canvasSchema.safeParse(retyped).success).toBe(false);
-    const related = { ...valid, edges: valid.edges.map((e) => ({ ...e, relationType: 'supports' })) };
-    expect(canvasSchema.safeParse(related).success).toBe(false);
+    for (const relationType of RELATION_IDS) {
+      const related = { ...valid, edges: valid.edges.map((e) => ({ ...e, relationType })) };
+      expect(canvasSchema.safeParse(related).success, relationType).toBe(true);
+    }
     expect(canvasSchema.safeParse({ ...valid, edges: valid.edges.map((e) => ({ ...e, relationType: 'causes' })) }).success).toBe(false);
   });
 

@@ -12,6 +12,7 @@
 import type { JSONContent } from '@tiptap/core';
 
 import { PROMPT_BODY_MAX, PROMPT_NODES_MAX } from './contracts';
+import type { GraphView } from '../../data/model/rules';
 import type { AiSource, PromptCanvas } from './contracts';
 
 type PromptNode = PromptCanvas['nodes'][number];
@@ -27,6 +28,15 @@ export interface ProjectContent {
   readonly title: string;
   readonly canvas: PromptCanvas;
   readonly documents: readonly ProjectDocument[];
+}
+
+/** A saved project as the AI routes load it: what prompts read, plus the whole canvas the rules check. */
+export interface LoadedProject extends ProjectContent {
+  /**
+   * The whole saved canvas. The gap check's rules read this, not `canvas`
+   * (which stops at `PROMPT_NODES_MAX` ideas), so they report what the cards show.
+   */
+  readonly graph: GraphView;
 }
 
 /** One block of a document with the ideas it cites. */

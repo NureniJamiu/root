@@ -88,7 +88,7 @@ describe('AI panel', () => {
   it('shows gap check issues, and the plan it needs on Free', async () => {
     const { a } = seedCanvas();
     vi.spyOn(aiApi, 'review').mockResolvedValue({
-      issues: [{ kind: 'unsupported', message: 'No findings.', suggestion: 'Add some.', sources: [{ kind: 'idea', ideaId: a }], rule: true }],
+      issues: [{ kind: 'unsupported', message: 'No findings.', suggestion: 'Add some.', sources: [{ kind: 'idea', ideaId: a }], ruleId: 'conclusion-unbacked', ruleVersion: 1 }],
       model: { id: 'm', label: 'Gemini' },
       allowance: config('pro').allowance,
       ownKey: false,

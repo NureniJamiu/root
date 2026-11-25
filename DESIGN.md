@@ -145,6 +145,7 @@ The palette establishes an authoritative, high-legibility scholarly environment 
 - **Finding Node (`#2d7a4c`):** Deep botanical green reserved for verified facts, data points, citations, and validated outcomes.
 - **Question Node (`#de5052`):** Crimson coral highlighting active inquiries, unresolved hypotheses, and critical anomalies.
 - **Conclusion Node (`#521010`):** Deep oxblood signaling consolidated theses, synthesized outcomes, and definitive closures.
+- **Problem-Framing Family (`#5b3fa0`, token `--framing`):** Deep violet shared by every problem-framing type (Problem statement, Objective, Research question, Hypothesis, Variable). Types beyond the four above take their family's colour rather than one each, and every card carries a mono type label ("RESEARCH QUESTION"), so the type never depends on colour alone. In dark mode the token lifts to `#b29cec`.
 
 ## Typography
 
@@ -172,7 +173,7 @@ This system operates under a **Zero-Shadow Mandate**. Ambient blur, drop shadows
 ### Mechanical Elevation Hierarchy
 - **Level 0 (Underlay Canvas):** Ground `#f9f9fb` etched with 1px `#ebebeb` dot matrix or millimeter rule pattern.
 - **Level 1 (Structural Panes & Cards):** Flat `#ffffff` surfaces bounded by crisp `1px solid #ebebeb` borders.
-- **Level 2 (Active / Focused Nodes):** Flat `#ffffff` surface with a high-contrast `1px solid #000000` perimeter boundary or corresponding semantic edge (`#0051c3`, `#de5052`, `#521010`, `#2d7a4c`).
+- **Level 2 (Active / Focused Nodes):** Flat `#ffffff` surface with a high-contrast `1px solid #000000` perimeter boundary or corresponding semantic edge (`#0051c3`, `#de5052`, `#521010`, `#2d7a4c`, `#5b3fa0` / `--framing`).
 - **Level 3 (Modals & Command Overlays):** `#ffffff` solid container encased in `2px solid #000000` with an opaque, unblurred structural backdrop mask of `rgba(0, 0, 0, 0.4)`.
 
 ## Shapes
@@ -199,12 +200,18 @@ Components follow desktop-first information density, featuring sharp hairline fr
 - **Finding Node:** Tagged with `#2d7a4c` metadata label; citation indicator anchored in `#2d7a4c`.
 - **Question Node:** Border rule highlighted in `#de5052`; query indicator flagged with monospaced question mark token in coral crimson.
 - **Conclusion Node:** Bordered in rich `#521010` oxblood; headline text styled in italicized transitional serif.
+- **Problem-Framing Nodes:** Border, top accent bar and type label in `#5b3fa0` violet (`--framing`). The label names the exact type in uppercase mono, since the family shares one colour.
+
+### Connectors
+- **Untyped (`related to`):** A 2px bezier in the colour of the card it leaves, dashed (`5 4`) when it leads to a Question. Its label shows only on hover or selection, so a canvas without typed connectors reads as before.
+- **Typed:** Coloured by relation and always labelled at the midpoint with a mono micro-pill (`label-sm`, uppercase, `2px` radius, `1px` border and text in the connector colour) that reads from the card it leaves ("SUPPORTED BY" when drawn from a conclusion to a finding). Framing relations (addresses, refines, involves) use `#5b3fa0` / `--framing`; evidence relations (answers, supports) use `#2d7a4c`; contradicts uses `#de5052`.
+- **Invalid relation:** A relation the validity map does not allow for its two cards is drawn dotted (`1 5`, round caps) in the warning colour (`#ba1a1a` / `--danger`), with a dashed label border and a warning mark. The dots and the always-on label tell it apart from a dashed connector into a Question without relying on colour (in dark mode `--danger` and `--question` are close). It is flagged, never removed.
 
 ### Text Input & Filter Fields
 - Minimalist architectural box: `#ffffff` surface, `1px solid #ebebeb` default border, `2px` radius. Focus transition (`150ms`) upgrades border to `1px solid #000000` without glow rings. Placeholder copy rendered in `#595959`.
 
 ### Chips & Semantic Tags
-- Monospace micro-pills (`label-sm`), strictly rectangular with `2px` radius, `2px 6px` padding. Bordered in `1px solid #ebebeb`. Active node filters adopt respective semantic colors (`#0051c3`, `#2d7a4c`, `#de5052`, `#521010`) for borders and typography.
+- Monospace micro-pills (`label-sm`), strictly rectangular with `2px` radius, `2px 6px` padding. Bordered in `1px solid #ebebeb`. Active node filters adopt respective semantic colors (`#0051c3`, `#2d7a4c`, `#de5052`, `#521010`, `#5b3fa0` / `--framing`) for borders and typography.
 
 ### Checkboxes & Radios
 - Hard geometric boxes (`0px` or `2px` radius) sized precisely at `14px × 14px`. Unchecked: `1px solid #404040`. Checked: `#000000` fill with sharp, unrounded white hairline glyphs.

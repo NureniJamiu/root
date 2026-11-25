@@ -1,12 +1,13 @@
 /**
- * Evidence checks: unbacked conclusions, conclusions resting on open
- * questions, and findings nothing uses.
+ * Evidence rules: unbacked conclusions, conclusions resting on open
+ * questions, and findings nothing uses. The cases are the ones the client's
+ * evidence checks had before the rule engine, now run against the engine.
  */
 
 import { describe, expect, test } from 'vitest';
 
-import { evidenceIssues, evidenceIssuesFor } from '../evidence';
-import type { Canvas, Edge, Node, NodeType } from '../types';
+import type { Canvas, Edge, Node, NodeType } from '../../types';
+import { issuesByNode, issuesFor, runRules } from '..';
 
 const TS = '2024-01-01T00:00:00.000Z';
 const TYPES: Record<string, NodeType> = { t: 'topic', f: 'finding', q: 'question', c: 'conclusion' };
@@ -33,12 +34,12 @@ function build(cards: string[], edges: string[]): { c: Canvas; id: (name: string
   return { c: { id: '20000000-0000-4000-8000-000000000000', schemaVersion: 2, title: '', nodes, edges: es, updatedAt: TS }, id };
 }
 
-const kinds = (c: Canvas, id: string): string[] => evidenceIssuesFor(c, id).map((i) => i.kind);
+const kinds = (c: Canvas, id: string): string[] => issuesFor(c, id).map((i) => i.ruleId);
 
 describe('unbacked conclusions', () => {
   test('a conclusion with no finding is unbacked', () => {
     const { c, id } = build(['t1', 'c1'], ['t1-c1']);
-    expect(kinds(c, id('c1'))).toEqual(['unbacked']);
+    expect(kinds(c, id('c1'))).toEqual(['conclusion-unbacked']);
   });
 
   test('a connected finding backs it, whichever way the connector runs', () => {
@@ -57,14 +58,23 @@ describe('unbacked conclusions', () => {
 
   test('a finding reached only through a topic does not count', () => {
     const { c, id } = build(['t1', 'c1', 'f1'], ['t1-c1', 't1-f1']);
-    expect(kinds(c, id('c1'))).toEqual(['unbacked']);
+    expect(kinds(c, id('c1'))).toEqual(['conclusion-unbacked']);
   });
 });
 
 describe('conclusions resting on open questions', () => {
   test('a question with no finding is open', () => {
     const { c, id } = build(['c1', 'f1', 'q1', 'q2'], ['c1-f1', 'q1-c1', 'c1-q2']);
-    expect(evidenceIssuesFor(c, id('c1'))).toEqual([{ kind: 'open-question', questionIds: [id('q1'), id('q2')] }]);
+    expect(issuesFor(c, id('c1'))).toEqual([
+      {
+        ruleId: 'conclusion-open-question',
+        ruleVersion: 2,
+        nodeIds: [id('c1'), id('q1'), id('q2')],
+        edgeIds: [],
+        label: '2 open questions',
+        hint: 'This conclusion depends on questions nothing answers yet. Connect a finding to each one.',
+      },
+    ]);
   });
 
   test('a question a finding answers is not open', () => {
@@ -74,16 +84,16 @@ describe('conclusions resting on open questions', () => {
 
   test('an unbacked conclusion can also rest on an open question', () => {
     const { c, id } = build(['c1', 'q1'], ['c1-q1']);
-    expect(kinds(c, id('c1'))).toEqual(['unbacked', 'open-question']);
+    expect(kinds(c, id('c1'))).toEqual(['conclusion-unbacked', 'conclusion-open-question']);
   });
 });
 
 describe('dangling findings', () => {
   test('a finding on its own, or among only findings, is dangling', () => {
     const { c, id } = build(['f1', 'f2', 'f3'], ['f2-f3']);
-    expect(kinds(c, id('f1'))).toEqual(['dangling']);
-    expect(kinds(c, id('f2'))).toEqual(['dangling']);
-    expect(kinds(c, id('f3'))).toEqual(['dangling']);
+    expect(kinds(c, id('f1'))).toEqual(['finding-dangling']);
+    expect(kinds(c, id('f2'))).toEqual(['finding-dangling']);
+    expect(kinds(c, id('f3'))).toEqual(['finding-dangling']);
   });
 
   test('a chain of findings that reaches a topic is used', () => {
@@ -96,5 +106,20 @@ test('topics and questions get no issues, and results are cached per canvas', ()
   const { c, id } = build(['t1', 'q1'], []);
   expect(kinds(c, id('t1'))).toEqual([]);
   expect(kinds(c, id('q1'))).toEqual([]);
-  expect(evidenceIssues(c)).toBe(evidenceIssues(c));
+  expect(runRules(c)).toBe(runRules(c));
+  expect(issuesByNode(c)).toBe(issuesByNode(c));
+});
+
+test('badges read as they did before the engine', () => {
+  const { c, id } = build(['c1', 'q1', 'f1'], ['c1-q1']);
+  const badge = (name: string) => issuesFor(c, id(name)).map((i) => i.label).join(' · ');
+  expect(badge('c1')).toBe('No evidence · Open question');
+  expect(badge('f1')).toBe('Not used');
+  expect(issuesFor(c, id('c1')).map((i) => i.hint)).toEqual([
+    'No finding supports this conclusion. Connect a finding to it, directly or through a question.',
+    'This conclusion depends on a question nothing answers yet. Connect a finding to the question.',
+  ]);
+  expect(issuesFor(c, id('f1'))[0]!.hint).toBe(
+    'This finding is not connected to any topic, question or conclusion, so nothing in your argument uses it.',
+  );
 });

@@ -137,7 +137,21 @@ describe('phase 2 features', () => {
       { kind: 'idea', ideaId: C },
     ]);
     const withConclusion = { ...canvas, nodes: [...canvas.nodes, { id: '00000000-0000-4000-8000-00000000000d', title: 'So sleep matters', body: '', type: 'conclusion' as const }] };
-    expect(ruleIssues(withConclusion)).toHaveLength(1);
+    const graph = { nodes: withConclusion.nodes, edges: canvas.edges.map((e) => ({ ...e, relationType: 'related-to' as const })) };
+    expect(ruleIssues(graph)).toHaveLength(1);
+  });
+
+  it('caps the gap check per rule, so one rule cannot crowd out the others', async () => {
+    const { ruleIssues } = await import('../features');
+    const id = (i: number) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+    const conclusions = Array.from({ length: 10 }, (_, i) => ({ id: id(i), title: `Claim ${i}`, type: 'conclusion' as const }));
+    const graph = { nodes: [...conclusions, { id: id(99), title: 'Loose finding', type: 'finding' as const }], edges: [] };
+    const counts = new Map<string, number>();
+    for (const issue of ruleIssues(graph)) counts.set(issue.ruleId!, (counts.get(issue.ruleId!) ?? 0) + 1);
+    expect([...counts]).toEqual([
+      ['conclusion-unbacked', 8],
+      ['finding-dangling', 1],
+    ]);
   });
 
   it('turns text into connected ideas', async () => {
@@ -167,6 +181,24 @@ describe('phase 2 features', () => {
     ]);
   });
 
+  it('never retypes a card outside the general family', async () => {
+    const { suggestTidy } = await import('../features');
+    const D = '00000000-0000-4000-8000-00000000000d';
+    const framed: PromptCanvas = {
+      ...canvas,
+      nodes: [...canvas.nodes, { id: D, title: 'Naps improve recall', body: '', type: 'hypothesis' }],
+    };
+    const model = jsonModel({
+      suggestions: [
+        { kind: 'retype', ref: 'I4', type: 'question', title: null, to: null, reason: 'Reads as a question.' },
+        { kind: 'retitle', ref: 'I4', type: null, title: 'Short naps improve recall', to: null, reason: 'Clearer.' },
+      ],
+    });
+    const result = await suggestTidy(model, { canvas: framed });
+    expect(result.output).toEqual([
+      { kind: 'retitle', ideaId: D, title: 'Short naps improve recall', reason: 'Clearer.' },
+    ]);
+  });
   it('streams an answer from the numbered context', async () => {
     const { streamAnswer } = await import('../features');
     const result = streamAnswer(streamModel(['REM helps ', '[[I2]].']), { question: 'Why?', context: 'I2: REM' });

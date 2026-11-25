@@ -1,9 +1,10 @@
 /**
- * `NodeEditor` — the title / body / images / type editor for a single Node
+ * `NodeEditor` — the title / type / fields / body / images editor for a single Node
  * (Requirements 4.1–4.7, design.md §Editor Flow).
  *
- * The editor works on a local draft of the node (title, body, type and
- * images). Nothing reaches the store until the user saves:
+ * The editor works on a local draft of the node (title, body, type, the
+ * type's own fields and images). Nothing reaches the store until the user
+ * saves:
  *
  *   - Save (button, Enter in the title, Cmd/Ctrl+Enter)
  *       → `canvasActions.saveNodeEdits(nodeId, draft)` — one undo step
@@ -11,6 +12,13 @@
  *       → `canvasActions.closeEditor()`, or `discardNewNode(nodeId)` when
  *         the idea was only just added, so cancelling an add leaves nothing
  *         behind.
+ *
+ * The type picker lists the enabled types grouped by family (general first),
+ * and below it the editor shows one choice per field the registry defines
+ * for the picked type. The draft keeps every field value while the person
+ * tries types, so picking a type and then the original one again loses
+ * nothing; on save, `updateNode` keeps only the fields the saved type
+ * defines.
  *
  * Structural caps come from `maxLength` on the inputs (200 / 20 000 —
  * design.md §Edge Cases and Boundary Conditions), and the body character
@@ -46,10 +54,15 @@ import type {
 } from 'react';
 
 import {
+  ENABLED_TYPES_BY_FAMILY,
   IMAGE_DATA_URL_MAX_BYTES,
   NODE_BODY_MAX,
   NODE_TITLE_MAX,
   canvasActions,
+  fieldChoices,
+  fieldsForType,
+  nodeTypeLabel,
+  sameFields,
   sameSource,
   useCanvasStore,
 } from '../data';
@@ -92,13 +105,10 @@ const BODY_COUNTER_WARN_AT = BODY_MAX - 200;
  */
 const IMAGE_MAX_BYTES = IMAGE_DATA_URL_MAX_BYTES;
 
-/** Buttons render in this fixed order (design.md §Editor Flow). */
-const TYPE_ORDER: readonly NodeType[] = [
-  'topic',
-  'finding',
-  'question',
-  'conclusion',
-];
+/** Columns of the type picker per family: the four general types fit one row. */
+const PICKER_COLUMNS: Readonly<Record<string, string>> = {
+  general: 'grid-cols-4',
+};
 
 /**
  * Palette color used when the character counter is in warn state, and
@@ -113,13 +123,11 @@ const SECONDARY = 'var(--color-semantic-question)'; // warning accent, follows t
  */
 const FLASH_MS = 150; // motion.duration.normal
 
-/** Display names for the type picker and header. */
-const TYPE_LABEL: { readonly [K in NodeType]: string } = {
-  topic: 'Topic',
-  finding: 'Finding',
-  question: 'Question',
-  conclusion: 'Conclusion',
-};
+/** "measurementLevel" → "Measurement level", "non-directional" → "Non-directional". */
+function humanize(id: string): string {
+  const words = id.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 const FIELD_LABEL =
   'font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-ink-3';
@@ -170,7 +178,14 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
   const [draft, setDraft] = useState<NodeEdits | null>(() =>
     node === undefined
       ? null
-      : { title: node.title, body: node.body, type: node.type, images: node.images, source: node.source ?? null },
+      : {
+          title: node.title,
+          body: node.body,
+          type: node.type,
+          fields: node.fields,
+          images: node.images,
+          source: node.source ?? null,
+        },
   );
   const isDirty =
     node !== undefined &&
@@ -178,6 +193,7 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
     (draft.title !== node.title ||
       draft.body !== node.body ||
       draft.type !== node.type ||
+      !sameFields(fieldsForType(draft.type, draft.fields ?? {}), node.fields) ||
       !sameSource(draft.source ?? undefined, node.source) ||
       draft.images.length !== node.images.length ||
       draft.images.some((img, i) => img.id !== node.images[i]?.id));
@@ -413,6 +429,14 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
     setDraft((d) => (d === null ? d : { ...d, type: t }));
   }, []);
 
+  const onPickField = useCallback((key: string, value: string): void => {
+    setDraft((d) => {
+      if (d === null) return d;
+      const { [key]: _old, ...rest } = d.fields ?? {};
+      return { ...d, fields: value === '' ? rest : { ...rest, [key]: value } };
+    });
+  }, []);
+
   const onRemoveImage = useCallback((imageId: UUID): void => {
     setDraft((d) => (d === null ? d : { ...d, images: d.images.filter((img) => img.id !== imageId) }));
   }, []);
@@ -455,7 +479,8 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
   // parent's re-render can drop the editor cleanly.
   if (node === undefined || draft === null) return null;
 
-  const typeLabel = TYPE_LABEL[draft.type];
+  const typeLabel = nodeTypeLabel(draft.type);
+  const choices = fieldChoices(draft.type);
   const accent = typeStyles[draft.type].border;
 
   return (
@@ -523,43 +548,84 @@ function NodeEditorImpl({ nodeId, onClose }: NodeEditorProps): JSX.Element | nul
             />
           </label>
 
-          {/* Type picker */}
+          {/* Type picker, grouped by family */}
           <div className="flex flex-col gap-1.5">
             <span className={FIELD_LABEL}>Card type</span>
             <div
-              className="grid grid-cols-4 gap-1 p-1 bg-sunken rounded-[3px]"
+              className="flex flex-col gap-1 p-1 bg-sunken rounded-[3px]"
               role="group"
               aria-label="Card type"
               data-testid="node-editor-type-buttons"
             >
-              {TYPE_ORDER.map((t) => {
-                const style = typeStyles[t];
-                const isSelected = draft.type === t;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => onPickType(t)}
-                    aria-pressed={isSelected}
-                    className={`h-8 inline-flex items-center justify-center gap-1.5 rounded-[2px] border font-mono text-[11px] transition-all duration-150 cursor-pointer ${
-                      isSelected
-                        ? 'bg-panel text-ink-strong'
-                        : 'border-transparent text-ink-3 hover:text-ink-strong hover:bg-panel/60'
-                    }`}
-                    style={isSelected ? { borderColor: style.border } : undefined}
-                    data-testid={`node-editor-type-${t}`}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: style.border }}
-                      aria-hidden="true"
-                    />
-                    {TYPE_LABEL[t]}
-                  </button>
-                );
-              })}
+              {ENABLED_TYPES_BY_FAMILY.map((group) => (
+                <div
+                  key={group.family}
+                  className="flex flex-col gap-1"
+                  role="group"
+                  aria-label={group.label}
+                  data-testid={`node-editor-type-family-${group.family}`}
+                >
+                  {ENABLED_TYPES_BY_FAMILY.length > 1 ? (
+                    <span className="px-1 pt-0.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-faint">
+                      {group.label}
+                    </span>
+                  ) : null}
+                  <div className={`grid ${PICKER_COLUMNS[group.family] ?? 'grid-cols-3'} gap-1`}>
+                    {group.types.map((t) => {
+                      const style = typeStyles[t];
+                      const isSelected = draft.type === t;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => onPickType(t)}
+                          aria-pressed={isSelected}
+                          className={`h-8 px-1.5 inline-flex items-center justify-center gap-1.5 rounded-[2px] border font-mono text-[11px] whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                            isSelected
+                              ? 'bg-panel text-ink-strong'
+                              : 'border-transparent text-ink-3 hover:text-ink-strong hover:bg-panel/60'
+                          }`}
+                          style={isSelected ? { borderColor: style.border } : undefined}
+                          data-testid={`node-editor-type-${t}`}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ background: style.border }}
+                            aria-hidden="true"
+                          />
+                          {nodeTypeLabel(t)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* The picked type's own fields, from the registry */}
+          {choices.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3" data-testid="node-editor-fields">
+              {choices.map((field) => (
+                <label key={field.key} className="flex flex-col gap-1.5">
+                  <span className={FIELD_LABEL}>{humanize(field.key)}</span>
+                  <select
+                    value={String(draft.fields?.[field.key] ?? '')}
+                    onChange={(e) => onPickField(field.key, e.target.value)}
+                    className={`${FIELD_INPUT} h-9 px-2 font-mono text-[12px] cursor-pointer`}
+                    data-testid={`node-editor-field-${field.key}`}
+                  >
+                    <option value="">Not specified</option>
+                    {field.options.map((option) => (
+                      <option key={option} value={option}>
+                        {humanize(option)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          ) : null}
 
           {/* Notes */}
           <div className="flex flex-col gap-1.5">

@@ -1,20 +1,22 @@
 import { useMemo } from 'react';
 import {
+  allowedRelations,
   canvasActions,
-  evidenceIssueHint,
-  evidenceIssueLabel,
-  evidenceIssues,
+  isRelationAllowed,
+  issuesByNode,
   nodeLabel,
   nodeOrdinals,
+  nodeTypeLabel,
+  relationLabel,
   useCanvasStore,
   useDocLinksStore,
 } from '../data';
-import type { Edge, EvidenceIssue, Node, NodeType, Side, Source, UUID } from '../data';
+import type { Edge, Issue, Node, RelationType, RuleId, Side, Source, UUID } from '../data';
 import type { DragState } from '../canvas';
 import type { SaveStatus } from '../lib/save-queue';
 import { formatReference } from '../lib/citation';
 import { Button } from '../ui/Button';
-import { IDEA_DRAG_MIME, MarkdownText } from '../nodes';
+import { IDEA_DRAG_MIME, MarkdownText, typeColor } from '../nodes';
 import { ImageMosaic } from './ImageGallery';
 
 export interface NodeInspectorRailProps {
@@ -71,13 +73,6 @@ function SaveIndicator({ status }: { readonly status: SaveStatus }): JSX.Element
   );
 }
 
-const TYPE_LABELS: Record<NodeType, { readonly label: string; readonly color: string }> = {
-  topic: { label: 'Topic', color: 'rgb(var(--topic))' },
-  finding: { label: 'Finding', color: 'rgb(var(--finding))' },
-  question: { label: 'Question', color: 'rgb(var(--question))' },
-  conclusion: { label: 'Conclusion', color: 'rgb(var(--conclusion))' },
-};
-
 /** Small uppercase heading over a section of the read-only view. */
 function SectionLabel({ children }: { readonly children: string }): JSX.Element {
   return (
@@ -87,7 +82,46 @@ function SectionLabel({ children }: { readonly children: string }): JSX.Element 
 
 const SIDE_OPTIONS: readonly Side[] = ['top', 'right', 'bottom', 'left'];
 
-/** Details of the selected connector: its two cards, the sides it attaches to, and a remove button. */
+/**
+ * What the selected connector means. Lists the relations the validity map
+ * allows for its two cards, read from the first card to the second, plus the
+ * current relation when it does not fit (it stays until the person changes it).
+ */
+function RelationPicker({ edge, from, to }: { readonly edge: Edge; readonly from: Node; readonly to: Node }): JSX.Element {
+  const fits = isRelationAllowed(edge.relationType, from.type, to.type);
+  const options: RelationType[] = allowedRelations(from.type, to.type);
+  if (!fits) options.unshift(edge.relationType);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="flex items-center justify-between gap-2">
+        <span className="text-muted text-[8.5px] uppercase">Relation</span>
+        <select
+          value={edge.relationType}
+          onChange={(e) => canvasActions.setEdgeRelation(edge.id, e.target.value as RelationType)}
+          className="font-mono text-[9px] bg-panel border border-rule rounded-[2px] px-1 py-0.5 text-ink focus:outline-none focus:border-topic cursor-pointer"
+          data-testid="connector-relation"
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {relationLabel(option, from.type, to.type)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {!fits && (
+        <p
+          className="m-0 border border-dashed border-danger/40 bg-danger-soft rounded-[2px] px-2 py-1.5 text-danger text-[9px] leading-[13px]"
+          data-testid="connector-relation-invalid"
+        >
+          “{relationLabel(edge.relationType, from.type, to.type)}” does not fit these card types ({nodeTypeLabel(from.type)} →{' '}
+          {nodeTypeLabel(to.type)}). Pick a relation that does.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Details of the selected connector: its two cards, its relation, the sides it attaches to, and a remove button. */
 function ConnectorPanel({
   edge,
   byId,
@@ -147,6 +181,7 @@ function ConnectorPanel({
       <div className="border border-rule bg-paper rounded-[2px] p-2.5 flex flex-col gap-2.5 font-mono text-[9.5px]">
         {row('From', from, edge.sourceSide, 'sourceSide', edge.sourcePinned)}
         {row('To', to, edge.targetSide, 'targetSide', edge.targetPinned)}
+        {from && to && <RelationPicker edge={edge} from={from} to={to} />}
       </div>
       <p className="font-serif text-[12px] leading-[18px] text-ink-3 m-0">
         With the connector selected, drag either end to attach it to another card or side. A side you pick stays pinned when the card moves; double-click the connector, or use Auto-route, to let it follow the facing sides again.
@@ -242,7 +277,7 @@ function EvidenceSection({
   byId,
   labelOf,
 }: {
-  readonly issues: readonly EvidenceIssue[];
+  readonly issues: readonly Issue[];
   readonly byId: ReadonlyMap<UUID, Node>;
   readonly labelOf: (node: Node) => string;
 }): JSX.Element {
@@ -252,19 +287,19 @@ function EvidenceSection({
       <ul className="m-0 p-0 list-none flex flex-col gap-2">
         {issues.map((issue) => (
           <li
-            key={issue.kind}
+            key={issue.ruleId}
             className="border border-dashed border-danger/40 bg-danger-soft rounded-[2px] p-2.5 flex flex-col gap-1.5"
-            data-testid={`evidence-issue-${issue.kind}`}
+            data-testid={`evidence-issue-${issueSlug(issue.ruleId)}`}
           >
             <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.06em] text-danger">
-              {evidenceIssueLabel(issue)}
+              {issue.label}
             </span>
-            <p className="m-0 font-serif text-[13px] leading-[19px] text-ink">{evidenceIssueHint(issue)}</p>
-            {issue.kind === 'open-question' &&
-              issue.questionIds.map((qid) => {
-                const q = byId.get(qid);
-                return q ? <IdeaLink key={qid} node={q} label={labelOf(q)} /> : null;
-              })}
+            <p className="m-0 font-serif text-[13px] leading-[19px] text-ink">{issue.hint}</p>
+            {/* The cards the issue points at, after the one it is about. */}
+            {issue.nodeIds.slice(1).map((nid) => {
+              const n = byId.get(nid);
+              return n ? <IdeaLink key={nid} node={n} label={labelOf(n)} /> : null;
+            })}
           </li>
         ))}
       </ul>
@@ -272,12 +307,31 @@ function EvidenceSection({
   );
 }
 
-const ISSUE_ORDER: readonly EvidenceIssue['kind'][] = ['unbacked', 'open-question', 'dangling'];
-const ISSUE_GROUP_TITLES: Record<EvidenceIssue['kind'], string> = {
-  unbacked: 'Conclusions with no evidence',
-  'open-question': 'Conclusions resting on open questions',
-  dangling: 'Findings nothing uses',
-};
+/** The overview's groups, in order. `slug` names the group in test ids. */
+const ISSUE_GROUPS: readonly { readonly ruleId: RuleId; readonly slug: string; readonly title: string }[] = [
+  { ruleId: 'conclusion-unbacked', slug: 'unbacked', title: 'Conclusions with no evidence' },
+  { ruleId: 'conclusion-open-question', slug: 'open-question', title: 'Conclusions resting on open questions' },
+  { ruleId: 'finding-dangling', slug: 'dangling', title: 'Findings nothing uses' },
+  { ruleId: 'rq-without-objective', slug: 'rq-without-objective', title: 'Research questions with no objective' },
+  { ruleId: 'objective-without-rq', slug: 'objective-without-rq', title: 'Objectives no research question addresses' },
+  { ruleId: 'objective-off-problem', slug: 'objective-off-problem', title: 'Objectives not tied to the problem' },
+  { ruleId: 'hypothesis-without-variable', slug: 'hypothesis-without-variable', title: 'Hypotheses with no variables' },
+  { ruleId: 'relation-invalid', slug: 'relation-invalid', title: "Cards with connectors that don't fit" },
+];
+
+/** Types some check looks at; the overview shows once the canvas holds one of them. */
+const CHECKED_TYPES: ReadonlySet<string> = new Set([
+  'conclusion',
+  'finding',
+  'research-question',
+  'objective',
+  'hypothesis',
+]);
+
+/** Types only the problem-framing checks look at. */
+const FRAMING_CHECKED: ReadonlySet<string> = new Set(['research-question', 'objective', 'hypothesis']);
+
+const issueSlug = (ruleId: RuleId): string => ISSUE_GROUPS.find((g) => g.ruleId === ruleId)?.slug ?? ruleId;
 
 /** Every evidence check on the canvas, grouped, for when no idea is selected. */
 function EvidenceOverview({
@@ -285,14 +339,16 @@ function EvidenceOverview({
   byId,
   labelOf,
 }: {
-  readonly issues: ReadonlyMap<UUID, readonly EvidenceIssue[]>;
+  readonly issues: ReadonlyMap<UUID, readonly Issue[]>;
   readonly byId: ReadonlyMap<UUID, Node>;
   readonly labelOf: (node: Node) => string;
 }): JSX.Element {
-  const groups = ISSUE_ORDER.map((kind) => ({
-    kind,
+  const framing = [...byId.values()].some((n) => FRAMING_CHECKED.has(n.type));
+  const groups = ISSUE_GROUPS.map(({ ruleId, slug, title }) => ({
+    slug,
+    title,
     nodes: [...issues]
-      .filter(([, list]) => list.some((i) => i.kind === kind))
+      .filter(([, list]) => list.some((i) => i.ruleId === ruleId))
       .map(([id]) => byId.get(id))
       .filter((n): n is Node => n !== undefined),
   })).filter((g) => g.nodes.length > 0);
@@ -302,13 +358,15 @@ function EvidenceOverview({
       <SectionLabel>Evidence check</SectionLabel>
       {groups.length === 0 ? (
         <p className="m-0 font-serif text-[13px] leading-[19px] text-ink-3" data-testid="evidence-all-clear">
-          Every conclusion has a finding behind it, and every finding is part of the argument.
+          {framing
+            ? 'Every check passes: research questions, objectives and hypotheses are linked, and the argument is backed.'
+            : 'Every conclusion has a finding behind it, and every finding is part of the argument.'}
         </p>
       ) : (
         groups.map((g) => (
-          <div key={g.kind} className="flex flex-col gap-1.5" data-testid={`evidence-group-${g.kind}`}>
+          <div key={g.slug} className="flex flex-col gap-1.5" data-testid={`evidence-group-${g.slug}`}>
             <span className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-danger">
-              {ISSUE_GROUP_TITLES[g.kind]} · {g.nodes.length}
+              {g.title} · {g.nodes.length}
             </span>
             {g.nodes.map((n) => (
               <IdeaLink key={n.id} node={n} label={labelOf(n)} />
@@ -351,7 +409,7 @@ export function NodeInspectorRail({
     () => ({
       byId: new Map(canvas.nodes.map((n) => [n.id, n])),
       ordinals: nodeOrdinals(canvas),
-      issues: evidenceIssues(canvas),
+      issues: issuesByNode(canvas),
     }),
     [canvas],
   );
@@ -365,7 +423,9 @@ export function NodeInspectorRail({
   const nameOf = (node: Node): string => node.title || 'Untitled idea';
 
   const isSelectedDragging = dragInfo && selectedNode && dragInfo.nodeId === selectedNode.id;
-  const type = selectedNode ? TYPE_LABELS[selectedNode.type] : null;
+  const type = selectedNode
+    ? { label: nodeTypeLabel(selectedNode.type), color: typeColor(selectedNode.type) }
+    : null;
 
   return (
     <aside
@@ -617,7 +677,7 @@ export function NodeInspectorRail({
                 ? 'Double-click empty canvas, or use Add Idea, to start.'
                 : 'Click any idea card on the canvas to read it here.'}
             </p>
-            {canvas.nodes.some((n) => n.type === 'conclusion' || n.type === 'finding') && (
+            {(issues.size > 0 || canvas.nodes.some((n) => CHECKED_TYPES.has(n.type))) && (
               <div className="w-full">
                 <EvidenceOverview issues={issues} byId={byId} labelOf={labelOf} />
               </div>

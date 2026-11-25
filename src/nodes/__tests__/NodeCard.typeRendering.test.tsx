@@ -38,6 +38,7 @@ import { emptyCanvas, addNode, updateNode } from '../../data/mutators';
 import { useCanvasStore } from '../../data/store';
 import type { CanvasState } from '../../data/store';
 import type { NodeType } from '../../data/types';
+import { ENABLED_NODE_TYPE_IDS, nodeTypeLabel } from '../../data';
 import { NodeCard } from '../NodeCard';
 import type { NodeCardData } from '../NodeCard';
 import { typeStyles } from '../typeStyles';
@@ -46,13 +47,8 @@ import { typeStyles } from '../typeStyles';
 /* Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** All four NodeTypes under test. */
-const NODE_TYPES: ReadonlyArray<NodeType> = [
-  'topic',
-  'finding',
-  'question',
-  'conclusion',
-];
+/** Every type the canvas accepts. */
+const NODE_TYPES: ReadonlyArray<NodeType> = ENABLED_NODE_TYPE_IDS;
 
 /**
  * Build a fresh `CanvasState` with a single root node of `type`.
@@ -133,6 +129,15 @@ describe('NodeCard — type rendering', () => {
       // NodeCard sets the border as a full shorthand ("1px solid <colour>"),
       // where the colour is a theme token such as `rgb(var(--topic))`.
       expect(card.style.border).toContain(typeStyles[type].border);
+    });
+
+    it(`shows the mono type label "${nodeTypeLabel(type).toUpperCase()}" in the type colour (D11)`, () => {
+      const { state, nodeId } = seedState(type);
+      useCanvasStore.setState(state);
+      render(<NodeCard {...makeProps(nodeId)} />);
+      const label = screen.getByTestId('node-type-label');
+      expect(label).toHaveTextContent(nodeTypeLabel(type).toUpperCase());
+      expect(label.style.color).toBe(typeStyles[type].border);
     });
   }
 });

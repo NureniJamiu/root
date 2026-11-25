@@ -14,8 +14,8 @@
 
 import { newId } from './ids';
 import { IMAGE_CAPTION_MAX, IMAGE_DATA_URL_MAX_BYTES, IMAGE_TEXT_MAX } from './limits';
-import { FALLBACK_RELATION, markEdited, researcherProvenance } from './model';
-import type { Provenance } from './model';
+import { FALLBACK_RELATION, defaultRelation, fieldsForType, markEdited, researcherProvenance } from './model';
+import type { Provenance, RelationId } from './model';
 import { CANVAS_SCHEMA_VERSION } from './schema';
 import { cleanSource } from './source';
 import { now } from './time';
@@ -200,6 +200,8 @@ export interface NodePatch {
   title?: string;
   body?: string;
   type?: NodeType;
+  /** New values for the type's own fields; replaces the ones recorded. */
+  fields?: Readonly<Record<string, unknown>>;
   /** A new source, or `null` to remove the one recorded. */
   source?: Source | null;
 }
@@ -209,18 +211,28 @@ export interface NodePatch {
  * R4.6). Fields absent from the patch are preserved. `updatedAt` is bumped
  * on both the node and the canvas whenever the node exists.
  *
+ * Retyping keeps the type fields the new type also defines and drops the
+ * rest; patched `fields` are likewise trimmed to what the type defines.
+ *
  * Unknown `id` returns `c` unchanged.
  */
 export function updateNode(c: Canvas, id: UUID, patch: NodePatch): Canvas {
   const ts = now();
   const edits =
-    patch.title !== undefined || patch.body !== undefined || patch.type !== undefined || patch.source !== undefined;
+    patch.title !== undefined ||
+    patch.body !== undefined ||
+    patch.type !== undefined ||
+    patch.fields !== undefined ||
+    patch.source !== undefined;
   const nextNodes = replaceNode(c.nodes, id, (n) => {
+    const type = patch.type ?? n.type;
     const next: Node = {
       ...n,
       ...(patch.title !== undefined ? { title: patch.title } : null),
       ...(patch.body !== undefined ? { body: patch.body } : null),
-      ...(patch.type !== undefined ? { type: patch.type } : null),
+      type,
+      fields:
+        patch.type !== undefined || patch.fields !== undefined ? fieldsForType(type, patch.fields ?? n.fields) : n.fields,
       // Editing an idea that came from AI makes it the researcher's (`edited`).
       provenance: edits ? markEdited(n.provenance) : n.provenance,
       updatedAt: ts,
@@ -594,10 +606,14 @@ function rejectEnds(c: Canvas, ends: ConnectorEnds, ignoreId?: UUID): string | n
  * Add a connector. Rejected (returns `c`) for a connector from a node to
  * itself, an unknown node, or a connector that repeats an existing one. Two
  * cards may share any number of connectors as long as they attach to
- * different sides.
+ * different sides. The connector starts with `relationType` when given,
+ * otherwise with the validity map's default relation for the two card types
+ * (`related-to` when the pair has none).
  */
-export function connect(c: Canvas, ends: ConnectorEnds): Canvas {
-  if (rejectEnds(c, ends) !== null) return c;
+export function connect(c: Canvas, ends: ConnectorEnds, relationType?: RelationId): Canvas {
+  const from = c.nodes.find((n) => n.id === ends.source);
+  const to = c.nodes.find((n) => n.id === ends.target);
+  if (from === undefined || to === undefined || rejectEnds(c, ends) !== null) return c;
   const edge: Edge = {
     id: newId(),
     source: ends.source,
@@ -606,7 +622,7 @@ export function connect(c: Canvas, ends: ConnectorEnds): Canvas {
     targetSide: ends.targetSide,
     sourcePinned: ends.sourcePinned ?? false,
     targetPinned: ends.targetPinned ?? false,
-    relationType: FALLBACK_RELATION,
+    relationType: relationType ?? defaultRelation(from.type, to.type),
     provenance: researcherProvenance(),
   };
   return { ...c, edges: [...c.edges, edge], updatedAt: now() };
@@ -662,6 +678,18 @@ export function autoRouteEdge(c: Canvas, edgeId: UUID): Canvas {
   if (!from || !to) return c;
   const sides = computeFacingSides(from.position, to.position);
   return updateEdge(c, edgeId, { ...edge, ...sides, sourcePinned: false, targetPinned: false });
+}
+
+/**
+ * Set what a connector means. Any known relation is accepted, even one the
+ * map does not allow for the two cards: validity is a rule, not a guard.
+ * Unknown `edgeId` or an unchanged relation returns `c`.
+ */
+export function setEdgeRelation(c: Canvas, edgeId: UUID, relationType: RelationId): Canvas {
+  const current = c.edges.find((e) => e.id === edgeId);
+  if (current === undefined || current.relationType === relationType) return c;
+  const next: Edge = { ...current, relationType, provenance: markEdited(current.provenance) };
+  return { ...c, edges: c.edges.map((e) => (e.id === edgeId ? next : e)), updatedAt: now() };
 }
 
 /** Remove one connector. Both cards stay. Unknown `edgeId` returns `c` unchanged. */

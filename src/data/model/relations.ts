@@ -142,6 +142,21 @@ export function isRelationAllowed(relation: RelationId, sourceType: NodeTypeId, 
   return relationDirection(relation, sourceType, targetType) !== null;
 }
 
+/**
+ * The label of `relation` read from the drawn source to the drawn target:
+ * the reverse label when the target is the subject ("supported by"), the
+ * forward label otherwise, including when the relation does not fit.
+ */
+export function relationLabel(relation: RelationId, sourceType: NodeTypeId, targetType: NodeTypeId): string {
+  const { label } = RELATIONS[relation] as RelationDefinition;
+  return relationDirection(relation, sourceType, targetType) === 'reverse' ? label.reverse : label.forward;
+}
+
+/** The relations the map allows between cards of these two types, in map order. */
+export function allowedRelations(sourceType: NodeTypeId, targetType: NodeTypeId): RelationId[] {
+  return RELATION_IDS.filter((id) => isRelationAllowed(id, sourceType, targetType));
+}
+
 /** The relation a new connector between these two types starts with. */
 export function defaultRelation(sourceType: NodeTypeId, targetType: NodeTypeId): RelationId {
   for (const id of RELATION_IDS) {

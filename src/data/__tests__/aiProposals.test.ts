@@ -146,4 +146,16 @@ describe('AI proposals', () => {
     canvasActions.undo();
     expect(canvas()).toEqual(before);
   });
+
+  it('links an accepted connect suggestion as related-to, the plain link it was shown as', () => {
+    aiProposalActions.propose(proposal({ ideas: [ghost('f', null), { ...ghost('c', null, 400), type: 'conclusion' }] }));
+    const ids = aiProposalActions.accept();
+    canvasActions.applyEdits({ updates: [], connections: [{ source: ids.f!, target: ids.c! }] });
+    const [edge] = canvas().edges;
+    expect(edge).toMatchObject({ source: ids.f, target: ids.c, relationType: 'related-to' });
+    // Drawn by hand, the same pair starts with the map's usual relation.
+    canvasActions.undo();
+    canvasActions.connect({ source: ids.f!, target: ids.c!, sourceSide: 'right', targetSide: 'left' });
+    expect(canvas().edges[0]!.relationType).toBe('supports');
+  });
 });

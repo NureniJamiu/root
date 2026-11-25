@@ -23,6 +23,8 @@
  *                                              ParseCanvasResult
  *   - Typed-graph contract (from `./model`)  — NODE_TYPES, RELATIONS,
  *                                              orient, provenanceSchema, ...
+ *   - Rule engine         (from `./rules`)   — runRules, issuesByNode,
+ *                                              issuesFor, RULES
  *
  * What is intentionally NOT exported:
  *   - `./ids` (`newId`) and `./time` (`now`) — internal helpers used by the
@@ -90,6 +92,7 @@ export {
   hideChild,
   setCanvasTitle,
   setCollapsed,
+  setEdgeRelation,
   updateEdge,
   updateNode,
 } from './mutators';
@@ -130,8 +133,7 @@ export {
 
 export { cleanSource, sameSource } from './source';
 
-export { evidenceIssueHint, evidenceIssueLabel, evidenceIssues, evidenceIssuesFor } from './evidence';
-export type { EvidenceIssue, EvidenceIssueKind } from './evidence';
+export { RULES, issuesByNode, issuesFor, runRules } from './rules';
 
 export { parseCanvas, serializeCanvas } from './serialize';
 export type { ParseCanvasResult } from './serialize';

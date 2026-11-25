@@ -307,6 +307,8 @@ export async function createApp({ sql, auth, blobs, aiLimiter, env }: AppDeps): 
         return {
           title: project.title,
           canvas: toPromptCanvas(project.canvas),
+          // The gap check's rules read the whole canvas, as the cards do.
+          graph: project.canvas,
           documents: docs.flatMap((doc) => (doc ? [{ id: doc.id, title: doc.title, content: doc.content }] : [])),
         };
       },

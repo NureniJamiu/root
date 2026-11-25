@@ -124,3 +124,45 @@ test('a canvas saved before schema v2 opens with the same cards, connectors and 
   expect(stored.canvas.nodes.map((n) => n.provenance.origin)).toEqual(['unrecorded', 'unrecorded', 'unrecorded']);
   expect(stored.canvas.edges.map((e) => e.relationType)).toEqual(['related-to']);
 });
+
+test('a research question with no objective is flagged until it addresses one', async ({ dashboard: page }) => {
+  const OBJECTIVE = 'c0000000-0000-4000-8000-000000000011';
+  const RQ = 'c0000000-0000-4000-8000-000000000012';
+  const setCanvas = (edges: object[]) =>
+    page.evaluate(
+      ({ ids, edges }) => {
+        const store = (window as unknown as {
+          __ROOT_CANVAS_STORE__: { getState(): { canvas: object }; setState(p: object): void };
+        }).__ROOT_CANVAS_STORE__;
+        const ts = new Date().toISOString();
+        const card = (id: string, type: string, title: string, x: number) => ({
+          id, type, title, body: '', position: { x, y: 200 }, collapsed: false, images: [], createdAt: ts, updatedAt: ts,
+          fields: {}, provenance: { origin: 'researcher', edited: false },
+        });
+        store.setState({
+          canvas: {
+            ...store.getState().canvas,
+            nodes: [card(ids.objective, 'objective', 'Measure churn drivers', 80), card(ids.rq, 'research-question', 'What drives churn?', 480)],
+            edges,
+          },
+          selection: { nodeId: null, edgeId: null },
+          editor: { openNodeId: null },
+        });
+      },
+      { ids: { objective: OBJECTIVE, rq: RQ }, edges },
+    );
+
+  await setCanvas([]);
+  await expect(card(page, RQ).getByTestId('node-evidence-badge')).toHaveText('No objective');
+  await expect(card(page, OBJECTIVE).getByTestId('node-evidence-badge')).toHaveText('No research question');
+  const overview = page.getByTestId('evidence-overview');
+  await expect(overview.getByTestId('evidence-group-rq-without-objective')).toContainText('What drives churn?');
+
+  // Drawn from the objective to the question: the relation still reads "question addresses objective".
+  await setCanvas([{
+    id: 'c0000000-0000-4000-8000-0000000000e3', source: OBJECTIVE, target: RQ, sourceSide: 'right', targetSide: 'left',
+    sourcePinned: false, targetPinned: false, relationType: 'addresses', provenance: { origin: 'researcher', edited: false },
+  }]);
+  await expect(page.getByTestId('node-evidence-badge')).toHaveCount(0);
+  await expect(page.getByTestId('evidence-all-clear')).toBeVisible();
+});

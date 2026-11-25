@@ -57,11 +57,13 @@ import {
   hideChild as mutHideChild,
   setCanvasTitle as mutSetCanvasTitle,
   setCollapsed as mutSetCollapsed,
+  setEdgeRelation as mutSetEdgeRelation,
   updateEdge as mutUpdateEdge,
   updateNode as mutUpdateNode,
 } from './mutators';
 import type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators';
-import type { Provenance } from './model';
+import { FALLBACK_RELATION, fieldsForType, sameFields } from './model';
+import type { Provenance, RelationId } from './model';
 import { emitSaveError } from './storeEvents';
 import { computeFacingSides, subtreeIds } from './graph';
 import { NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
@@ -73,6 +75,8 @@ export interface NodeEdits {
   readonly title: string;
   readonly body: string;
   readonly type: NodeType;
+  /** The type's own fields; absent leaves them as they are (trimmed to `type`). */
+  readonly fields?: Readonly<Record<string, unknown>>;
   readonly images: readonly ImageEntry[];
   /** The idea's source; `null` removes it, absent leaves it as it is. */
   readonly source?: Source | null;
@@ -423,8 +427,8 @@ export const canvasActions = {
 
   /**
    * Apply several edits at once (new titles or types, new connectors) as one
-   * undo step. Edits naming ideas that no longer exist are skipped. Returns
-   * how many were applied.
+   * undo step. New connectors are `related-to`. Edits naming ideas that no
+   * longer exist are skipped. Returns how many were applied.
    */
   applyEdits(edits: {
     readonly updates: ReadonlyArray<{ readonly id: UUID; readonly patch: NodePatch }>;
@@ -444,7 +448,9 @@ export const canvasActions = {
           const from = next.nodes.find((n) => n.id === source);
           const to = next.nodes.find((n) => n.id === target);
           if (!from || !to) continue;
-          const after = mutConnect(next, { source, target, ...computeFacingSides(from.position, to.position) });
+          // A suggested link was shown with no meaning, so it gets none (principle 0.3):
+          // it stays `related-to` until suggestions carry a relation (S7).
+          const after = mutConnect(next, { source, target, ...computeFacingSides(from.position, to.position) }, FALLBACK_RELATION);
           if (after !== next) applied += 1;
           next = after;
         }
@@ -478,7 +484,7 @@ export const canvasActions = {
   },
 
   /**
-   * Commit everything the editor changed on `id` (text, type and images) as
+   * Commit everything the editor changed on `id` (text, type, fields and images) as
    * one undo step, then close the editor. Nothing is written when the
    * values already match the node.
    */
@@ -490,8 +496,14 @@ export const canvasActions = {
     const removed = node.images.filter((img) => !keep.has(img.id));
     const added = edits.images.filter((img) => !had.has(img.id));
     const sourceChanged = edits.source !== undefined && !sameSource(node.source, edits.source ?? undefined);
+    const fieldsChanged =
+      edits.fields !== undefined && !sameFields(node.fields, fieldsForType(edits.type, edits.fields));
     const textChanged =
-      node.title !== edits.title || node.body !== edits.body || node.type !== edits.type || sourceChanged;
+      node.title !== edits.title ||
+      node.body !== edits.body ||
+      node.type !== edits.type ||
+      fieldsChanged ||
+      sourceChanged;
     if (textChanged || removed.length > 0 || added.length > 0) {
       commitCanvasWrite(
         'saveNodeEdits',
@@ -501,6 +513,7 @@ export const canvasActions = {
                 title: edits.title,
                 body: edits.body,
                 type: edits.type,
+                ...(edits.fields !== undefined ? { fields: edits.fields } : {}),
                 ...(sourceChanged ? { source: edits.source ?? null } : {}),
               })
             : s.canvas;
@@ -619,6 +632,15 @@ export const canvasActions = {
     commitCanvasWrite(
       'autoRouteEdge',
       (s) => mutAutoRouteEdge(s.canvas, edgeId),
+      () => ({}),
+    );
+  },
+
+  /** Set what a connector means; one undo step. */
+  setEdgeRelation(edgeId: UUID, relationType: RelationId): void {
+    commitCanvasWrite(
+      'setEdgeRelation',
+      (s) => mutSetEdgeRelation(s.canvas, edgeId, relationType),
       () => ({}),
     );
   },

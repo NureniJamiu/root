@@ -14,20 +14,13 @@ import { NodeViewWrapper } from '@tiptap/react';
 import type { ReactNodeViewProps } from '@tiptap/react';
 import { useRef, useState } from 'react';
 
-import { useCanvasStore } from '../data';
-import type { Node, NodeType } from '../data';
-import { MarkdownText } from '../nodes';
+import { nodeTypeLabel, useCanvasStore } from '../data';
+import type { Node } from '../data';
+import { MarkdownText, typeColor } from '../nodes';
 
 import { useDocumentEditorServices } from './context';
 import { notesToBlocks } from './draftFromBranch';
 import { IDEA_REF } from './schema';
-
-const TYPE_LABEL: Record<NodeType, string> = {
-  topic: 'Topic',
-  finding: 'Finding',
-  question: 'Question',
-  conclusion: 'Conclusion',
-};
 
 function useIdea(id: unknown): Node | undefined {
   return useCanvasStore((s) => (typeof id === 'string' ? s.canvas.nodes.find((n) => n.id === id) : undefined));
@@ -41,8 +34,8 @@ function IdeaPreview({ idea }: { readonly idea: Node }): JSX.Element {
   const image = idea.images[0];
   return (
     <span className="idea-preview" role="tooltip" contentEditable={false}>
-      <span className="idea-preview-type" style={{ color: `rgb(var(--${idea.type}))` }}>
-        {TYPE_LABEL[idea.type]}
+      <span className="idea-preview-type" style={{ color: typeColor(idea.type) }}>
+        {nodeTypeLabel(idea.type)}
       </span>
       <span className="idea-preview-title">{idea.title || 'Untitled idea'}</span>
       {idea.body.trim() && <MarkdownText source={idea.body} className="idea-preview-body" />}
@@ -122,13 +115,13 @@ export function IdeaCardView({ node, selected, editor, getPos, deleteNode }: Rea
       data-testid="idea-card"
       contentEditable={false}
     >
-      <div className="idea-card-bar" style={idea ? { background: `rgb(var(--${idea.type}))` } : undefined} />
+      <div className="idea-card-bar" style={idea ? { background: typeColor(idea.type) } : undefined} />
       <div className="idea-card-body" data-drag-handle="">
         {idea ? (
           <>
             <div className="idea-card-head">
-              <span className="idea-card-type" style={{ color: `rgb(var(--${idea.type}))` }}>
-                {TYPE_LABEL[idea.type]}
+              <span className="idea-card-type" style={{ color: typeColor(idea.type) }}>
+                {nodeTypeLabel(idea.type)}
               </span>
               <span className="idea-card-actions">
                 <button type="button" onClick={() => services.focusIdea(idea.id)} data-testid="idea-card-show">

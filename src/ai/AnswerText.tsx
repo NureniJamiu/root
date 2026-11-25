@@ -11,8 +11,9 @@ import { Fragment } from 'react';
 import type { ReactNode } from 'react';
 
 import { useCanvasStore } from '../data';
-import type { NodeType } from '../data';
 import { parseSourceMarker } from '../lib/ai/citations';
+import { typeColorToken } from '../nodes';
+import type { TypeColorToken } from '../nodes';
 import type { AiSource } from '../lib/ai/contracts';
 import { parseMarkdown } from '../lib/markdown';
 import type { Inline } from '../lib/markdown';
@@ -24,11 +25,12 @@ export interface SourceNavigation {
   readonly documentTitle: (documentId: string) => string | null;
 }
 
-const TYPE_DOT: Record<NodeType, string> = {
+const TYPE_DOT: Record<TypeColorToken, string> = {
   topic: 'bg-topic',
   finding: 'bg-finding',
   question: 'bg-question',
   conclusion: 'bg-conclusion',
+  framing: 'bg-framing',
 };
 
 const MARKER = /\[\[((?:idea|doc):[^\]]+)\]\]/g;
@@ -48,7 +50,7 @@ export function SourceChip({ source, nav }: { readonly source: AiSource; readonl
         title={`Show “${idea.title || 'Untitled idea'}” on the canvas`}
         data-testid="ai-source-idea"
       >
-        <span className={`ai-chip-dot ${TYPE_DOT[idea.type]}`} aria-hidden="true" />
+        <span className={`ai-chip-dot ${TYPE_DOT[typeColorToken(idea.type)]}`} aria-hidden="true" />
         {idea.title || 'Untitled idea'}
       </button>
     );

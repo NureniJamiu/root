@@ -35,6 +35,7 @@
   --color-semantic-finding: rgb(var(--finding));
   --color-semantic-question: rgb(var(--question));
   --color-semantic-conclusion: rgb(var(--conclusion));
+  --color-semantic-framing: rgb(var(--framing));
 
   /* Micro-radii (DESIGN.md: 2px - 4px) */
   --radius-xs: 2px;

@@ -27,13 +27,12 @@ import { Handle, Position as RFPosition } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 
 import {
-  evidenceIssueHint,
-  evidenceIssueLabel,
-  evidenceIssuesFor,
   formatNodeLabel,
   hasHiddenChildren,
   hiddenDescendantCount,
+  issuesFor,
   nodeOrdinal,
+  nodeTypeLabel,
   useCanvasStore,
   useDocLinksStore,
 } from '../data';
@@ -42,7 +41,7 @@ import type { Node, Side, UUID } from '../data';
 import { CollapseBadge } from './CollapseBadge';
 import { HoverToolbar } from './HoverToolbar';
 import { MarkdownText } from './MarkdownText';
-import { SELECTION_BORDER_COLOR, typeStyles } from './typeStyles';
+import { SELECTION_BORDER_COLOR, typeColor, typeColorToken, typeStyles } from './typeStyles';
 
 /**
  * The data payload React Flow attaches to a `'research'` node.
@@ -89,15 +88,8 @@ function NodeCardImpl(props: NodeProps<NodeCardData>): JSX.Element | null {
   // Short label, unique within the canvas
   const shortId = formatNodeLabel(node, ordinal);
 
-  // Top accent bar color: always the idea's type, so selection is carried by the border alone
-  const topAccentColor =
-    node.type === 'topic'
-      ? 'rgb(var(--topic))'
-      : node.type === 'finding'
-      ? 'rgb(var(--finding))'
-      : node.type === 'question'
-      ? 'rgb(var(--question))'
-      : 'rgb(var(--conclusion))';
+  // Top accent bar color: always the idea's type (or its family), so selection is carried by the border alone
+  const topAccentColor = typeColor(node.type);
 
   return (
     <div
@@ -281,35 +273,10 @@ function Header({ node, isConclusion }: HeaderProps): JSX.Element {
 /* TypeBadge — Architectural classification tag                               */
 /* -------------------------------------------------------------------------- */
 
-const BADGE_CONFIG = {
-  topic: {
-    label: 'TOPIC',
-    border: 'rgb(var(--topic))',
-    bg: 'rgb(var(--topic) / 0.08)',
-    color: 'rgb(var(--topic))',
-  },
-  finding: {
-    label: 'FINDING',
-    border: 'rgb(var(--finding))',
-    bg: 'rgb(var(--finding) / 0.1)',
-    color: 'rgb(var(--finding))',
-  },
-  question: {
-    label: 'QUESTION',
-    border: 'rgb(var(--question))',
-    bg: 'rgb(var(--question) / 0.08)',
-    color: 'rgb(var(--question))',
-  },
-  conclusion: {
-    label: 'CONCLUSION',
-    border: 'rgb(var(--conclusion))',
-    bg: 'rgb(var(--conclusion) / 0.08)',
-    color: 'rgb(var(--conclusion))',
-  },
-} as const;
-
+/** The type's name in mono capitals, in its type or family colour (D11). */
 function TypeBadge({ type }: { readonly type: Node['type'] }): JSX.Element {
-  const conf = BADGE_CONFIG[type];
+  const token = typeColorToken(type);
+  const color = `rgb(var(--${token}))`;
   return (
     <div
       className="inline-flex items-center gap-1 select-none font-mono"
@@ -321,20 +288,21 @@ function TypeBadge({ type }: { readonly type: Node['type'] }): JSX.Element {
         fontWeight: 600,
         padding: '2px 5px',
         borderRadius: 2,
-        background: conf.bg,
-        color: conf.color,
-        border: `1px solid ${conf.border}`,
+        background: `rgb(var(--${token}) / ${token === 'finding' ? 0.1 : 0.08})`,
+        color,
+        border: `1px solid ${color}`,
       }}
+      data-testid="node-type-label"
     >
       <span
         style={{
           width: 4,
           height: 4,
           borderRadius: '50%',
-          background: conf.color,
+          background: color,
         }}
       />
-      {conf.label}
+      {nodeTypeLabel(type).toUpperCase()}
     </div>
   );
 }
@@ -344,8 +312,8 @@ function TypeBadge({ type }: { readonly type: Node['type'] }): JSX.Element {
  * Selects strings, so the card re-renders only when its own issues change.
  */
 function EvidenceBadge({ nodeId }: { readonly nodeId: UUID }): JSX.Element | null {
-  const label = useCanvasStore((s) => evidenceIssuesFor(s.canvas, nodeId).map(evidenceIssueLabel).join(' · '));
-  const hint = useCanvasStore((s) => evidenceIssuesFor(s.canvas, nodeId).map(evidenceIssueHint).join('\n'));
+  const label = useCanvasStore((s) => issuesFor(s.canvas, nodeId).map((i) => i.label).join(' · '));
+  const hint = useCanvasStore((s) => issuesFor(s.canvas, nodeId).map((i) => i.hint).join('\n'));
   if (label === '') return null;
   return (
     <span

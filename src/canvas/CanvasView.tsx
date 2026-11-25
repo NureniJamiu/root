@@ -118,6 +118,7 @@ export interface CanvasViewControls {
 
 export interface CanvasViewProps {
   readonly onNodeSelect?: (id: UUID) => void;
+  readonly onEdgeSelect?: (id: UUID) => void;
   readonly onPaneClick?: () => void;
   readonly isPanActive?: boolean;
   readonly onTogglePan?: () => void;
@@ -137,6 +138,7 @@ export interface CanvasViewProps {
 function CanvasViewInner(props: CanvasViewProps): JSX.Element {
   const {
     onNodeSelect,
+    onEdgeSelect,
     onPaneClick,
     isPanActive = false,
     onTogglePan,
@@ -359,10 +361,13 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
     // Keyboard selection of a connector (Tab, then Enter/Space).
     for (const change of changes) {
       if (change.type === 'select' && change.selected && change.id) {
-        if (change.id !== useCanvasStore.getState().selection.edgeId) canvasActions.selectEdge(change.id);
+        if (change.id !== useCanvasStore.getState().selection.edgeId) {
+          canvasActions.selectEdge(change.id);
+          onEdgeSelect?.(change.id);
+        }
       }
     }
-  }, []);
+  }, [onEdgeSelect]);
 
   /* ----------------------------- selection ------------------------------ */
 
@@ -384,7 +389,8 @@ function CanvasViewInner(props: CanvasViewProps): JSX.Element {
 
   const handleEdgeClick = useCallback((_event: React.MouseEvent, edge: RFEdge): void => {
     canvasActions.selectEdge(edge.id);
-  }, []);
+    onEdgeSelect?.(edge.id);
+  }, [onEdgeSelect]);
 
   const handlePaneClick = useCallback(() => {
     canvasActions.select(null);

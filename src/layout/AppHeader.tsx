@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { ENABLED_NODE_TYPE_IDS, nodeTypeLabel } from '../data';
 import type { NodeType } from '../data';
+import { typeColor } from '../nodes';
 import { Button } from '../ui/Button';
 import { Kbd } from '../ui/Kbd';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -42,21 +44,6 @@ const VIEW_MODES: ReadonlyArray<{ mode: ViewMode; label: string; hint: string }>
   { mode: 'split', label: 'Split', hint: 'Canvas and document side by side (Alt+2)' },
   { mode: 'write', label: 'Write', hint: 'Document only (Alt+3)' },
 ];
-
-const TYPE_LABELS: Record<NodeType, string> = {
-  topic: 'Topic',
-  finding: 'Finding',
-  question: 'Question',
-  conclusion: 'Conclusion',
-};
-
-/** The colour of each type, shown as a dot beside the highlight dropdown. */
-const TYPE_COLORS: Record<NodeType, string> = {
-  topic: 'rgb(var(--topic))',
-  finding: 'rgb(var(--finding))',
-  question: 'rgb(var(--question))',
-  conclusion: 'rgb(var(--conclusion))',
-};
 
 const GUIDE_ITEMS: ReadonlyArray<{ keys: readonly string[]; label: string }> = [
   { keys: ['Space', 'Drag'], label: 'Pan the canvas' },
@@ -239,7 +226,7 @@ export function AppHeader({
               <span
                 className="pointer-events-none absolute left-2.5 w-2 h-2 rounded-full"
                 style={{
-                  background: activeTypeFilter ? TYPE_COLORS[activeTypeFilter] : 'transparent',
+                  background: activeTypeFilter ? typeColor(activeTypeFilter) : 'transparent',
                   border: activeTypeFilter ? 'none' : '1px solid rgb(var(--rule-strong))',
                 }}
                 aria-hidden="true"
@@ -252,9 +239,9 @@ export function AppHeader({
                 data-testid="type-filter-select"
               >
                 <option value="">All</option>
-                {(Object.keys(TYPE_LABELS) as NodeType[]).map((type) => (
+                {ENABLED_NODE_TYPE_IDS.map((type) => (
                   <option key={type} value={type}>
-                    {TYPE_LABELS[type]}
+                    {nodeTypeLabel(type)}
                   </option>
                 ))}
               </select>
@@ -309,7 +296,7 @@ export function AppHeader({
                 Hover an idea to add a connected idea, edit or collapse it. Drag from a dot on any side of a card to any side of another card (or drop on the card itself) to connect them. A card can have as many connectors as you like.
               </p>
               <p className="font-serif text-[13px] leading-[19px] text-ink-read m-0 mb-3">
-                Click a connector to select it, then press Delete or use its ✕ button to remove it. With a connector selected, drag either end to re-attach it (dropped on empty canvas, it goes back). A side you pick stays put; double-click a connector to let it follow the facing sides again. A dashed connector leads to a Question.
+                Click a connector to select it, then press Delete or use its ✕ button to remove it. With a connector selected, drag either end to re-attach it (dropped on empty canvas, it goes back). A side you pick stays put; double-click a connector to let it follow the facing sides again. A connector’s label says what it means, read from the card it leaves (a Finding supports a Conclusion). A new connector gets the usual relation for its two cards; select it to change that in the inspector. A connector with no set meaning shows “related to” only while hovered or selected, and is dashed when it leads to a Question. A relation that does not fit its cards is drawn dotted, with a warning mark on its label.
               </p>
               <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
                 {GUIDE_ITEMS.map((item) => (

@@ -64,6 +64,7 @@ import {
   suggestExpansion,
   suggestMap,
   suggestTidy,
+  withoutRuleDuplicates,
   writeScript,
 } from './features';
 import type { TokenUsage } from './features';
@@ -75,7 +76,7 @@ import type { AiFeature, Plan } from './plans';
 import { embeddingModelFor, embeddingProviderOf, languageModelFor } from './providers';
 import type { AiEnv } from './providers';
 import { buildChunks, chunksSize, numberChunks } from './project-content';
-import type { ProjectContent } from './project-content';
+import type { LoadedProject, ProjectContent } from './project-content';
 import { gatherContext, sdkEmbedder, withinBudget } from './retrieval';
 import type { Embedder } from './retrieval';
 import type { SearchIndex } from './search-index';
@@ -99,7 +100,7 @@ export interface AiRouterOptions {
    * Reads a project the person owns (its canvas and documents), for features
    * that look at the whole project. Without it, Ask and the gap check are off.
    */
-  readonly loadProject?: (userId: string, projectId: string) => Promise<ProjectContent | null>;
+  readonly loadProject?: (userId: string, projectId: string) => Promise<LoadedProject | null>;
   /** The project search index. Without it, Ask and the gap check read what fits from the top. */
   readonly index?: SearchIndex;
   /** Swappable for tests: builds the embedder for the search index. */
@@ -364,7 +365,7 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
     return model ? sdkEmbedder(modelId, model) : null;
   }
 
-  async function projectFor(userId: string, projectId: string): Promise<ProjectContent> {
+  async function projectFor(userId: string, projectId: string): Promise<LoadedProject> {
     if (!opts.loadProject) throw new AiHttpError(503, 'no-model', 'This server cannot read projects for AI.');
     const content = await opts.loadProject(userId, projectId);
     if (!content) throw new AiHttpError(404, 'invalid', 'That project was not found.');
@@ -762,17 +763,12 @@ export function createAiRouter(opts: AiRouterOptions): express.Router {
       const userId = res.locals.userId as string;
       const content = await projectFor(userId, body.projectId);
       const { context } = await projectContext(userId, body.projectId, content, null, REVIEW_BUDGET);
-      const rules = ruleIssues(content.canvas);
+      const rules = ruleIssues(content.graph);
       const { p, result } = await runFeature(req, res, 'ai.review', 'smart', timeouts.review, (model, signal) =>
         reviewProject(model, context, signal),
       );
-      // Root's rules already flag conclusions with no findings; skip the model saying the same.
-      const flagged = new Set(rules.flatMap((r) => r.sources.map((s) => (s.kind === 'idea' ? s.ideaId : ''))));
-      const fromModel = result.output.filter(
-        (i) =>
-          !(i.kind === 'unsupported' && i.sources.length === 1 && i.sources[0]!.kind === 'idea' && flagged.has(i.sources[0]!.ideaId)),
-      );
-      const issues: ReviewIssue[] = [...rules, ...fromModel];
+      // Skip the model saying what a rule already says about the same one idea.
+      const issues: ReviewIssue[] = [...rules, ...withoutRuleDuplicates(result.output, rules)];
       res.json({ issues, ...(await meta(p)) });
     } catch (error) {
       fail(res, error);

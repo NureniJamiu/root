@@ -357,7 +357,7 @@ function ReviewTab({ projectId, nav }: { readonly projectId: string; readonly na
             <li key={i} className="flex flex-col gap-1 p-2.5 rounded-[2px] border border-rule" data-testid="ai-review-issue">
               <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted">
                 {KIND_LABELS[issue.kind]}
-                {issue.rule ? ' · rule' : ''}
+                {issue.ruleId ? ' · rule' : ''}
               </span>
               <span className="font-serif text-[13px] leading-[19px] text-ink-strong">{issue.message}</span>
               {issue.suggestion && <span className="font-serif text-[12.5px] leading-[18px] text-ink-3">{issue.suggestion}</span>}

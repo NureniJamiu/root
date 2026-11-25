@@ -13,7 +13,7 @@ import type { AiStore } from '../ai-store';
 import { deriveKeyFromSecret } from '../keys';
 import type { AiModel } from '../models';
 import { readAiEnv } from '../providers';
-import type { ProjectContent } from '../project-content';
+import type { LoadedProject } from '../project-content';
 import { createAiRouter } from '../routes';
 import { createSearchIndex } from '../search-index';
 import type { SearchProvider } from '../web-search';
@@ -32,7 +32,7 @@ interface Setup {
   /** Pick a model per catalog entry; wins over `model`. */
   modelFor?: (model: AiModel) => LanguageModel;
   timeouts?: Partial<Record<'suggest' | 'draft' | 'rewrite' | 'test' | 'ask' | 'review' | 'research' | 'describe', number>>;
-  projects?: Record<string, ProjectContent>;
+  projects?: Record<string, LoadedProject>;
   /** Research sources; none turns research off. */
   research?: SearchProvider[];
 }
@@ -288,20 +288,19 @@ describe('/api/ai', () => {
     const PROJECT = '00000000-0000-4000-8000-0000000000aa';
     const IDEA = '00000000-0000-4000-8000-0000000000a1';
     const CONCLUSION = '00000000-0000-4000-8000-0000000000a2';
-    const projects: Record<string, ProjectContent> = {
+    const nodes = [
+      { id: IDEA, title: 'REM consolidates skills', body: '', type: 'finding' as const },
+      { id: CONCLUSION, title: 'Sleep matters', body: '', type: 'conclusion' as const },
+    ];
+    const projects: Record<string, LoadedProject> = {
       [PROJECT]: {
         title: 'Sleep',
-        canvas: {
-          title: 'Sleep',
-          nodes: [
-            { id: IDEA, title: 'REM consolidates skills', body: '', type: 'finding' },
-            { id: CONCLUSION, title: 'Sleep matters', body: '', type: 'conclusion' },
-          ],
-          edges: [],
-        },
+        canvas: { title: 'Sleep', nodes, edges: [] },
+        graph: { nodes, edges: [] },
         documents: [],
       },
     };
+    const kindsAndRules = (issues: Array<{ kind: string; ruleId?: string }>) => issues.map((i) => [i.kind, i.ruleId ?? null]);
 
     it('answers a question with citations to real ideas', async () => {
       const { call, store } = await start({ projects, model: streamModel(['Skills [[I1]] and ', 'more [[I7]].']) });
@@ -325,12 +324,47 @@ describe('/api/ai', () => {
       const res = await call('/review', { body: { projectId: PROJECT } });
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.issues.map((i: { kind: string; rule: boolean }) => [i.kind, i.rule])).toEqual([
-        ['unsupported', true],
-        ['gap', false],
+      // The same rules as the cards: the conclusion has no evidence and the finding is not used.
+      expect(body.issues.map((i: { kind: string; ruleId?: string }) => [i.kind, i.ruleId ?? null])).toEqual([
+        ['unsupported', 'conclusion-unbacked'],
+        ['gap', 'finding-dangling'],
+        ['gap', null],
       ]);
+      expect(body.issues[0].ruleVersion).toBe(2);
       const free = await start({ projects, model, plan: 'free' });
       expect((await free.call('/review', { body: { projectId: PROJECT } })).status).toBe(403);
+    });
+    it('drops a model issue that repeats a rule, and keeps other kinds about the same idea', async () => {
+      // I1 is the finding, I2 the conclusion; the rules flag the conclusion as unbacked and the finding as unused.
+      const model = jsonModel({
+        issues: [
+          { kind: 'unsupported', refs: ['I2'], message: 'Nothing backs this.', suggestion: 'Add a finding.' },
+          { kind: 'gap', refs: ['I2'], message: 'Says nothing about naps.', suggestion: 'Add a question on naps.' },
+          { kind: 'gap', refs: ['I1'], message: 'No sample size given.', suggestion: 'Say how many people.' },
+        ],
+      });
+      const { call } = await start({ projects, model });
+      const body = await (await call('/review', { body: { projectId: PROJECT } })).json();
+      expect(kindsAndRules(body.issues)).toEqual([
+        ['unsupported', 'conclusion-unbacked'],
+        ['gap', 'finding-dangling'],
+        ['gap', null],
+        ['gap', null],
+      ]);
+      expect(body.issues.slice(2).map((i: { message: string; sources: unknown }) => [i.message, i.sources])).toEqual([
+        ['Says nothing about naps.', [{ kind: 'idea', ideaId: CONCLUSION }]],
+        ['No sample size given.', [{ kind: 'idea', ideaId: IDEA }]],
+      ]);
+    });
+    it('runs the rules on the whole saved canvas, not the prompt copy', async () => {
+      // The prompt copy lost the connector (as it does past PROMPT_NODES_MAX); the saved canvas has it.
+      const linked: LoadedProject = {
+        ...projects[PROJECT]!,
+        graph: { nodes, edges: [{ source: IDEA, target: CONCLUSION, relationType: 'supports' }] },
+      };
+      const { call } = await start({ projects: { [PROJECT]: linked }, model: jsonModel({ issues: [] }) });
+      const body = await (await call('/review', { body: { projectId: PROJECT } })).json();
+      expect(body.issues).toEqual([]);
     });
 
     it('makes ideas from text and suggests tidying', async () => {
