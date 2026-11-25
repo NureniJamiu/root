@@ -167,6 +167,24 @@ describe('phase 2 features', () => {
     ]);
   });
 
+  it('never retypes a card outside the general family', async () => {
+    const { suggestTidy } = await import('../features');
+    const D = '00000000-0000-4000-8000-00000000000d';
+    const framed: PromptCanvas = {
+      ...canvas,
+      nodes: [...canvas.nodes, { id: D, title: 'Naps improve recall', body: '', type: 'hypothesis' }],
+    };
+    const model = jsonModel({
+      suggestions: [
+        { kind: 'retype', ref: 'I4', type: 'question', title: null, to: null, reason: 'Reads as a question.' },
+        { kind: 'retitle', ref: 'I4', type: null, title: 'Short naps improve recall', to: null, reason: 'Clearer.' },
+      ],
+    });
+    const result = await suggestTidy(model, { canvas: framed });
+    expect(result.output).toEqual([
+      { kind: 'retitle', ideaId: D, title: 'Short naps improve recall', reason: 'Clearer.' },
+    ]);
+  });
   it('streams an answer from the numbered context', async () => {
     const { streamAnswer } = await import('../features');
     const result = streamAnswer(streamModel(['REM helps ', '[[I2]].']), { question: 'Why?', context: 'I2: REM' });

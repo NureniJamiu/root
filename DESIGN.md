@@ -173,7 +173,7 @@ This system operates under a **Zero-Shadow Mandate**. Ambient blur, drop shadows
 ### Mechanical Elevation Hierarchy
 - **Level 0 (Underlay Canvas):** Ground `#f9f9fb` etched with 1px `#ebebeb` dot matrix or millimeter rule pattern.
 - **Level 1 (Structural Panes & Cards):** Flat `#ffffff` surfaces bounded by crisp `1px solid #ebebeb` borders.
-- **Level 2 (Active / Focused Nodes):** Flat `#ffffff` surface with a high-contrast `1px solid #000000` perimeter boundary or corresponding semantic edge (`#0051c3`, `#de5052`, `#521010`, `#2d7a4c`).
+- **Level 2 (Active / Focused Nodes):** Flat `#ffffff` surface with a high-contrast `1px solid #000000` perimeter boundary or corresponding semantic edge (`#0051c3`, `#de5052`, `#521010`, `#2d7a4c`, `#5b3fa0` / `--framing`).
 - **Level 3 (Modals & Command Overlays):** `#ffffff` solid container encased in `2px solid #000000` with an opaque, unblurred structural backdrop mask of `rgba(0, 0, 0, 0.4)`.
 
 ## Shapes
@@ -206,7 +206,7 @@ Components follow desktop-first information density, featuring sharp hairline fr
 - Minimalist architectural box: `#ffffff` surface, `1px solid #ebebeb` default border, `2px` radius. Focus transition (`150ms`) upgrades border to `1px solid #000000` without glow rings. Placeholder copy rendered in `#595959`.
 
 ### Chips & Semantic Tags
-- Monospace micro-pills (`label-sm`), strictly rectangular with `2px` radius, `2px 6px` padding. Bordered in `1px solid #ebebeb`. Active node filters adopt respective semantic colors (`#0051c3`, `#2d7a4c`, `#de5052`, `#521010`) for borders and typography.
+- Monospace micro-pills (`label-sm`), strictly rectangular with `2px` radius, `2px 6px` padding. Bordered in `1px solid #ebebeb`. Active node filters adopt respective semantic colors (`#0051c3`, `#2d7a4c`, `#de5052`, `#521010`, `#5b3fa0` / `--framing`) for borders and typography.
 
 ### Checkboxes & Radios
 - Hard geometric boxes (`0px` or `2px` radius) sized precisely at `14px × 14px`. Unchecked: `1px solid #404040`. Checked: `#000000` fill with sharp, unrounded white hairline glyphs.

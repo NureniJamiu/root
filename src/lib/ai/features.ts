@@ -21,6 +21,7 @@ import {
   researchPlanSchema,
   reviewOutputSchema,
   scriptOutputSchema,
+  suggestedTypeSchema,
   tidyOutputSchema,
 } from './contracts';
 import type {
@@ -451,7 +452,7 @@ export async function suggestTidy(
     model,
     output: Output.object({ schema: tidyOutputSchema }),
     system: `You help keep a research canvas tidy. Suggest only clear improvements, at most ${TIDY_SUGGESTIONS_MAX}, most useful first:
-- retype: an idea whose type is clearly wrong (for example a question typed as a finding). Give the better type.
+- retype: an idea whose type is clearly wrong (for example a question typed as a finding). Give the better type. Only retype ideas typed topic, finding, question or conclusion; leave every other type as it is.
 - retitle: an idea with no title or a vague one, where its notes say what it is about. Give a better title (under 12 words).
 - connect: two related ideas that are not connected yet. ref is the idea it leads from, to the idea it leads to.
 For every suggestion give a one-sentence reason. Leave type, title and to null when they do not apply.
@@ -470,7 +471,14 @@ ${TYPES_GUIDE}`,
     const node = idOf.get(s.ref.trim());
     if (!node) continue;
     const reason = s.reason.trim();
-    if (s.kind === 'retype' && s.type && s.type !== node.type && !seen.has(`type:${node.id}`)) {
+    if (
+      s.kind === 'retype' &&
+      s.type &&
+      s.type !== node.type &&
+      // Until AI suggestions cover the other families (S7), never move a card off its type.
+      suggestedTypeSchema.safeParse(node.type).success &&
+      !seen.has(`type:${node.id}`)
+    ) {
       seen.add(`type:${node.id}`);
       out.push({ kind: 'retype', ideaId: node.id, type: s.type, reason });
     } else if (s.kind === 'retitle' && !seen.has(`title:${node.id}`)) {
