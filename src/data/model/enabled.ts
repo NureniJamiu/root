@@ -3,11 +3,11 @@
  *
  * The registry and the validity map define the full M0 vocabulary, but the
  * canvas schema only accepts what is listed here, so a node or edge cannot use
- * a type or relation the interface does not show yet. The other relations
- * arrive with the relation picker (plan slice S5); each is enabled by adding
- * its id below.
+ * a type or relation the interface does not show yet. Since the relation
+ * picker (plan slice S5) every relation in the validity map is enabled.
  */
 import { NODE_FAMILIES, NODE_TYPES } from './nodeTypes';
+import { RELATION_IDS } from './relations';
 import type { NodeFamilyId, NodeTypeId } from './nodeTypes';
 import type { RelationId } from './relations';
 
@@ -27,8 +27,8 @@ export const ENABLED_NODE_TYPE_IDS = [
   'variable',
 ] as const satisfies readonly [NodeTypeId, ...NodeTypeId[]];
 
-/** Relations an edge may carry. */
-export const ENABLED_RELATION_IDS = ['related-to'] as const satisfies readonly [RelationId, ...RelationId[]];
+/** Relations an edge may carry: the whole validity map, in map order. */
+export const ENABLED_RELATION_IDS: readonly [RelationId, ...RelationId[]] = RELATION_IDS;
 
 export type EnabledNodeTypeId = (typeof ENABLED_NODE_TYPE_IDS)[number];
 export type EnabledRelationId = (typeof ENABLED_RELATION_IDS)[number];

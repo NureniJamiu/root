@@ -129,6 +129,38 @@ describe('NodeInspectorRail shows real data', () => {
     expect(useCanvasStore.getState().canvas.edges.some((e) => e.id === edge.id)).toBe(false);
   });
 
+  it('the connector panel picks a relation from those that fit its two cards, read from the first card', () => {
+    const { canvas, ids } = build();
+    show(canvas, null);
+    const edge = canvas.edges.find((e) => e.source === ids[1] && e.target === ids[3])!; // finding → conclusion
+    canvasActions.selectEdge(edge.id);
+    render(<NodeInspectorRail />);
+    const picker = screen.getByTestId('connector-relation') as HTMLSelectElement;
+    expect([...picker.options].map((o) => o.textContent)).toEqual(['related to', 'supports', 'contradicts']);
+    fireEvent.change(picker, { target: { value: 'supports' } });
+    expect(useCanvasStore.getState().canvas.edges.find((e) => e.id === edge.id)!.relationType).toBe('supports');
+    expect(screen.queryByTestId('connector-relation-invalid')).toBeNull();
+  });
+
+  it('a relation that no longer fits its cards stays, flagged, until the person picks another', () => {
+    const { canvas, ids } = build();
+    const edge = canvas.edges.find((e) => e.source === ids[1] && e.target === ids[3])!;
+    const typed = {
+      ...canvas,
+      nodes: canvas.nodes.map((n) => (n.id === ids[3] ? { ...n, type: 'topic' as const } : n)),
+      edges: canvas.edges.map((e) => (e.id === edge.id ? { ...e, relationType: 'supports' as const } : e)),
+    };
+    show(typed, null);
+    canvasActions.selectEdge(edge.id);
+    render(<NodeInspectorRail />);
+    const picker = screen.getByTestId('connector-relation') as HTMLSelectElement;
+    expect(picker.value).toBe('supports');
+    expect([...picker.options].map((o) => o.value)).toEqual(['supports', 'related-to']);
+    expect(screen.getByTestId('connector-relation-invalid')).toHaveTextContent('Finding → Topic');
+    fireEvent.change(picker, { target: { value: 'related-to' } });
+    expect(screen.queryByTestId('connector-relation-invalid')).toBeNull();
+  });
+
   it('while dragging there is no disabled "Repositioning" button or spinner', () => {
     const { canvas, ids } = build();
     show(canvas, ids[1]!);

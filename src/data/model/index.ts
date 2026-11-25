@@ -18,11 +18,13 @@ export {
   FALLBACK_RELATION,
   RELATION_IDS,
   RELATIONS,
+  allowedRelations,
   defaultRelation,
   isRelationAllowed,
   orient,
   relationDirection,
   relationIdSchema,
+  relationLabel,
 } from './relations';
 export type {
   OrientableEdge,

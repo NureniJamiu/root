@@ -57,12 +57,13 @@ import {
   hideChild as mutHideChild,
   setCanvasTitle as mutSetCanvasTitle,
   setCollapsed as mutSetCollapsed,
+  setEdgeRelation as mutSetEdgeRelation,
   updateEdge as mutUpdateEdge,
   updateNode as mutUpdateNode,
 } from './mutators';
 import type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators';
 import { fieldsForType, sameFields } from './model';
-import type { Provenance } from './model';
+import type { Provenance, RelationId } from './model';
 import { emitSaveError } from './storeEvents';
 import { computeFacingSides, subtreeIds } from './graph';
 import { NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
@@ -629,6 +630,15 @@ export const canvasActions = {
     commitCanvasWrite(
       'autoRouteEdge',
       (s) => mutAutoRouteEdge(s.canvas, edgeId),
+      () => ({}),
+    );
+  },
+
+  /** Set what a connector means; one undo step. */
+  setEdgeRelation(edgeId: UUID, relationType: RelationId): void {
+    commitCanvasWrite(
+      'setEdgeRelation',
+      (s) => mutSetEdgeRelation(s.canvas, edgeId, relationType),
       () => ({}),
     );
   },

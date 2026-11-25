@@ -36,7 +36,7 @@ import {
   type NodePatch,
 } from '../mutators';
 import type { AiFeature } from '../../lib/ai/plans';
-import { INTAKE_ANSWERS, STAGE_IDS } from '../model';
+import { INTAKE_ANSWERS, RELATION_IDS, STAGE_IDS } from '../model';
 import type { Provenance, Workspace } from '../model';
 import type {
   Canvas,
@@ -425,7 +425,11 @@ const arbNodeExtras = fc.record({
   text: fc.option(fc.string({ maxLength: 60 }), { nil: undefined }),
 });
 
-const arbEdgeExtras = fc.record({ hidden: fc.boolean(), provenance: arbProvenance });
+const arbEdgeExtras = fc.record({
+  hidden: fc.boolean(),
+  provenance: arbProvenance,
+  relationType: fc.constantFrom(...RELATION_IDS),
+});
 
 /**
  * A canvas from `arbCanvas` that also uses every field the mutators never
@@ -457,7 +461,12 @@ export const arbRichCanvas: fc.Arbitrary<Canvas> = arbCanvas.chain((c) =>
       }),
       edges: c.edges.map((e, i) => {
         const extra = edges[i]!;
-        return { ...e, provenance: extra.provenance, ...(extra.hidden ? { hidden: true } : {}) };
+        return {
+          ...e,
+          provenance: extra.provenance,
+          relationType: extra.relationType,
+          ...(extra.hidden ? { hidden: true } : {}),
+        };
       }),
     })),
 );

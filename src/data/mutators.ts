@@ -14,8 +14,8 @@
 
 import { newId } from './ids';
 import { IMAGE_CAPTION_MAX, IMAGE_DATA_URL_MAX_BYTES, IMAGE_TEXT_MAX } from './limits';
-import { FALLBACK_RELATION, fieldsForType, markEdited, researcherProvenance } from './model';
-import type { Provenance } from './model';
+import { FALLBACK_RELATION, defaultRelation, fieldsForType, markEdited, researcherProvenance } from './model';
+import type { Provenance, RelationId } from './model';
 import { CANVAS_SCHEMA_VERSION } from './schema';
 import { cleanSource } from './source';
 import { now } from './time';
@@ -606,10 +606,13 @@ function rejectEnds(c: Canvas, ends: ConnectorEnds, ignoreId?: UUID): string | n
  * Add a connector. Rejected (returns `c`) for a connector from a node to
  * itself, an unknown node, or a connector that repeats an existing one. Two
  * cards may share any number of connectors as long as they attach to
- * different sides.
+ * different sides. The connector starts with the validity map's default
+ * relation for the two card types (`related-to` when the pair has none).
  */
 export function connect(c: Canvas, ends: ConnectorEnds): Canvas {
-  if (rejectEnds(c, ends) !== null) return c;
+  const from = c.nodes.find((n) => n.id === ends.source);
+  const to = c.nodes.find((n) => n.id === ends.target);
+  if (from === undefined || to === undefined || rejectEnds(c, ends) !== null) return c;
   const edge: Edge = {
     id: newId(),
     source: ends.source,
@@ -618,7 +621,7 @@ export function connect(c: Canvas, ends: ConnectorEnds): Canvas {
     targetSide: ends.targetSide,
     sourcePinned: ends.sourcePinned ?? false,
     targetPinned: ends.targetPinned ?? false,
-    relationType: FALLBACK_RELATION,
+    relationType: defaultRelation(from.type, to.type),
     provenance: researcherProvenance(),
   };
   return { ...c, edges: [...c.edges, edge], updatedAt: now() };
@@ -674,6 +677,18 @@ export function autoRouteEdge(c: Canvas, edgeId: UUID): Canvas {
   if (!from || !to) return c;
   const sides = computeFacingSides(from.position, to.position);
   return updateEdge(c, edgeId, { ...edge, ...sides, sourcePinned: false, targetPinned: false });
+}
+
+/**
+ * Set what a connector means. Any known relation is accepted, even one the
+ * map does not allow for the two cards: validity is a rule, not a guard.
+ * Unknown `edgeId` or an unchanged relation returns `c`.
+ */
+export function setEdgeRelation(c: Canvas, edgeId: UUID, relationType: RelationId): Canvas {
+  const current = c.edges.find((e) => e.id === edgeId);
+  if (current === undefined || current.relationType === relationType) return c;
+  const next: Edge = { ...current, relationType, provenance: markEdited(current.provenance) };
+  return { ...c, edges: c.edges.map((e) => (e.id === edgeId ? next : e)), updatedAt: now() };
 }
 
 /** Remove one connector. Both cards stay. Unknown `edgeId` returns `c` unchanged. */

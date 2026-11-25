@@ -70,7 +70,7 @@ Rules run over a `GraphView` and return `Issue`s carrying `ruleId` and `ruleVers
 
 ## What the app exposes today (`enabled.ts`)
 
-The canvas schema accepts only the node types and relations listed in `enabled.ts`, so nothing can be saved that the interface cannot show. Today that is every M0 node type (the general and problem-framing families, enabled with the grouped type picker in slice S4) and `related-to`. The other relations are enabled with the relation picker (S5).
+The canvas schema accepts only the node types and relations listed in `enabled.ts`, so nothing can be saved that the interface cannot show. Today that is every M0 node type (the general and problem-framing families, enabled with the grouped type picker in slice S4) and every relation in the map (enabled with the relation picker in S5).
 
 Retyping a card keeps the fields the new type also defines (with a value it accepts) and drops the rest (`fieldsForType`). The hover toolbar's type button cycles within the card's family; changing family goes through the editor's type picker.
 

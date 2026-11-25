@@ -92,6 +92,7 @@ export {
   hideChild,
   setCanvasTitle,
   setCollapsed,
+  setEdgeRelation,
   updateEdge,
   updateNode,
 } from './mutators';

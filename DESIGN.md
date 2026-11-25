@@ -202,6 +202,11 @@ Components follow desktop-first information density, featuring sharp hairline fr
 - **Conclusion Node:** Bordered in rich `#521010` oxblood; headline text styled in italicized transitional serif.
 - **Problem-Framing Nodes:** Border, top accent bar and type label in `#5b3fa0` violet (`--framing`). The label names the exact type in uppercase mono, since the family shares one colour.
 
+### Connectors
+- **Untyped (`related to`):** A 2px bezier in the colour of the card it leaves, dashed (`5 4`) when it leads to a Question. Its label shows only on hover or selection, so a canvas without typed connectors reads as before.
+- **Typed:** Coloured by relation and always labelled at the midpoint with a mono micro-pill (`label-sm`, uppercase, `2px` radius, `1px` border and text in the connector colour) that reads from the card it leaves ("SUPPORTED BY" when drawn from a conclusion to a finding). Framing relations (addresses, refines, involves) use `#5b3fa0` / `--framing`; evidence relations (answers, supports) use `#2d7a4c`; contradicts uses `#de5052`.
+- **Invalid relation:** A relation the validity map does not allow for its two cards is drawn dashed in the warning colour (`#ba1a1a` / `--danger`), with a dashed label border and a warning mark. It is flagged, never removed.
+
 ### Text Input & Filter Fields
 - Minimalist architectural box: `#ffffff` surface, `1px solid #ebebeb` default border, `2px` radius. Focus transition (`150ms`) upgrades border to `1px solid #000000` without glow rings. Placeholder copy rendered in `#595959`.
 

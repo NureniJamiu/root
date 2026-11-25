@@ -1,14 +1,17 @@
 import { useMemo } from 'react';
 import {
+  allowedRelations,
   canvasActions,
+  isRelationAllowed,
   issuesByNode,
   nodeLabel,
   nodeOrdinals,
   nodeTypeLabel,
+  relationLabel,
   useCanvasStore,
   useDocLinksStore,
 } from '../data';
-import type { Edge, Issue, Node, RuleId, Side, Source, UUID } from '../data';
+import type { Edge, Issue, Node, RelationType, RuleId, Side, Source, UUID } from '../data';
 import type { DragState } from '../canvas';
 import type { SaveStatus } from '../lib/save-queue';
 import { formatReference } from '../lib/citation';
@@ -79,7 +82,46 @@ function SectionLabel({ children }: { readonly children: string }): JSX.Element 
 
 const SIDE_OPTIONS: readonly Side[] = ['top', 'right', 'bottom', 'left'];
 
-/** Details of the selected connector: its two cards, the sides it attaches to, and a remove button. */
+/**
+ * What the selected connector means. Lists the relations the validity map
+ * allows for its two cards, read from the first card to the second, plus the
+ * current relation when it does not fit (it stays until the person changes it).
+ */
+function RelationPicker({ edge, from, to }: { readonly edge: Edge; readonly from: Node; readonly to: Node }): JSX.Element {
+  const fits = isRelationAllowed(edge.relationType, from.type, to.type);
+  const options: RelationType[] = allowedRelations(from.type, to.type);
+  if (!fits) options.unshift(edge.relationType);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="flex items-center justify-between gap-2">
+        <span className="text-muted text-[8.5px] uppercase">Relation</span>
+        <select
+          value={edge.relationType}
+          onChange={(e) => canvasActions.setEdgeRelation(edge.id, e.target.value as RelationType)}
+          className="font-mono text-[9px] bg-panel border border-rule rounded-[2px] px-1 py-0.5 text-ink focus:outline-none focus:border-topic cursor-pointer"
+          data-testid="connector-relation"
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {relationLabel(option, from.type, to.type)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {!fits && (
+        <p
+          className="m-0 border border-dashed border-danger/40 bg-danger-soft rounded-[2px] px-2 py-1.5 text-danger text-[9px] leading-[13px]"
+          data-testid="connector-relation-invalid"
+        >
+          “{relationLabel(edge.relationType, from.type, to.type)}” does not fit these card types ({nodeTypeLabel(from.type)} →{' '}
+          {nodeTypeLabel(to.type)}). Pick a relation that does.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Details of the selected connector: its two cards, its relation, the sides it attaches to, and a remove button. */
 function ConnectorPanel({
   edge,
   byId,
@@ -139,6 +181,7 @@ function ConnectorPanel({
       <div className="border border-rule bg-paper rounded-[2px] p-2.5 flex flex-col gap-2.5 font-mono text-[9.5px]">
         {row('From', from, edge.sourceSide, 'sourceSide', edge.sourcePinned)}
         {row('To', to, edge.targetSide, 'targetSide', edge.targetPinned)}
+        {from && to && <RelationPicker edge={edge} from={from} to={to} />}
       </div>
       <p className="font-serif text-[12px] leading-[18px] text-ink-3 m-0">
         With the connector selected, drag either end to attach it to another card or side. A side you pick stays pinned when the card moves; double-click the connector, or use Auto-route, to let it follow the facing sides again.

@@ -17,15 +17,27 @@
  *     the connector's own id, and its handles name the sides it is attached
  *     to (`source-right`, `target-top`, ...). Pinned ends use their stored
  *     side; automatic ends use the side that faces the other card.
+ *   - Each edge carries its relation's look (`connectorLook`): the label read
+ *     from source to target, the colour, and whether it is dashed or
+ *     invalid. A `related-to` connector looks exactly as connectors did
+ *     before relations: the source card's colour, dashed into a question,
+ *     and a label only while it is hovered or selected.
  */
 
 import { useMemo } from 'react';
 import type { Edge as RFEdge, Node as RFNode } from 'reactflow';
 
-import { resolveEdgeSides, useCanvasStore } from '../data';
-import type { Canvas, Position, UUID } from '../data';
+import { FALLBACK_RELATION, isRelationAllowed, relationLabel, resolveEdgeSides, useCanvasStore } from '../data';
+import type { Canvas, Edge, Node, Position, UUID } from '../data';
 
-import { CONNECTOR_EDGE_TYPE, EDGE_COLOR_BY_TYPE, EDGE_INTERACTION_WIDTH } from './edgeStyles';
+import {
+  CONNECTOR_EDGE_TYPE,
+  EDGE_COLOR_BY_RELATION,
+  EDGE_COLOR_BY_TYPE,
+  EDGE_INTERACTION_WIDTH,
+  EDGE_INVALID_COLOR,
+  EDGE_STROKE_COLOR,
+} from './edgeStyles';
 import type { ConnectorEdgeData } from './ConnectorEdge';
 import { sourceHandleId, targetHandleId } from './reconnect';
 import { shownNodeIds, useWalkthroughStore } from './walkthrough';
@@ -48,6 +60,29 @@ export interface DeriveGraphOptions {
 export interface ReactFlowGraph {
   readonly nodes: RFNode<ResearchNodeData>[];
   readonly edges: RFEdge<ConnectorEdgeData>[];
+}
+
+/**
+ * How a connector is drawn, from its relation and the types of its two cards.
+ * A missing card (never the case on a parsed canvas) draws a neutral line.
+ */
+export function connectorLook(
+  edge: Pick<Edge, 'relationType'>,
+  from: Pick<Node, 'type'> | undefined,
+  to: Pick<Node, 'type'> | undefined,
+): Omit<ConnectorEdgeData, 'opacity'> {
+  const relation = edge.relationType;
+  if (!from || !to) {
+    return { relation, color: EDGE_STROKE_COLOR, dashed: false, label: '', quiet: true, invalid: false };
+  }
+  const label = relationLabel(relation, from.type, to.type);
+  if (relation === FALLBACK_RELATION) {
+    return { relation, color: EDGE_COLOR_BY_TYPE[from.type], dashed: to.type === 'question', label, quiet: true, invalid: false };
+  }
+  if (!isRelationAllowed(relation, from.type, to.type)) {
+    return { relation, color: EDGE_INVALID_COLOR, dashed: true, label, quiet: false, invalid: true };
+  }
+  return { relation, color: EDGE_COLOR_BY_RELATION[relation], dashed: false, label, quiet: false, invalid: false };
 }
 
 /**
@@ -90,10 +125,7 @@ export function deriveReactFlowGraph(
       targetHandle: targetHandleId(sides.targetSide),
       type: CONNECTOR_EDGE_TYPE,
       selected: options?.selectedEdgeId === edge.id,
-      data: {
-        color: from ? EDGE_COLOR_BY_TYPE[from.type] : 'rgb(var(--muted))',
-        dashed: to?.type === 'question',
-      },
+      data: connectorLook(edge, from, to),
       reconnectable: true,
       interactionWidth: EDGE_INTERACTION_WIDTH,
     });
