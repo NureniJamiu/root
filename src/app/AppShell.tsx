@@ -46,11 +46,15 @@ import {
   aiProposalActions,
   canvasActions,
   incomingIndex,
+  stageTypes,
   useAiProposalStore,
   useCanvasStore,
   visibleNodeIds,
 } from '../data';
-import type { NodeType, Position, Source, UUID } from '../data';
+import type { IntakeAnswer, NodeType, Position, Source, StageId, UUID } from '../data';
+import { IntakeDialog } from './IntakeDialog';
+import type { IntakeResult } from './IntakeDialog';
+import { StagePanel } from './StagePanel';
 import { DocumentEditorContext } from '../editor/context';
 import type { DocumentEditorServices } from '../editor/context';
 import { insertIdeaIntoDocument, revealBlockInDocument, revealIdeaInDocument } from '../editor/bridge';
@@ -202,6 +206,15 @@ function revealOnCanvas(id: UUID): void {
   }
 }
 
+/** The stage the workspace opens on after each intake answer (D10 table). */
+const INTAKE_FOCUS: Record<IntakeAnswer, StageId> = {
+  'no-topic': 'topic',
+  'has-topic': 'problem',
+  'objectives-drafted': 'problem',
+  'collected-data': 'data',
+  'writing-up': 'documentation',
+};
+
 export function AppShell(): JSX.Element {
   const canvas = useCanvasStore((s) => s.canvas);
   const openNodeId = useCanvasStore((s) => s.editor.openNodeId);
@@ -305,6 +318,25 @@ export function AppShell(): JSX.Element {
   );
 
   /** Where a new idea goes: below `parentId` when it is on the canvas, else free space mid-view. */
+  /* ------------------------ intake and stages (D10) ---------------------- */
+
+  /** The project the intake is open for; it only shows while that project is open. */
+  const [intake, setIntake] = useState<{ readonly projectId: string; readonly rerun: boolean } | null>(null);
+  const handleNewProject = useCallback(async () => {
+    const id = await createProject();
+    if (id) setIntake({ projectId: id, rerun: false });
+  }, [createProject]);
+  const handleSetStartingPoint = useCallback((id: string) => {
+    if (id === activeProjectId) setIntake({ projectId: id, rerun: true });
+  }, [activeProjectId]);
+  const focusStage: StageId | null = canvas.workspace?.focusStage ?? null;
+  // A stage with no card types yet (framework, writing) dims nothing.
+  const focusTypes = useMemo(() => {
+    if (focusStage === null) return null;
+    const types = stageTypes(focusStage);
+    return types.size > 0 ? (types as ReadonlySet<NodeType>) : null;
+  }, [focusStage]);
+
   const placeNewIdea = useCallback((parentId: UUID | null): { position: Position; parentId: UUID | null } => {
     const { canvas: current } = useCanvasStore.getState();
     if (parentId !== null && current.nodes.some((n) => n.id === parentId)) {
@@ -483,6 +515,30 @@ export function AppShell(): JSX.Element {
       }
     },
     [describingImages],
+  );
+
+  /** Record the answer, open its stage, and seed what it asks for (never more). */
+  const handleIntakeComplete = useCallback(
+    (result: IntakeResult) => {
+      setIntake(null);
+      canvasActions.setWorkspace({
+        intake: { answer: result.answer, answeredAt: new Date().toISOString() },
+        focusStage: INTAKE_FOCUS[result.answer],
+      });
+      if (result.answer === 'has-topic' && result.text) {
+        const place = placeNewIdea(null);
+        canvasActions.createIdea({ position: place.position, title: result.text, type: 'topic' });
+      } else if (result.answer === 'objectives-drafted' && result.text && aiEnabled && captureAllowed) {
+        // Suggested cards only: nothing is added until the person keeps them.
+        const center = canvasControlsRef.current?.getViewportCenter() ?? { x: 400, y: 300 };
+        void aiActions.captureFromText(result.text, center);
+      }
+    },
+    [placeNewIdea, aiEnabled, captureAllowed],
+  );
+  const handleAddOfType = useCallback(
+    (type: NodeType) => canvasActions.addNode(placeNewIdea(null).position, type),
+    [placeNewIdea],
   );
 
   const handleMapTopic = useCallback((topic: string) => {
@@ -713,8 +769,9 @@ export function AppShell(): JSX.Element {
             projects={projects}
             activeProjectId={activeProjectId}
             onSelectProject={selectProject}
-            onNewProject={createProject}
+            onNewProject={() => void handleNewProject()}
             onDeleteProject={deleteProject}
+            onSetStartingPoint={isReady ? handleSetStartingPoint : undefined}
             onNavigateHome={() => navigateTo('/')}
             user={auth?.user ?? null}
             onSignOut={handleSignOut}
@@ -795,8 +852,20 @@ export function AppShell(): JSX.Element {
                 isPanActive={isPanActive}
                 onTogglePan={() => setIsPanActive((prev) => !prev)}
                 highlightType={activeTypeFilter}
+                focusTypes={focusTypes}
                 onAiCancel={aiActions.cancel}
               />
+
+              {isReady && canvas.workspace?.intake && (
+                <StagePanel
+                  focus={focusStage}
+                  onFocus={(stage) => canvasActions.setWorkspace({ focusStage: stage ?? undefined })}
+                  onAdd={handleAddOfType}
+                  onShow={focusIdea}
+                  onWrite={() => setViewMode('split')}
+                  onRerunIntake={() => handleSetStartingPoint(activeProjectId)}
+                />
+              )}
 
               {isReady && aiEnabled && canvas.nodes.length === 0 && !aiBusy && (
                 <StartFromTopic onMapTopic={handleMapTopic} />
@@ -924,6 +993,16 @@ export function AppShell(): JSX.Element {
         )}
 
         {isAiSettingsOpen && <AiSettingsDialog onClose={() => setAiSettingsOpen(false)} />}
+
+        {intake !== null && intake.projectId === activeProjectId && isReady && (
+          <IntakeDialog
+            key={`${intake.projectId}:${intake.rerun}`}
+            rerun={intake.rerun}
+            aiAvailable={aiEnabled && captureAllowed}
+            onComplete={handleIntakeComplete}
+            onSkip={() => setIntake(null)}
+          />
+        )}
 
         {/* Toast surface — subscribes to error buses and renders toasts. */}
         <ToastSurface />

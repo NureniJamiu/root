@@ -158,5 +158,7 @@ export { docLinksActions, useDocLinksStore } from './docLinks';
 export type { DocLinksState } from './docLinks';
 
 export * from './model';
+export { stageStates, stageTypes } from './stageStates';
+export type { StageProgress, StageState } from './stageStates';
 export { emitSaveError, onSaveError } from './storeEvents';
 export type { SaveErrorDetail } from './storeEvents';

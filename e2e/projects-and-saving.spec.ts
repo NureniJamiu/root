@@ -38,6 +38,8 @@ test('switching projects keeps each canvas in its own project', async ({ dashboa
   await waitForSaved(page);
 
   await page.getByTestId('btn-new-project').click();
+  // A new project asks where the researcher is; skipping gives a blank canvas.
+  await page.getByTestId('intake-skip').click();
   await expect(page.locator('[data-testid^="node-card-"]')).toHaveCount(0);
   await expect(page.getByTestId('empty-canvas-affordance')).toHaveCount(0);
 
@@ -60,7 +62,11 @@ test('switching projects keeps each canvas in its own project', async ({ dashboa
 
 test('new projects get unused names, and a deleted project stays deleted', async ({ dashboard: page }) => {
   await page.getByTestId('btn-new-project').click();
+  // A new project asks where the researcher is; skipping gives a blank canvas.
+  await page.getByTestId('intake-skip').click();
   await page.getByTestId('btn-new-project').click();
+  // A new project asks where the researcher is; skipping gives a blank canvas.
+  await page.getByTestId('intake-skip').click();
   await expect.poll(async () => (await listProjects(page)).length).toBe(3);
 
   const names = (await listProjects(page)).map((p) => p.title);
@@ -77,6 +83,8 @@ test('new projects get unused names, and a deleted project stays deleted', async
   await expect(page.getByTestId(`project-item-${victim.id}`)).toHaveCount(0);
 
   await page.getByTestId('btn-new-project').click();
+  // A new project asks where the researcher is; skipping gives a blank canvas.
+  await page.getByTestId('intake-skip').click();
   await expect.poll(async () => (await listProjects(page)).map((p) => p.title)).toContain('Project 2');
 });
 

@@ -56,6 +56,7 @@ import {
   revealChild as mutRevealChild,
   hideChild as mutHideChild,
   setCanvasTitle as mutSetCanvasTitle,
+  setWorkspace as mutSetWorkspace,
   setCollapsed as mutSetCollapsed,
   setEdgeRelation as mutSetEdgeRelation,
   updateEdge as mutUpdateEdge,
@@ -63,7 +64,7 @@ import {
 } from './mutators';
 import type { ConnectorEnds, ImageDescriptionPatch, NodePatch } from './mutators';
 import { FALLBACK_RELATION, fieldsForType, sameFields } from './model';
-import type { Provenance, RelationId } from './model';
+import type { Provenance, RelationId, Workspace } from './model';
 import { emitSaveError } from './storeEvents';
 import { computeFacingSides, subtreeIds } from './graph';
 import { NODE_BODY_MAX, NODE_TITLE_MAX } from './limits';
@@ -190,6 +191,13 @@ function recordHistory(before: Canvas, coalesceKey: string | null): void {
   if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
 }
 
+/** `snapshot` with `current`'s workspace: undo history never moves the workspace. */
+function withWorkspaceOf(snapshot: Canvas, current: Canvas): Canvas {
+  if (snapshot.workspace === current.workspace) return snapshot;
+  const { workspace: _old, ...rest } = snapshot;
+  return current.workspace === undefined ? rest : { ...rest, workspace: current.workspace };
+}
+
 function clearHistory(): void {
   undoStack = [];
   redoStack = [];
@@ -307,11 +315,12 @@ export const canvasActions = {
   /**
    * Add a new, unconnected idea at `position` and open its editor (the
    * editor's autoFocus then focuses the title field). Works on any canvas.
+   * `type` starts the idea as that type (a topic otherwise).
    */
-  addNode(position: Position): void {
+  addNode(position: Position, type?: NodeType): void {
     commitCanvasWrite(
       'addNode',
-      (s) => mutAddNode(s.canvas, { position }),
+      (s) => mutAddNode(s.canvas, { position, ...(type ? { type } : {}) }),
       (parsed, s) => {
         const newId = findNewNodeId(s.canvas, parsed);
         return newId === null ? {} : { editor: { openNodeId: newId, isNew: true } };
@@ -775,6 +784,23 @@ export const canvasActions = {
   },
 
   /**
+   * Record workspace state (the intake answer, the stage in focus). Saved
+   * with the canvas but kept out of undo history: undo and redo never move
+   * the workspace, they carry the current one into the canvas they restore.
+   */
+  setWorkspace(patch: { readonly [K in keyof Workspace]?: Workspace[K] | undefined }): void {
+    const state = useCanvasStore.getState();
+    const next = mutSetWorkspace(state.canvas, patch);
+    if (next === state.canvas) return;
+    const parsed = canvasSchema.safeParse(next);
+    if (!parsed.success) {
+      emitSaveError({ action: 'setWorkspace', message: formatZodMessage(parsed.error.issues) });
+      return;
+    }
+    useCanvasStore.setState({ canvas: parsed.data });
+  },
+
+  /**
    * Swap in a canvas that was loaded from the server (project open/switch).
    * Resets selection, open dialogs and undo history: they belong to the
    * previous project.
@@ -796,7 +822,8 @@ export const canvasActions = {
     const state = useCanvasStore.getState();
     redoStack.push(state.canvas);
     lastCoalesceKey = null;
-    useCanvasStore.setState({ canvas: previous, ...uiForCanvas(previous, state) });
+    const restored = withWorkspaceOf(previous, state.canvas);
+    useCanvasStore.setState({ canvas: restored, ...uiForCanvas(restored, state) });
   },
 
   /** Re-apply an edit that was undone. */
@@ -806,7 +833,8 @@ export const canvasActions = {
     const state = useCanvasStore.getState();
     undoStack.push(state.canvas);
     lastCoalesceKey = null;
-    useCanvasStore.setState({ canvas: next, ...uiForCanvas(next, state) });
+    const restored = withWorkspaceOf(next, state.canvas);
+    useCanvasStore.setState({ canvas: restored, ...uiForCanvas(restored, state) });
   },
 
   /**

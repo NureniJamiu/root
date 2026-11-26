@@ -88,6 +88,12 @@ A suggestion may carry the relation of its connector to its parent. The clean-up
 
 `canvas.workspace` is optional: `{ intake?: { answer, answeredAt }, focusStage? }`. The intake answers are `no-topic`, `has-topic`, `objectives-drafted`, `collected-data` and `writing-up`, one per row of the D10 intake table.
 
+It is written with `canvasActions.setWorkspace`, saved with the canvas and kept out of undo history: undo and redo carry the current workspace into the canvas they restore.
+
+The intake (`src/app/IntakeDialog.tsx`) opens for a project made with New Project and from the starting-point button on the open project in the sidebar; projects that exist already are never prompted. Each answer sets the focus stage (no topic → topic; topic or objectives → problem; data → data; writing up → documentation) and seeds only what it asks for: a topic card, or AI-suggested cards from pasted objectives that wait for an accept. Skipping records nothing.
+
+Once a project has an intake answer, the stage panel (`src/app/StagePanel.tsx`) lists the eight stages with their derived state (`../stageStates.ts`) and issue counts. Focusing a stage dims the cards whose types are outside it; "All stages" shows the whole canvas. Its next steps (`src/app/nextSteps.ts`) are deterministic: rule issues first, then the cards a stage starts with that the project lacks.
+
 ## Canvas schema v2
 
 `canvasSchema` (in `../schema.ts`) is version 2: `schemaVersion: 2`, node `fields` and `provenance`, edge `relationType` and `provenance`, and the optional `workspace`. `migrateCanvas` brings older canvases up on parse: legacy `parentId` → v1 → v2, where every v1 node gets `fields: {}` and `unrecorded` provenance and every v1 edge gets `related-to` and `unrecorded`. The server refuses (409 `stale-schema`) a save whose canvas is older than the one stored.
